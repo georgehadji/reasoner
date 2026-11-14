@@ -1,5 +1,6 @@
 'use client';
 
+import { AuthShell } from '@/components/auth/AuthShell';
 import { useState, Suspense } from 'react';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { useRouter } from 'next/navigation';
@@ -154,9 +155,7 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <main id="main-content" className="flex min-h-dvh items-center justify-center px-[var(--gutter)] py-[var(--space-12)]">
-      <div className="flex w-full max-w-[var(--width-form)] flex-col gap-[var(--space-5)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-[var(--space-8)] shadow-[var(--shadow)]">
-        <h1 className="font-display text-[length:var(--text-2xl)] font-bold text-[var(--text)]">Update Password</h1>
+    <AuthShell lines={['Choose a new', 'password.']} lead="Pick one you do not use anywhere else, then sign in with it on the next screen.">
         <Suspense
           fallback={
             <div
@@ -168,7 +167,6 @@ export default function ResetPasswordPage() {
         >
           <ResetPasswordForm />
         </Suspense>
-      </div>
-    </main>
+    </AuthShell>
   );
 }

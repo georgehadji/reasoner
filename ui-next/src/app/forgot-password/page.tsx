@@ -1,5 +1,6 @@
 'use client';
 
+import { AuthShell } from '@/components/auth/AuthShell';
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Check } from 'lucide-react';
 import { Button } from '@/components/ui';
@@ -71,10 +72,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <main id="main-content" className="flex min-h-dvh items-center justify-center px-[var(--gutter)] py-[var(--space-12)]">
-      <div className="flex w-full max-w-[var(--width-form)] flex-col gap-[var(--space-5)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-[var(--space-8)] shadow-[var(--shadow)]">
-        <h1 className="font-display text-[length:var(--text-2xl)] font-bold text-[var(--text)]">Reset Password</h1>
-
+    <AuthShell lines={['Forgot your', 'password?']} lead="Enter the email on your account and we send it a link to choose a new password.">
         {sent ? (
           <>
             {/* Success. Tick + sentence carry it; the surface tint is decoration,
@@ -88,8 +86,8 @@ export default function ForgotPasswordPage() {
               <Check aria-hidden="true" className="mt-px size-[var(--space-4)] shrink-0 text-[var(--text)]" />
               <span>Check your email for a reset link.</span>
             </p>
-            <p className="text-center text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-muted)]">
-              Remember your password?{' '}
+            <p className="flex flex-wrap items-center justify-between gap-[var(--space-3)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-muted)]">
+              <span>Remember your password?</span>
               <a href="/login" className="link-smooth inline-flex min-h-[var(--space-10)] items-center text-[var(--accent)] hover:underline">
                 Sign in
               </a>
@@ -149,15 +147,14 @@ export default function ForgotPasswordPage() {
               {loading ? 'Sending…' : 'Send Reset Link'}
             </Button>
 
-            <p className="text-center text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-muted)]">
-              Remember your password?{' '}
+            <p className="flex flex-wrap items-center justify-between gap-[var(--space-3)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-muted)]">
+              <span>Remember your password?</span>
               <a href="/login" className="link-smooth inline-flex min-h-[var(--space-10)] items-center text-[var(--accent)] hover:underline">
                 Sign in
               </a>
             </p>
           </form>
         )}
-      </div>
-    </main>
+    </AuthShell>
   );
 }

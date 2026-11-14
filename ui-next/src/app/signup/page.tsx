@@ -1,5 +1,7 @@
 'use client';
 
+import { AuthShell } from '@/components/auth/AuthShell';
+import { FREE_CREDITS, RUN_COSTS } from '@/lib/credits';
 import { useState } from 'react';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { useRouter } from 'next/navigation';
@@ -7,6 +9,9 @@ import { AlertCircle, Check, Info } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { signUpWithEmail, signInWithOAuth, getEnabledOAuthProviders } from '@/lib/auth';
 import type { AuthError } from '@/lib/auth';
+
+/** Typical credits for one budget run, from the same table /pricing reads. */
+const BUDGET_RUN_CREDITS = RUN_COSTS.find((r) => r.kind === 'Budget pipeline')?.cost[0];
 
 /* ────────────────────────────────────────────────────────────────────────────
    Field chrome — identical to /login on purpose. Two auth screens that look
@@ -138,10 +143,7 @@ export default function SignupPage() {
     auth.run(provider, () => signInWithOAuth(provider), `${provider} signup failed`);
 
   return (
-    <main id="main-content" className="flex min-h-dvh items-center justify-center px-[var(--gutter)] py-[var(--space-12)]">
-      <div className="flex w-full max-w-[var(--width-form)] flex-col gap-[var(--space-5)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-[var(--space-8)] shadow-[var(--shadow)]">
-        <h1 className="font-display text-[length:var(--text-2xl)] font-bold text-[var(--text)]">Create Account</h1>
-
+    <AuthShell lines={['Create an', 'account.']} lead={`The free plan includes ${FREE_CREDITS.toLocaleString('en')} credits a month. A budget run costs about ${BUDGET_RUN_CREDITS}.`}>
         {error && (
           <p
             id="signup-error"
@@ -210,11 +212,7 @@ export default function SignupPage() {
               )}
             </div>
 
-            <div className="flex items-center gap-[var(--space-4)]">
-              <span aria-hidden="true" className="h-px flex-1 bg-[var(--border)]" />
-              <span className="smallcaps text-[length:var(--text-xs)] text-[var(--text-muted)]">Or</span>
-              <span aria-hidden="true" className="h-px flex-1 bg-[var(--border)]" />
-            </div>
+            <p className="text-center text-[length:var(--text-sm)] text-[var(--text-muted)]">or with your email</p>
           </>
         )}
 
@@ -308,7 +306,6 @@ export default function SignupPage() {
             Sign in
           </a>
         </p>
-      </div>
-    </main>
+    </AuthShell>
   );
 }

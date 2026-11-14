@@ -42,7 +42,7 @@ export default function GlobalError({
           Critical Error
         </h2>
         <p className="mb-8 max-w-sm text-[length:var(--text-sm)] leading-relaxed text-[#A2A7B2]">
-          The application failed to load. We&apos;ve been notified. Please refresh the page to try again.
+          The application failed to load. Refresh the page to try again.
         </p>
         <button
           onClick={() => reset()}

@@ -15,7 +15,7 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-[var(--bg)] p-6 text-center">
+    <main id="main-content" className="flex min-h-[100dvh] flex-col items-center justify-center bg-[var(--bg)] p-6 text-center">
       <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--red-bg)] text-[var(--red)]">
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -34,11 +34,11 @@ export default function Error({
           <line x1="12" x2="12.01" y1="16" y2="16" />
         </svg>
       </div>
-      <h2 className="mb-2 text-[length:var(--text-xl)] font-semibold text-[var(--text)]">
+      <h1 className="mb-2 text-[length:var(--text-xl)] font-semibold text-[var(--text)]">
         Something went wrong
-      </h2>
+      </h1>
       <p className="mb-8 max-w-sm text-[length:var(--text-sm)] leading-relaxed text-[var(--text-2)]">
-        We&apos;ve been notified and are looking into it. If this persists, try refreshing the page.
+        This page hit an error and an error report was attempted. Try again; if it keeps happening, refresh the page.
       </p>
       <button
         onClick={() => reset()}
@@ -46,6 +46,6 @@ export default function Error({
       >
         Try again
       </button>
-    </div>
+    </main>
   );
 }
