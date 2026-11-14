@@ -128,6 +128,14 @@ control, the pinned pilot fragment changing state. All of it collapses under
   /capabilities into `site/ArgumentSection.tsx`, shared by both; `landing/prose.tsx` had no
   importers left and was deleted. A hero cell holding `<pre>` needs `min-w-0`, or the code's
   longest line widens the page at 390. Inspector: 0 FAIL.
+- /about rebuilt (2026-11-14): "Nothing asks to be believed." beside the page's own claims,
+  each labelled VERIFIED or HYPOTHESIS, then six `ArgumentSection`s with fragments for the
+  regenerated counts, the three routing rules, the four commitments with their cost, and the
+  sycophancy controls listed from `SYCOPHANCY_CONTROLS`. Claims corrected: the unfinished
+  section said no sycophancy mitigation was built (7 of 10 are); the privacy commitment now
+  matches the corrected security wording (no training on user data, providers have their own
+  terms); "20 questions a month" became the 500 free credits from `TIER_CREDITS`.
+  Inspector: 0 FAIL.
 - Rolled out (2026-11-13, tokens and chrome only): `.site` on every marketing page root,
   `SiteFooter` is now the quiet line, inverted bands flip to the concrete field, uppercase
   micro-labels and prose mono removed, `Reveal` mounted in `SiteHeader`. Their layouts are

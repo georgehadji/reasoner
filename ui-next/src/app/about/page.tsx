@@ -1,399 +1,371 @@
 import Link from 'next/link';
-import type { ReactNode } from 'react';
 
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
-import { CAPABILITIES } from '@/lib/capabilities.generated';
+import {
+  ArgumentBody as Body,
+  ArgumentSection as Section,
+  BODY,
+  CAP,
+  FIGURE,
+  HEAD,
+  More,
+  ROW,
+} from '@/components/site/ArgumentSection';
+import { CAPABILITIES, SYCOPHANCY_CONTROLS } from '@/lib/capabilities.generated';
+import { TIER_CREDITS } from '@/lib/credits';
+import { EPISTEMIC_TAG, epistemicClassName } from '@/lib/remark-epistemic';
 import { SITE } from '@/lib/site';
 
 /**
- * The About page argues the same thing the home page argues, turned inward.
+ * /about in the site world "The product performs": the home page's argument,
+ * turned inward.
  *
- * The old version of this page was a four-item capability grid — the same
- * features as `/`, restated with less evidence. That is the one thing an
- * About page cannot be: a visitor who reaches it has already read the
- * feature copy and is here to decide whether the person behind it can be
- * trusted.
+ * A visitor who reaches an About page has read the feature copy and is here to
+ * decide whether the people behind it can be trusted. So the page applies the
+ * product's own rule to itself: its hero fragment is the page's claims, each
+ * labelled with what it is, and the unfinished work is listed from the same
+ * generated flags the build checks. Admitting unfinished work is load-bearing
+ * here, not a disclaimer.
  *
- * So the page applies the product's own rule to itself. Claims a reader can
- * go and check are marked VERIFIED; the one thing that is researched but not
- * yet built is marked HYPOTHESIS and says so on the page meant to sell it.
- * Admitting unfinished work is load-bearing here, not a disclaimer — a
- * system whose premise is "you should not have to trust us" cannot ask for
- * trust in its own biography.
- *
- * Deliberately absent: an origin anecdote. §2 is built on the CI test that
- * fails when a marketing number is hand-edited, which is checkable, rather
- * than a founding scene, which is not. Same rule as everything else here.
- *
- * Shares the Section/Heading/Lede/Body helpers with LandingPage so the two
- * read as one document. The helpers are copied
- * rather than imported: importing them would pull the whole landing module
- * into this route's bundle for four six-line functions.
+ * Deliberately absent: an origin anecdote. The origin section is built on the
+ * CI test that fails when a marketing number is hand-edited, which is
+ * checkable, rather than a founding scene, which is not.
  */
-
-/* ── Type helpers (mirrors LandingPage) ───────────────────────────── */
-
-function Section({
-  id,
-  children,
-}: {
-  id?: string;
-  children: ReactNode;
-}) {
-  return (
-    <section
-      id={id}
-      className="mx-auto w-full max-w-[var(--width-wide)] scroll-mt-[var(--space-20)] px-[var(--gutter)] py-[var(--section-y)]"
-    >
-      <div className="min-w-0">{children}</div>
-    </section>
-  );
-}
-
-function Heading({ children }: { children: ReactNode }) {
-  return (
-    <h2 className="font-display text-[length:var(--text-3xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-snug)] text-[var(--text)]">
-      {children}
-    </h2>
-  );
-}
-
-function Lede({ children }: { children: ReactNode }) {
-  return (
-    <p className="prose-measure mt-[var(--space-6)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
-      {children}
-    </p>
-  );
-}
-
-function Body({ children }: { children: ReactNode }) {
-  return (
-    <p className="prose-measure mt-[var(--space-4)] text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-      {children}
-    </p>
-  );
-}
-
-/**
- * A claim carrying its own epistemic label, using the same two utilities the
- * run record uses (globals.css). The label is not decoration: VERIFIED here
- * means a reader can open the repository and check it, which is the same bar
- * the pipeline applies to an answer.
- */
-function Claim({ tone, children }: { tone: 'verified' | 'hypothesis'; children: ReactNode }) {
-  return (
-    <div
-      className={`prose-measure mt-[var(--space-8)] pl-[var(--space-4)] ${
-        tone === 'verified' ? 'epistemic-verified' : 'epistemic-hypothesis'
-      }`}
-    >
-      <p className="font-sans text-[length:var(--text-xs)] font-semibold leading-[var(--lh-ui)]">
-        {tone === 'verified' ? 'Verified' : 'Hypothesis'}
-      </p>
-      <p className="mt-[var(--space-2)] text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-        {children}
-      </p>
-    </div>
-  );
-}
 
 /* ── Content ──────────────────────────────────────────────────────── */
 
+/** Readable names for the generated sycophancy flags (docs/plans/sycophancy-mitigation.md). */
+const CONTROL_NAMES: Record<keyof typeof SYCOPHANCY_CONTROLS, string> = {
+  noApprovalGradient: 'No approval gradient to climb',
+  mandatoryDissent: 'A dissenting generator in every run',
+  confidencePenalty: 'A penalty for unsupported confidence',
+  noStyleSelector: 'No warmth or personality setting',
+  directPathEpistemicRules: 'Epistemic rules on direct answers',
+  premiseAudit: 'An audit of the premises you state',
+  revisionLicence: 'Licence to revise its own earlier answer',
+  deaffirmEgress: 'A de-affirmation pass on answers',
+  advisoryRoute: 'A route for personal advice',
+  verificationStep: 'A verification step in action plans',
+};
+const CONTROLS = (Object.keys(CONTROL_NAMES) as Array<keyof typeof SYCOPHANCY_CONTROLS>).map((key) => ({
+  key,
+  name: CONTROL_NAMES[key],
+  built: SYCOPHANCY_CONTROLS[key],
+}));
+const BUILT = CONTROLS.filter((c) => c.built).length;
+const UNBUILT = CONTROLS.length - BUILT;
+
+/** The page's own claims, labelled the way the pipeline labels an answer. */
+const PAGE_CLAIMS = [
+  { claim: 'A claim only its own model backs is downgraded, in code', label: 'VERIFIED' },
+  { claim: 'Scoring and synthesis never share a bloc; a breach fails the build', label: 'VERIFIED' },
+  { claim: 'The parallel generators never read each other', label: 'VERIFIED' },
+  { claim: 'Every capability count here regenerates from the live registry', label: 'VERIFIED' },
+  { claim: `${BUILT} of ${CONTROLS.length} sycophancy controls are in the code`, label: 'VERIFIED' },
+  { claim: `The other ${UNBUILT} will help as much as the research says`, label: 'HYPOTHESIS' },
+] as const;
+
+/** The three rules the mechanism section stands on. Each is checkable in the repository. */
+const RULES = [
+  {
+    title: 'No model vouches for itself',
+    text: 'A claim whose only backing is the model that produced it is downgraded from verified to hypothesis in code, before it reaches you. Verified is reserved for what a source outside the model can carry: a search result, a document you supplied, a check that executed.',
+  },
+  {
+    title: 'No shared bloc',
+    text: 'The model writing your final answer and the model pruning it never come from the same geopolitical bloc, and the generators span at least two. A routing configuration that violates it fails the build (after Buyl et al., npj AI, 2026).',
+  },
+  {
+    title: 'Nothing travels between stages',
+    text: 'The parallel generators never read one another, and nothing an earlier stage produced can enter a later stage as an instruction (after Papadopoulos et al., Mind Viruses, 2026).',
+  },
+];
+
 /**
  * Each commitment names what it costs. A value that costs nothing to hold is
- * a slogan; the cost line is what makes the claim falsifiable, and it is the
- * only reason this section earns its place over a generic values list.
+ * a slogan; the cost line is what makes the claim falsifiable.
  */
 const COMMITMENTS = [
   {
     term: 'No model grades its own homework',
-    detail:
-      'Self-reported confidence never becomes a VERIFIED label. Fewer confident-looking answers, more honest ones.',
+    detail: 'Self-reported confidence never becomes a verified label. Fewer confident-looking answers, more honest ones.',
     cost: 'Costs: the demo looks less impressive',
   },
   {
     term: 'Cross-bloc routing is enforced, not encouraged',
-    detail:
-      'A preset that routes scoring and synthesis into the same bloc fails CI. It cannot be shipped around on a deadline, and that is the point.',
+    detail: 'A preset that routes scoring and synthesis into the same bloc fails CI. It cannot be shipped around on a deadline.',
     cost: 'Costs: slower routing work, narrower model choice',
   },
   {
-    term: 'Your conversations are not training data',
+    term: 'Your conversations are not our training data',
     detail:
-      'Encrypted in transit and at rest, private by default. There is no version of this where your questions become somebody’s next corpus.',
+      'We do not train models on your questions or answers. Each model provider that handles a request has its own terms, listed on the privacy page.',
     cost: 'Costs: the asset every competitor is accumulating',
   },
   {
     term: 'You can read the code, and leave with it',
     detail:
-      'Source-available under a Business Source Licence that converts to Apache-2.0 in 2030. Self-hostable today against your own Postgres, your keys, your infrastructure.',
+      'Source-available under a Business Source Licence that converts to Apache-2.0 in 2030. Self-hostable today against your own Postgres and your own keys.',
     cost: 'Costs: lock-in, which was never ours to take',
   },
-] as const;
+];
 
 const FIGURES = [
   { value: CAPABILITIES.methods, label: 'Reasoning methods' },
   { value: CAPABILITIES.presets, label: 'Routing presets' },
   { value: CAPABILITIES.routableModels, label: 'Routable models' },
   { value: CAPABILITIES.testFiles, label: 'Test files' },
-] as const;
+];
+
+const FREE_CREDITS = TIER_CREDITS.find((t) => t.tier === 'free')?.credits ?? 0;
 
 /* ── Page ─────────────────────────────────────────────────────────── */
 
 export default function AboutPage() {
   return (
-    <div className="site min-h-dvh bg-[var(--bg)] text-[var(--text)]">
+    <div className="site flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
 
-      <main id="main-content">
-        {/* ── Masthead ───────────────────────────────────────────
-            The headline is the page's thesis and its method at once:
-            it tells the reader not to take the page on faith, which is the
-            only opening consistent with the product. */}
-        <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-32)]">
-          <div className="grid gap-[var(--space-12)] lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-start lg:gap-[var(--space-16)]">
-            <div>
-              <h1 className="max-w-[16ch] text-balance font-display text-[length:var(--text-6xl)] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
-                Nothing here asks to be believed.
-              </h1>
-
-              <p className="prose-measure mt-[var(--space-8)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
-                Reasoner exists because of one uncomfortable fact: a language model sounds exactly
-                the same whether it checked something or invented it. Fluency came free.{' '}
-                <strong className="font-medium text-[var(--text)]">Truth did not.</strong> Everything
-                built here since is an attempt to pull those two apart again, and to hand you the
-                seam so you can look at it yourself.
+      <main id="main-content" className="flex-1">
+        {/* ── Hero: the thesis (left), this page's claims labelled (right) ── */}
+        <header className="grid min-h-[var(--site-hero-h)] lg:grid-cols-2">
+          <div className="flex flex-col justify-end px-[var(--site-margin)] pb-[var(--space-12)] pt-[var(--space-32)] lg:pb-[var(--space-16)]">
+            <h1 className="font-display text-[length:var(--site-display)] leading-[var(--site-lh-display)]">
+              <span className="site-line">
+                <span>Nothing asks</span>
+              </span>
+              <span className="site-line">
+                <span>to be believed.</span>
+              </span>
+            </h1>
+            <div className="site-after-headline">
+              <p className="mt-[var(--space-8)] max-w-[40ch] text-[length:var(--site-lead)] leading-[var(--site-lh-body)]">
+                A language model sounds the same whether it checked something or invented it. Reasoner
+                exists to pull those two apart again, and to show you the seam.
               </p>
-            </div>
-
-            <div>
-              <p className="prose-measure mt-[var(--space-8)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
-                This page is that same rule turned on itself. Every claim below is marked with what
-                it actually is: something you can go and verify, or something still only hoped for.
+              <p className={`mt-[var(--space-4)] max-w-[52ch] ${BODY}`}>
+                This page holds itself to the same rule: every claim on it is labelled with what it is.
               </p>
+              <div className="mt-[var(--space-8)] flex flex-wrap items-center gap-x-[var(--space-8)] gap-y-[var(--space-4)]">
+                <Link href="/chat" className="site-button">
+                  Start reasoning
+                </Link>
+                <Link href="/how-it-works" className={`site-link ${BODY}`}>
+                  Read a complete run
+                </Link>
+              </div>
             </div>
+          </div>
+
+          <div className="flex min-w-0 items-center justify-center bg-[var(--site-surface)] px-[var(--site-margin)] py-[var(--space-16)] lg:pt-[var(--space-24)]">
+            <figure
+              data-ui
+              className="w-full rounded-[var(--radius-lg)] border border-[var(--site-line)] bg-[var(--site-bg)] lg:max-w-[var(--site-fragment)]"
+            >
+              <figcaption className={CAP}>This page, labelled</figcaption>
+              <ul className="list-none">
+                {PAGE_CLAIMS.map(({ claim, label }) => (
+                  <li key={claim} className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-[var(--space-3)] ${ROW}`}>
+                    <span>{claim}</span>
+                    <span className={epistemicClassName(EPISTEMIC_TAG[label])}>{label}</span>
+                  </li>
+                ))}
+              </ul>
+            </figure>
           </div>
         </header>
 
-        {/* ── §1 ─────────────────────────────────────────────── */}
-        <Section id="problem">
-          <Heading>It stopped being possible to unsee.</Heading>
-          <Lede>
+        {/* ── The problem ── */}
+        <Section id="problem" lines={['It stopped being', 'possible to unsee.']}>
+          <Body>
             Ask a model something hard and it answers in the same calm register every time. The
             paragraph that took real evidence and the paragraph that took none are typographically
-            identical. There is no tell. That is not a bug in any one model &mdash; it is what the
-            training objective rewards.
-          </Lede>
-          <Body>
-            Then it gets worse. Ask the model whether it is confident and you have asked the system
-            that produced the claim to grade the claim. Ask a second model from the same lab, in the
-            same country, trained on much the same internet, and you have not bought a second
-            opinion. You have bought an echo, and paid twice for it.
+            identical. There is no tell. That is not a bug in any one model: it is what the training
+            objective rewards.
           </Body>
           <Body>
-            Everyone in this market answered that by printing a confidence score. A score was never
-            the thing worth having. The thing worth having is underneath it:{' '}
-            <strong className="font-medium text-[var(--text)]">
-              who checked, against what, and what happens when they disagree.
-            </strong>
+            Then it gets worse. Ask the model whether it is confident and you have asked the system that
+            produced the claim to grade the claim. Ask a second model from the same lab, in the same
+            country, trained on much the same internet, and you have not bought a second opinion. You
+            have bought an echo, and paid twice for it.
+          </Body>
+          <Body>
+            Everyone in this market answered that by printing a confidence score. The thing worth having
+            is underneath it: <strong className="font-semibold">who checked, against what, and what happens when they disagree.</strong>
           </Body>
         </Section>
 
-        {/* ── §2 ─────────────────────────────────────────────── */}
-        <Section id="origin">
-          <Heading>We did not trust ourselves either.</Heading>
-          <Lede>
-            The honest version of this section is not a founding anecdote. It is a test file.
-          </Lede>
+        {/* ── Origin: a test file, not an anecdote ── */}
+        <Section
+          id="origin"
+          lines={['We did not trust', 'ourselves either.']}
+          field
+          figure={
+            <figure data-ui className={FIGURE}>
+              <figcaption className={CAP}>Regenerated on every commit</figcaption>
+              <dl className="grid grid-cols-2">
+                {FIGURES.map(({ value, label }) => (
+                  <div key={label} className="border-b border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-4)] odd:border-r">
+                    <dt className="font-display text-[length:var(--site-head)] leading-[var(--site-lh-head)] nums-tabular">
+                      {value.toLocaleString('en-US')}
+                    </dt>
+                    <dd className="text-[var(--site-muted)]">{label}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="px-[var(--space-4)] py-[var(--space-3)] text-[var(--site-muted)]">
+                Edit one by hand to make it sound better and a test fails.
+              </p>
+            </figure>
+          }
+        >
           <Body>
-            Every capability number on this site &mdash; {CAPABILITIES.methods} methods,{' '}
-            {CAPABILITIES.presets} presets, {CAPABILITIES.routableModels.toLocaleString('en-US')}{' '}
-            routable models &mdash; is regenerated from the live registry on every commit. Edit one
-            by hand to make it sound better and a test fails, and the build stops. That test was
-            written early, deliberately, and pointed back at us: the same pressure that makes a
-            model overstate its confidence operates on the people writing its marketing page. We did
-            not think we were immune. We thought we should be checkable.
+            The honest version of this section is not a founding anecdote. It is a test file. Every
+            capability number on this site is regenerated from the live registry on every commit; edit
+            one by hand and the build stops.
           </Body>
           <Body>
-            That instinct is the whole product in miniature. Not a wrapper, not a prompt library.
-            A pipeline that takes a question apart, routes the pieces to models built by rivals,
-            keeps their disagreement instead of averaging it flat, and refuses to stamp anything
-            verified on a model&rsquo;s say-so &mdash; because a claim that cannot be checked should
-            not be dressed as one that can.
+            That test was written early, deliberately, and pointed back at us: the same pressure that
+            makes a model overstate its confidence operates on the people writing its marketing page. We
+            did not think we were immune. We thought we should be checkable.
           </Body>
         </Section>
 
-        {/* ── §3 ─────────────────────────────────────────────── */}
-        <Section id="mechanism">
-          <Heading>Disagreement is the product, not a defect to smooth over.</Heading>
-          <Lede>
-            Most systems treat models arguing as noise to resolve before it reaches you. Here it is
-            the signal. If four models from four labs converge, the convergence means something. If
-            they split, you deserve to see where the fault line runs &mdash; that is precisely the
-            question worth your own judgment.
-          </Lede>
-
-          <Claim tone="verified">
-            A claim whose only backing is the model that produced it is downgraded from VERIFIED to
-            HYPOTHESIS <strong className="font-medium text-[var(--text)]">in code</strong>, before it
-            reaches you. No model is consulted when that rule runs, so no model can talk its way
-            around it. VERIFIED is reserved for what a source outside the model can carry: a search
-            result, a document you supplied, a check that actually executed.
-          </Claim>
-
-          <Claim tone="verified">
-            The model writing your final answer and the model pruning it never come from the same
-            geopolitical bloc, and the generators span at least two. Two labs in one country share
-            an ideological prior; the constraint follows Buyl et al., <em>npj AI</em> (2026), which
-            finds a creator&rsquo;s bloc to be the dominant axis of a model&rsquo;s bias. It is held
-            by a validator and a test rather than by good intentions, so a routing configuration
-            that violates it fails the build.
-          </Claim>
-
-          <Claim tone="verified">
-            The parallel generators never read one another, and nothing an earlier stage produced
-            can enter a later stage as an instruction. This follows Papadopoulos et al.,{' '}
-            <em>Mind Viruses: Self-Propagating Ideas in Multi-Agent LLM Systems</em> (2026): in any
-            system that passes work between models, text that persuades one stage to carry it
-            onward can ride the entire pipeline and settle into what the system remembers. Here it
-            has nowhere to travel.
-          </Claim>
-
-          <dl className="mt-[var(--space-12)] grid grid-cols-2 gap-[var(--space-6)] border-y border-[var(--border)] py-[var(--space-8)] sm:grid-cols-4">
-            {FIGURES.map(({ value, label }) => (
-              <div key={label}>
-                <dt className="nums-tabular font-display text-[length:var(--text-2xl)] font-medium leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
-                  {value.toLocaleString('en-US')}
-                </dt>
-                <dd className="mt-[var(--space-1)] font-sans text-[length:var(--text-xs)] font-medium leading-[var(--lh-ui)] text-[var(--text-muted)]">
-                  {label}
-                </dd>
-              </div>
-            ))}
-          </dl>
-
+        {/* ── Mechanism ── */}
+        <Section
+          id="mechanism"
+          lines={['Disagreement is', 'the product.']}
+          figure={
+            <figure data-ui className={FIGURE}>
+              <figcaption className={CAP}>Three rules, each checkable</figcaption>
+              <ul className="list-none">
+                {RULES.map(({ title, text }) => (
+                  <li key={title} className={ROW}>
+                    <p className="flex flex-wrap items-center justify-between gap-[var(--space-3)]">
+                      <span className="font-semibold">{title}</span>
+                      <span className={epistemicClassName(EPISTEMIC_TAG.VERIFIED)}>VERIFIED</span>
+                    </p>
+                    <p className="mt-[var(--space-1)] text-[var(--site-muted)]">{text}</p>
+                  </li>
+                ))}
+              </ul>
+            </figure>
+          }
+        >
+          <Body>
+            Most systems treat models arguing as noise to resolve before it reaches you. Here it is the
+            signal. If four models from four labs converge, the convergence means something. If they
+            split, you deserve to see where the fault line runs.
+          </Body>
           <Body>
             {CAPABILITIES.methods} methods, not {CAPABILITIES.methods} prompts. Tree-of-Thoughts
-            genuinely backtracks. Program-of-Thoughts genuinely executes the code it writes, in a
-            sandbox with a wall-clock limit and a memory cap &mdash; so a reasoning step that claims
-            a result has actually run it.
+            backtracks. Program-of-Thoughts executes the code it writes, in a sandbox with a wall-clock
+            limit and a memory cap, so a reasoning step that claims a result has run it.
           </Body>
-
-          <Link
-            href="/how-it-works"
-            className="link-smooth mt-[var(--space-6)] inline-flex font-sans text-[length:var(--text-sm)] font-semibold leading-[var(--lh-ui)] text-[var(--accent)] hover:text-[var(--accent-hover)]"
-          >
-            Read a complete production run &rarr;
-          </Link>
+          <More href="/how-it-works">Read a complete production run</More>
         </Section>
 
-        {/* ── §4 ─────────────────────────────────────────────── */}
-        <Section id="commitments">
-          <Heading>Every one of these costs something.</Heading>
-          <Lede>
-            A value you can hold for free is not a value, it is a slogan. These four are in the
-            build, in the licence, or in the bank, which is the only reason they are worth reading.
-          </Lede>
-
-          <dl className="mt-[var(--space-10)] grid gap-x-[var(--space-8)] gap-y-[var(--space-8)] sm:grid-cols-2">
-            {COMMITMENTS.map(({ term, detail, cost }) => (
-              <div key={term}>
-                <dt className="font-sans text-[length:var(--text-sm)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
-                  {term}
-                </dt>
-                <dd className="mt-[var(--space-2)] text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-                  {detail}
-                </dd>
-                <dd className="mt-[var(--space-2)] font-sans text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--accent)]">
-                  {cost}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </Section>
-
-        {/* ── §5 ─────────────────────────────────────────────── */}
-        <Section id="unfinished">
-          <Heading>The part that is not finished.</Heading>
-
-          <Claim tone="hypothesis">
-            There is a second failure mode that has been researched here and{' '}
-            <strong className="font-medium text-[var(--text)]">not yet shipped</strong>: sycophancy.
-            Ibrahim et al. (2026) measured it across 3,075 participants and found that models
-            actively affirm your own reasoning back at you &mdash; and that this buys emotional
-            comfort while doing nothing measurable for answer quality. The analysis is written up,
-            ranked by the effect sizes the study actually measured. The mitigations are not built.
-            When they are, this section will say so, and you will be able to check.
-          </Claim>
-
+        {/* ── Commitments ── */}
+        <Section
+          id="commitments"
+          lines={['Every one of these', 'costs something.']}
+          field
+          figure={
+            <figure data-ui className={FIGURE}>
+              <figcaption className={CAP}>Four commitments, and their price</figcaption>
+              <dl>
+                {COMMITMENTS.map(({ term, detail, cost }) => (
+                  <div key={term} className={ROW}>
+                    <dt className="font-semibold">{term}</dt>
+                    <dd className="mt-[var(--space-1)] text-[var(--site-muted)]">{detail}</dd>
+                    <dd className="mt-[var(--space-1)] text-[var(--site-accent)]">{cost}</dd>
+                  </div>
+                ))}
+              </dl>
+            </figure>
+          }
+        >
           <Body>
-            That admission sits on the page meant to sell you the product because the alternative is
-            asking you to trust a system whose entire premise is that you should not have to.
+            A value you can hold for free is not a value, it is a slogan. These four are in the build,
+            in the licence, or in the bank, which is the only reason they are worth reading.
           </Body>
+          <More href="/privacy">What is stored, and who handles it</More>
         </Section>
 
-        {/* ── §6 ─────────────────────────────────────────────── */}
-        <Section id="who">
-          <Heading>We read the paper before we write the code.</Heading>
-          <Lede>
+        {/* ── Unfinished: listed from the same generated flags the build
+            checks, so this section cannot claim more than the code does. ── */}
+        <Section
+          id="unfinished"
+          lines={['The part that', 'is not finished.']}
+          figure={
+            <figure data-ui className={FIGURE}>
+              <figcaption className={CAP}>Sycophancy controls, detected at each commit</figcaption>
+              <ul className="list-none">
+                {CONTROLS.map(({ key, name, built }) => (
+                  <li key={key} className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-[var(--space-3)] ${ROW}`}>
+                    <span className={built ? '' : 'text-[var(--site-muted)]'}>{name}</span>
+                    <span className={epistemicClassName(EPISTEMIC_TAG[built ? 'VERIFIED' : 'HYPOTHESIS'])}>
+                      {built ? 'IN CODE' : 'NOT BUILT'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </figure>
+          }
+        >
+          <Body>
+            Ibrahim et al. (2026) measured sycophancy across 3,075 participants: models affirm your own
+            reasoning back at you, which buys comfort and does nothing measurable for answer quality.
+          </Body>
+          <Body>
+            {BUILT} of the {CONTROLS.length} mitigations researched here are in the code, each found by a
+            detector at every commit rather than ticked off by hand. The other {UNBUILT} are designed and
+            not built. When they land, this list changes by itself, and you can check it.
+          </Body>
+          <More href="/capabilities#sycophancy">How the shipped controls work</More>
+        </Section>
+
+        {/* ── How the work is done ── */}
+        <Section id="who" lines={['We read the paper', 'before the code.']} field>
+          <Body>
             Before the mind-virus defences existed in code, they existed as a research note: the
             paper&rsquo;s findings in a table, each mitigation ranked by the effect size its authors
-            actually measured, and an honest line at the top saying nothing had been implemented
-            yet. Same for sycophancy. The note comes first. The code comes after, or it does not
-            come at all.
-          </Lede>
-          <Body>
-            The mind-virus note is in the repository, dated, with the commit it was verified
-            against. That is not a work style anyone would choose for speed. It is the only one
-            that produces a system you can argue with, and it is why this took as long as it did.
+            measured, and an honest line at the top saying nothing had been implemented yet. Same for
+            sycophancy. The note comes first. The code comes after, or it does not come at all.
           </Body>
           <Body>
-            None of it is written to impress an investor. The same standard the pipeline applies to
-            an answer is the one we try to hold ourselves to, and when something here turns out to
-            be wrong we would rather hear it than not.
+            Those notes are in the repository, dated, with the commit they were checked against. It is
+            not a work style anyone would choose for speed. It is the only one that produces a system you
+            can argue with, and when something here turns out to be wrong we would rather hear it than not.
           </Body>
         </Section>
 
-        {/* ── Close ──────────────────────────────────────────── */}
-        <Section id="start">
-          <Heading>Ask it something you would check by hand.</Heading>
-          <Lede>
-            Not a trivia question &mdash; the kind where being confidently wrong would actually cost
-            you. That is the case this was built for, and the only fair test of whether any of the
-            above is true.
-          </Lede>
-
-          <div className="mt-[var(--space-10)] flex flex-wrap items-center gap-[var(--space-3)] gap-x-[var(--space-8)]">
-            <Link
-              href="/chat"
-              className="btn-lift group flex min-h-[var(--space-12)] items-center gap-[var(--space-2)] rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[length:var(--text-base)] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
-            >
+        {/* ── Close ── */}
+        <section aria-labelledby="close-h" className="mx-auto w-full max-w-[var(--site-max)] px-[var(--site-margin)] py-[var(--space-24)]">
+          <h2 id="close-h" className={HEAD}>
+            <span className="block">Ask what you</span>
+            <span className="block">would check by hand.</span>
+          </h2>
+          <p className={`mt-[var(--space-6)] max-w-[52ch] ${BODY}`}>
+            Not a trivia question: the kind where being confidently wrong would cost you. That is the case
+            this was built for, and the only fair test of whether any of the above is true.
+          </p>
+          <div className="mt-[var(--space-8)] flex flex-wrap items-center gap-x-[var(--space-8)] gap-y-[var(--space-4)]">
+            <Link href="/chat" className="site-button">
               Start reasoning
-              <span
-                aria-hidden="true"
-                className="transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
-              >
-                &rarr;
-              </span>
             </Link>
-            <span className="font-sans text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-muted)]">
-              20 questions a month on the free tier.
-            </span>
+            <span className={BODY}>{FREE_CREDITS.toLocaleString('en-US')} credits a month on the free plan.</span>
           </div>
-
-          <p className="prose-measure mt-[var(--space-12)] border-t border-[var(--border)] pt-[var(--space-6)] font-sans text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-subtle)]">
-            {SITE.name} is built and operated by {SITE.legalName}. Something here
-            wrong, or a claim you want the receipts for?{' '}
-            <Link
-              href="/contact"
-              className="link-smooth text-[var(--accent)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--accent-hover)]"
-            >
+          <p className={`mt-[var(--space-12)] max-w-[60ch] ${BODY}`}>
+            {SITE.name} is built and operated by {SITE.legalName}. Something here wrong, or a claim you
+            want the receipts for?{' '}
+            <Link href="/contact" className="site-link">
               Get in touch
             </Link>
             .
           </p>
-        </Section>
+        </section>
       </main>
 
       <SiteFooter />
