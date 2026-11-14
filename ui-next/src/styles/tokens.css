@@ -329,6 +329,11 @@
     --ok:            #6CC4C0;
     --warn:          #E0A458;
     --unknown:       #C9C9C3;
+    /* The app's dark-scheme red: a .site page is charcoal in both schemes, so the
+       light-scheme #B3122E would fall to about 2.5:1 here. */
+    --red:           #FF7A7A;
+    --red-bg:        rgb(255 122 122 / 0.10);
+    --red-border:    rgb(255 122 122 / 0.26);
     --ink-pink:      transparent;  /* Overprint drum: off in this world */
     --grain-opacity: 0;
 
