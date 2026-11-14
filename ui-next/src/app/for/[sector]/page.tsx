@@ -189,7 +189,7 @@ export default async function SectorPage({ params }: SectorParams) {
 
           <div className="mt-[var(--space-16)] grid gap-[var(--space-10)] lg:grid-cols-12 lg:items-center">
             <p className={`max-w-[44ch] lg:col-span-5 ${BODY}`}>
-              Every company a request can reach is listed, with its privacy policy, on{' '}
+              Every company a request can reach is listed on{' '}
               <Link href="/subprocessors" className="site-link">
                 sub-processors
               </Link>

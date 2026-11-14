@@ -158,6 +158,15 @@ control, the pinned pilot fragment changing state. All of it collapses under
   source and is replaced by the licence's one restriction (no hosted resale); the metadata
   promised billing and liability sections that do not exist. Jurisdiction and effective date
   are `[INPUT REQUIRED]`. Inspector: 0 FAIL.
+- /subprocessors rebuilt (2026-11-14): "Who else sees your request." beside one run's path out
+  of our servers, then every model maker a run can reach, the direct fallbacks with their
+  privacy policies, and the services around the model call (search, sign-in, payments, email,
+  error reports). Corrected: the page said its list "cannot go stale" yet named only the eight
+  direct fallback adapters; every call goes through OpenRouter first, which reaches 30 makers.
+  The makers now come from `MODEL_VENDORS`, generated into `capabilities.generated.ts` by
+  `scripts/update_mindmap_meta.py`. Three pages said every provider was listed "with its
+  privacy policy"; only the direct fallbacks have one linked, so that phrase is gone. Host
+  pinning and hosting region are `[INPUT REQUIRED]`. Inspector: 0 FAIL.
 - /status rebuilt (2026-11-14): "Checked as you load it." beside the live `GET /api/health`
   panel, which lists the six checks in every state (checking, answered, no answer) so it keeps
   its height. Sections say what each check really tests (`lib/status-checks.ts`, mirrored from

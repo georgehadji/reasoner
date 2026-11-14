@@ -84,7 +84,7 @@ export default function SecurityPage() {
             </h2>
             <p className={`mt-[var(--space-6)] max-w-[44ch] ${BODY}`}>
               Through OpenRouter to one or more of the model providers below, each under its own terms.
-              We do not sell your data. Every provider, with its privacy policy, is listed on{' '}
+              We do not sell your data. Every company a request can reach is listed on{' '}
               <Link href="/subprocessors" className="site-link">
                 sub-processors
               </Link>

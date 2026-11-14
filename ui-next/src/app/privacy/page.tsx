@@ -117,7 +117,7 @@ export default function PrivacyPage() {
                 ))}
               </ul>
               <p className="border-t border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-3)] text-[var(--site-muted)]">
-                Routed through OpenRouter, over TLS. Each is listed with its privacy policy on{' '}
+                Routed through OpenRouter, over TLS. Every company a request can reach is listed on{' '}
                 <Link href="/subprocessors" className="text-[var(--site-ink)] underline underline-offset-4">
                   sub-processors
                 </Link>

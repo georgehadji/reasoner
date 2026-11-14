@@ -279,6 +279,23 @@ _CURATED_MARQUEE_LABS: dict[str, str] = {
 }
 
 
+def _model_vendors() -> list[str]:
+    """Every OpenRouter vendor slug a registered model belongs to, sorted.
+
+    The /subprocessors page lists these: each is a company a request may
+    reach. Local Ollama models carry no vendor prefix and send nothing out,
+    so they fall away; ``openrouter/`` is OpenRouter's own router, listed on
+    that page in its own right.
+    """
+    return sorted(
+        {
+            model.split("/", 1)[0]
+            for model in _whitelist_model_ids()
+            if "/" in model and not model.startswith("openrouter/")
+        }
+    )
+
+
 def _marquee_lab_names() -> list[str]:
     """PROVIDERS plus the curated labs above that still have a live model."""
     names = list(_provider_names())
@@ -532,6 +549,7 @@ def _render_capabilities_ts(today: str, presets: int, methods: int) -> str:
     adapters = _count_provider_adapters()
     providers_literal = ", ".join(f"'{name}'" for name in _provider_names())
     marquee_literal = ", ".join(f"'{name}'" for name in _marquee_lab_names())
+    vendors_literal = ", ".join(f"'{slug}'" for slug in _model_vendors())
     tests = _count_test_files()
     controls = _detect_sycophancy_controls()
     controls_literal = ",\n".join(
@@ -567,6 +585,13 @@ export const PROVIDERS = [{providers_literal}] as const;
  * behind it.
  */
 export const MARQUEE_LABS = [{marquee_literal}] as const;
+
+/**
+ * Every OpenRouter vendor slug with a registered model, sorted: each is a
+ * company a request may reach. Local Ollama models are excluded. Drives the
+ * /subprocessors list.
+ */
+export const MODEL_VENDORS = [{vendors_literal}] as const;
 
 /**
  * Sycophancy controls that are actually present in the code, per commit.
