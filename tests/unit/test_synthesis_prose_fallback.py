@@ -23,5 +23,12 @@ def test_string_steps_are_kept():
     assert "Action Blueprint:\n- Do X\n- Do Y" in _prose(["Do X", "Do Y"])
 
 
+def test_step_without_a_label_has_no_leading_colon():
+    # Live Delphi run: each step arrived with an empty "step", printed ": Align ...".
+    assert "Action Blueprint:\n- Align\n- Ship" in _prose(
+        [{"step": "", "action": "Align"}, {"step": "", "action": "Ship"}]
+    )
+
+
 def test_no_heading_without_steps():
     assert "Action Blueprint" not in _prose([{"description": "neither step nor action"}])

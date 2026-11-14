@@ -133,9 +133,10 @@ def finalize_solution(raw: str, state: PipelineState, services: WorkflowServices
         if insights:
             parts.append("Critical Insights:\n" + "\n".join(f"- {i}" for i in insights))
         # A step may be a plain string; a dict-only filter printed the heading
-        # with nothing under it.
+        # with nothing under it. An empty "step" printed ": action".
         steps = [
-            f"- {b.get('step', '')}: {b.get('action', '')}" if isinstance(b, dict) else f"- {b}"
+            "- " + ": ".join(str(v) for v in (b.get("step"), b.get("action")) if v)
+            if isinstance(b, dict) else f"- {b}"
             for b in coerce_list(data.get("action_blueprint"))
             if b and (not isinstance(b, dict) or b.get("step") or b.get("action"))
         ]
