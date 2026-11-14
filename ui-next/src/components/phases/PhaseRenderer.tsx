@@ -162,7 +162,8 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
 
   // Direct Response / Web Search: render inline without a phase card
   if (name === 'Direct Response' || name === 'Web Search') {
-    const md = buildMarkdownFromPhase(index, phaseNum, name, data, { omitSections: ['vetted_context'] });
+    // The answer itself, so no "Phase 1 · Direct Response" heading above it.
+    const md = buildMarkdownFromPhase(index, phaseNum, name, data, { omitSections: ['vetted_context'], omitHeading: true });
     return <MarkdownRenderer>{md}</MarkdownRenderer>;
   }
 

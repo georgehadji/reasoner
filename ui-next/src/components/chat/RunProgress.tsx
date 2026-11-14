@@ -74,7 +74,9 @@ export function RunProgress({
   const upcoming = plan.filter((p) => p.id > frontier);
   const step = plan.filter((p) => doneIds.has(p.id) || (active && p.id === currentPhase)).length;
   const total = step + upcoming.length;
-  const title = method ? prettyMethod(method) : 'Choosing a method…';
+  // A phase running with no method named is the gate's direct or web-search
+  // answer: the choice is made, so "Choosing a method…" would be stale.
+  const title = method ? prettyMethod(method) : active ? 'Answering…' : 'Choosing a method…';
   const elapsed = startedAt ? formatElapsed(Math.max(0, Math.floor((now - startedAt) / 1000))) : null;
 
   return (
