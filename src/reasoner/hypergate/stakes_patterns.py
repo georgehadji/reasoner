@@ -13,9 +13,13 @@ import unicodedata
 from reasoner.domain.stakes import StakesDomain
 
 
-def _fold(text: str) -> str:
+def fold_text(text: str) -> str:
+    """Accent-fold and casefold, so Greek matches with or without tonos."""
     nfd = unicodedata.normalize("NFD", text)
     return "".join(c for c in nfd if not unicodedata.combining(c)).casefold()
+
+
+_fold = fold_text
 
 
 # Near-miss guards ("health bar in a game", "law of large numbers") come first.

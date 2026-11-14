@@ -17,6 +17,10 @@ class StakesDomain(StrEnum):
     NONE = "none"
 
 
+# Countries the resolver may name (ISO 3166-1 alpha-2). "EU" is a bloc, not an ISO country.
+KNOWN_COUNTRIES = frozenset({"GR", "US", "GB", "DE", "FR", "CY", "EU"})
+
+
 @dataclass(frozen=True, slots=True)
 class Jurisdiction:
     country: str | None = None  # ISO 3166-1 alpha-2, e.g. "GR"

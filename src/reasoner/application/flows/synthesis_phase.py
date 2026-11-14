@@ -82,6 +82,21 @@ def enforce_citations(text: str, allowed_urls: set[str]) -> tuple[str, list[str]
         parts[i] = _BARE_URL_RE.sub(_bare, _MD_LINK_RE.sub(_link, parts[i]))
     return "".join(parts), list(dict.fromkeys(removed))
 
+def _stakes_block(state: PipelineState) -> str:
+    """Scope instruction for a high-stakes run in active mode; "" otherwise."""
+    from reasoner.application.services.stakes_service import (
+        detect_stakes,
+        scope_for,
+        scope_prompt_block,
+        stakes_mode,
+    )
+
+    profile = detect_stakes(state.problem)
+    if not profile.is_high or stakes_mode() != "active":
+        return ""
+    return scope_prompt_block(profile.domain, scope_for(state.problem))
+
+
 async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("SYNTHESIS", "Synthesizing final solution...", state)
 
@@ -104,7 +119,7 @@ async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) 
     raw, _ = await services.call_llm(
         role="synthesis",
         system_prompt=system_prompt,
-        user_prompt=phases.synthesis_prompt(state),
+        user_prompt=phases.synthesis_prompt(state) + _stakes_block(state),
         state=state,
         max_tokens=get_token_budget("synthesis") if TOKEN_OPTIMIZATION["dynamic_budgets"] else DEFAULT_MAX_TOKENS
     )
@@ -186,17 +201,33 @@ def finalize_solution(raw: str, state: PipelineState, services: WorkflowServices
 
     # Apply promotion rules: model-sourced VERIFIED is capped at HYPOTHESIS
     # This import is lazy to avoid circular dependency at module level
+    scope: dict = {}
     try:
         from reasoner.application.services.evidence_service import (
             HighStakesPolicy,
             apply_promotion_rules,
             reconcile_labels,
         )
-        from reasoner.application.services.stakes_service import detect_stakes, stakes_mode
+        from reasoner.application.services.stakes_service import (
+            detect_stakes,
+            scope_for,
+            stakes_mode,
+        )
+        from reasoner.domain.stakes import Jurisdiction, StakesProfile
 
         profile = detect_stakes(state.problem)
+        active = profile.is_high and stakes_mode() == "active"
+        scope = scope_for(state.problem) if active else {}
         policy = (
-            HighStakesPolicy(profile) if profile.is_high and stakes_mode() == "active" else None
+            HighStakesPolicy(
+                StakesProfile(
+                    domain=profile.domain,
+                    confidence=profile.confidence,
+                    jurisdiction=Jurisdiction(country=scope["jurisdiction"]),
+                )
+            )
+            if active
+            else None
         )
         evidence_bundles = apply_promotion_rules(evidence_bundles, allowed_urls, policy)
         clean_labels = reconcile_labels(clean_labels, evidence_bundles)
@@ -308,4 +339,5 @@ def finalize_solution(raw: str, state: PipelineState, services: WorkflowServices
         sources=sources,
         layout_hints=json_data.get("layout_hints", {}),
         evidence=evidence_bundles,
+        scope=scope,
     )
