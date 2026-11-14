@@ -187,8 +187,12 @@ def finalize_solution(raw: str, state: PipelineState, services: WorkflowServices
     # Apply promotion rules: model-sourced VERIFIED is capped at HYPOTHESIS
     # This import is lazy to avoid circular dependency at module level
     try:
-        from reasoner.application.services.evidence_service import apply_promotion_rules
-        evidence_bundles = apply_promotion_rules(evidence_bundles)
+        from reasoner.application.services.evidence_service import (
+            apply_promotion_rules,
+            reconcile_labels,
+        )
+        evidence_bundles = apply_promotion_rules(evidence_bundles, allowed_urls)
+        clean_labels = reconcile_labels(clean_labels, evidence_bundles)
     except Exception as exc:
         # Silence here is the worst possible outcome for this particular call:
         # promotion rules are what cap a model-sourced VERIFIED claim down to
