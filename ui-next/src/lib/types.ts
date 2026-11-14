@@ -58,6 +58,8 @@ export interface PhaseEvent {
   error_type?: string;
   retryable?: boolean;
   retry_after?: number;
+  /** On `error`: false when only a non-critical phase failed and the run goes on. */
+  fatal?: boolean;
   /** Cost transparency fields on done event */
   total_cost_usd?: number;
   phase_costs?: Record<string, number>;
@@ -250,7 +252,6 @@ export interface MethodPreset {
 export interface MethodPhase {
   id: number;
   name: string;
-  short: string;
 }
 
 export interface MethodDef {

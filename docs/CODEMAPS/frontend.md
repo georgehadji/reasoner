@@ -81,7 +81,6 @@ ui-next/src/
 │   │   ├── SiteHeader.tsx        # Top navigation bar
 │   │   ├── Sidebar.tsx           # Left sidebar (chat history)
 │   │   ├── Composer.tsx          # Input composer + preset selector
-│   │   ├── PhaseTimeline.tsx     # Visual phase progress (0-5)
 │   │   ├── CommandPalette.tsx    # Cmd+K global command palette
 │   │   ├── ShortcutModal.tsx     # Keyboard shortcuts help (?)
 │   │   ├── UserMenu.tsx          # User profile menu (dropdown)
@@ -206,7 +205,7 @@ ui-next/src/
   │  │  │  │  └─ <WidgetRenderer> (for widgets)
   │  │  │  └─ Auto-scroll anchor
   │  │  │
-  │  │  ├─ <PhaseTimeline>
+  │  │  ├─ <RunProgress>
   │  │  │  └─ <PhaseIndicator>[] (0, 1, 2, 3, 4, 5)
   │  │  │
   │  │  └─ <Composer>

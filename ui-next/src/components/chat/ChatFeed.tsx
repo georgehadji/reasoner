@@ -8,7 +8,7 @@ import { StreamingMarkdown } from './StreamingMarkdown';
 import { PhaseRenderer } from '@/components/phases/PhaseRenderer';
 import { AnswerFirstRun } from '@/components/phases/AnswerFirstRun';
 import { answerMarkdown, findAnswer } from '@/lib/answer';
-import { ResearchProgress } from '@/components/phases/ResearchProgress';
+import { RunProgress } from './RunProgress';
 import { ErrorMessage } from './ErrorMessage';
 import { WidgetRenderer } from '@/components/widgets/WidgetRenderer';
 import { TokenCount, Attachment } from '@/lib/types';
@@ -16,7 +16,6 @@ import { TIMING } from '@/lib/config';
 import { copyToClipboard, cn } from '@/lib/utils';
 import { isEnabled } from '@/hooks/useFeatureFlags';
 import { ManifestationVisuals } from './ManifestationVisuals';
-import { Tooltip } from '@/components/ui/Tooltip';
 
 /* ── Message entrance ──────────────────────────────────────────
    One transition token for every row that lands in the feed, so a
@@ -34,11 +33,6 @@ const enterDelay = (i: number): CSSProperties => ({
   animationDelay: `calc(var(--stagger-step) * ${Math.min(i, 4)})`,
 });
 
-/* Small chip shared by the model and agent lists. Model IDs are strings a
-   user may retype, so they get mono + ligatures-off. */
-const CHIP =
-  'inline-flex items-center gap-[var(--space-1)] rounded-[var(--radius-pill)] border border-[var(--border)] bg-[var(--surface-2)] px-[var(--space-2)] py-[var(--space-1)] text-[length:var(--text-2xs)] font-medium text-[var(--text-subtle)]';
-
 export interface RenderedPhase {
   index: number;
   phase: number;
@@ -54,6 +48,14 @@ export interface ChatFeedMessage {
   phases?: RenderedPhase[];
   isStreaming?: boolean;
   currentPhaseName?: string;
+  /** Id of the phase now running; cleared when it completes. */
+  currentPhase?: number;
+  /** The run's method, once the backend's `start` frame names it. */
+  method?: string;
+  /** HyperGate's reason for picking the method. */
+  methodNote?: string;
+  /** Epoch ms when the run was submitted, for the elapsed timer. */
+  startedAt?: number;
   tokens?: TokenCount;
   duration?: number;
   cost?: number;
@@ -81,72 +83,6 @@ interface ChatFeedProps {
   onFeedback?: (messageId: string, rating: 'up' | 'down') => void;
   onContinueGenerating?: () => void;
   currentPhaseName?: string;
-}
-
-function PhaseIndicator({
-  name,
-  agents,
-  models,
-  researchSteps,
-}: {
-  name?: string;
-  agents?: { name: string; task: string }[];
-  models?: string[];
-  researchSteps?: { step_type: string; queries: string[]; plan: string; urls: string[] }[];
-}) {
-  return (
-    <div className="mb-[var(--space-3)] flex flex-col gap-[var(--space-2)]">
-      <div className="flex items-center gap-[var(--space-2)]">
-        {/* Pending, not impatient: a slow opacity pulse offset by a third
-            of a cycle per dot. Flattened under prefers-reduced-motion by
-            the keyframe override in globals.css. */}
-        <div className="flex items-center gap-[var(--space-1)]" aria-hidden="true">
-          {TIMING.streamingBounceDelays.map((delay, i) => (
-            <span
-              key={delay}
-              className="h-[var(--space-2)] w-[var(--space-2)] rounded-[var(--radius-pill)] bg-[var(--text-muted)] animate-[skeleton-pulse_var(--dur-pulse)_var(--ease-standard)_infinite]"
-              style={{ animationDelay: `calc(var(--dur-pulse) / 3 * ${i})` }}
-            />
-          ))}
-        </div>
-        {name ? (
-          <span className="text-[length:var(--text-xs)] font-medium leading-[var(--lh-ui)] text-[var(--text-muted)]">
-            Running {name}…
-          </span>
-        ) : null}
-      </div>
-      {models && models.length > 0 && (
-        <div className="flex flex-wrap gap-[var(--space-1)] pl-[var(--space-6)]">
-          {models.map((m) => (
-            <span key={m} className={cn(CHIP, 'font-mono')}>
-              <span className="h-1.5 w-1.5 rounded-[var(--radius-pill)] bg-[var(--accent)]" aria-hidden="true" />
-              {m.split('/').pop() || m}
-            </span>
-          ))}
-        </div>
-      )}
-      {agents && agents.length > 0 && (
-        <div className="flex flex-wrap gap-[var(--space-1)] pl-[var(--space-6)]">
-          {agents.map((a) => (
-            <Tooltip key={a.name} text={a.task}>
-              <span className={CHIP}>
-                <span
-                  className="h-1.5 w-1.5 rounded-[var(--radius-pill)] bg-[var(--accent)] animate-[skeleton-pulse_var(--dur-pulse)_var(--ease-standard)_infinite]"
-                  aria-hidden="true"
-                />
-                {a.name}
-              </span>
-            </Tooltip>
-          ))}
-        </div>
-      )}
-      {researchSteps && researchSteps.length > 0 && (
-        <div className="pl-[var(--space-6)]">
-          <ResearchProgress steps={researchSteps} />
-        </div>
-      )}
-    </div>
-  );
 }
 
 function ImageGenerationIndicator({ prompt }: { prompt?: string }) {
@@ -522,7 +458,7 @@ function ChatFeedComponent({
                     <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
                     Prompt Enhanced
                   </div>
-                  <div className="mb-[var(--space-2)] text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)] line-through opacity-70">
+                  <div className="mb-[var(--space-2)] text-[length:var(--text-sm)] leading-[var(--lh-body)] text-[var(--text-muted)] line-through">
                     {msg.meta?.original}
                   </div>
                   <div className="text-[length:var(--text-sm)] font-medium leading-[var(--lh-body)] text-[var(--text)]">
@@ -557,11 +493,17 @@ function ChatFeedComponent({
               {msg.loadingKind === 'image-generation' ? (
                 <ImageGenerationIndicator prompt={msg.loadingPrompt} />
               ) : msg.isStreaming && (
-                <PhaseIndicator
-                  name={msg.currentPhaseName}
-                  agents={msg.activeAgents}
+                <RunProgress
+                  method={msg.method}
+                  methodNote={msg.methodNote}
+                  phases={phases}
+                  currentPhase={msg.currentPhase}
+                  currentPhaseName={msg.currentPhaseName}
                   models={msg.phaseModels}
+                  agents={msg.activeAgents}
                   researchSteps={msg.researchSteps}
+                  startedAt={msg.startedAt}
+                  errorPhases={errorPhases}
                 />
               )}
               {msg.images && msg.images.length > 0 && (
@@ -611,7 +553,7 @@ function ChatFeedComponent({
                 </div>
               )}
               {msg.isStreaming && msg.streamingContent ? (
-                <div className="prose-serif prose-measure whitespace-pre-wrap text-[var(--text)]">
+                <div className="prose-serif prose-measure mt-[var(--space-4)] whitespace-pre-wrap text-[var(--text)]">
                   {msg.streamingContent}
                   <span
                     className="ml-0.5 inline-block h-[1em] w-0.5 animate-cursor-blink rounded-[var(--radius-sm)] bg-[var(--accent)] align-middle"
@@ -631,7 +573,7 @@ function ChatFeedComponent({
                   duration={msg.duration}
                   cost={msg.cost}
                 />
-              ) : phases.length > 0 ? (
+              ) : msg.isStreaming ? null : phases.length > 0 ? (
                 <div className="w-full">
                   {visiblePhases.map((phase, idx) => {
                     return (
@@ -656,7 +598,8 @@ function ChatFeedComponent({
                 </div>
               )}
             </ChatMessage>
-            {msg.role === 'assistant' && (
+            {/* Copy and rate a finished run only: mid-run there is nothing whole to copy. */}
+            {msg.role === 'assistant' && !msg.isStreaming && (
               <>
                 <MessageActions
                   content={msg.isStreaming ? (msg.streamingContent || msg.content) : msg.content}
