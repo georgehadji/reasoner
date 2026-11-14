@@ -312,5 +312,7 @@ class FinalSolution:
     evidence: dict[str, EvidenceBundle] = field(default_factory=dict)
     # High-stakes runs: {"jurisdiction": "GR" | None, "as_of": "YYYY-MM-DD"}. Empty otherwise.
     scope: dict[str, Any] = field(default_factory=dict)
+    # High-stakes runs: {"level": "answer"|"answer_with_caveats"|"refer", "reasons": [...]}.
+    reliability: dict[str, Any] = field(default_factory=dict)
 
 

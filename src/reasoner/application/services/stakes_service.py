@@ -76,7 +76,9 @@ def scope_prompt_block(domain: StakesDomain, scope: dict) -> str:
         f"\nHIGH-STAKES SCOPE ({domain.value}): jurisdiction {where}; as of {scope['as_of']}. "
         "State which rules apply as of this date and name the source of each rule. "
         "If the jurisdiction is not stated, say that the answer may differ by country "
-        "and do not assume one. Label a claim VERIFIED only when a primary source backs it.\n"
+        "and do not assume one. Label a claim VERIFIED only when a primary source backs it. "
+        'End with a short section "Who to ask and what to ask them": the kind of '
+        "professional or authority to consult, and the specific questions to put to them.\n"
     )
 
 

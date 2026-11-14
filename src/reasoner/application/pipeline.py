@@ -38,6 +38,7 @@ from reasoner.core import DEFAULT_PERSPECTIVES, PhaseConfig
 from reasoner.core.constants import (
     TRUNCATION,
 )
+from reasoner.core.degrade import degraded
 from reasoner.core.parsing import (
     coerce_list,
     extract_json,
@@ -407,6 +408,7 @@ class ReasonerPipeline:
 
         # ── Optional: Post-Synthesis Verification ──
         await self._phase_post_synthesis_verify(state)
+        self._assess_answerability(state)
 
         # ── Optional: B2-B4 Cross-Lingual Probe ─────────────────────────
         if state.language_sensitive and state.pivot_active:
@@ -537,6 +539,21 @@ class ReasonerPipeline:
                 await get_event_bus().publish(audit_evt)
         except Exception as exc:
             logger.debug("W2 premise audit event skipped: %s", exc)
+
+    def _assess_answerability(self, state: PipelineState) -> None:
+        """Imperative shell: record the pure assessment on a high-stakes run's solution."""
+        fs = state.final_solution
+        if fs is None or not fs.scope:  # scope is set only for an active high-stakes run
+            return
+        try:
+            from reasoner.application.services.answerability import assess_answerability
+
+            picks = [c.ranking[0] for c in state.critic_scores if c.ranking]
+            fs.reliability = assess_answerability(
+                fs.claim_labels, fs.verification_audit, picks
+            ).to_dict()
+        except Exception as exc:
+            degraded("pipeline.answerability", None, exc=exc, state=state)
 
     @timed
     async def _phase_post_synthesis_verify(self, state: PipelineState) -> None:

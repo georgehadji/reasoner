@@ -360,6 +360,14 @@ EVIDENCE_SENSOR_SOURCES: tuple[str, ...] = ("sensor", "search")
 # Sources capped at HYPOTHESIS (self-attested by LLM).
 EVIDENCE_MODEL_SOURCES: tuple[str, ...] = ("model",)
 
+# ── Answerability (high-stakes runs) ──
+# PROVISIONAL: set by judgement, to be tuned from the plan's section 6 evaluation data.
+# Share of claims not VERIFIED at which a caveat banner shows / a referral is advised.
+ANSWERABILITY_CAVEAT_UNVERIFIED_SHARE = 0.4
+ANSWERABILITY_REFER_UNVERIFIED_SHARE = 0.75
+# Critic disagreement (1 - share agreeing on the top candidate) that counts as a split.
+ANSWERABILITY_DISAGREEMENT = 0.5
+
 def get_quality_judge_threshold(preset_name: str) -> float:
     """Return the minimum score required to pass quality evaluation."""
     if "premium" in preset_name:
