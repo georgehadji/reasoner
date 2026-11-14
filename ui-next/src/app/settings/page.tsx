@@ -79,7 +79,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
-      <SiteHeader />
+      <SiteHeader themeToggle />
       <main className="flex-1 w-full">
         {/* ── Masthead ───────────────────────────────────────────
             No label above the h1 and no lede here, this is an account-management page, not a

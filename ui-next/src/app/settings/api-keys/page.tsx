@@ -210,7 +210,7 @@ export default function ApiKeysPage() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
-      <SiteHeader />
+      <SiteHeader themeToggle />
       <main id="main-content" className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 pt-24">
         <EmailVerifyBanner />
         <nav className="mb-6 text-[length:var(--text-sm)] text-[var(--text-muted)]">

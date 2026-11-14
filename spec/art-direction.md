@@ -158,6 +158,12 @@ control, the pinned pilot fragment changing state. All of it collapses under
   source and is replaced by the licence's one restriction (no hosted resale); the metadata
   promised billing and liability sections that do not exist. Jurisdiction and effective date
   are `[INPUT REQUIRED]`. Inspector: 0 FAIL.
+- Site chrome simplified (2026-11-14, Maeda's laws of simplicity): the header lost its theme
+  toggle (a `.site` page is charcoal in both schemes; `/settings` still passes `themeToggle`),
+  its "Secure" badge (/security makes that case), and its glass and shadow when scrolled (now a
+  flat ground and a hairline). Its one action reads "Open the app" signed in or out, and every
+  header action is a `<Link>`, so it prefetches and opens in a new tab. The footer's 14 links
+  are grouped as Product, Build, Trust and Company, and /cookies is now among them.
 - Rolled out (2026-11-13, tokens and chrome only): `.site` on every marketing page root,
   `SiteFooter` is now the quiet line, inverted bands flip to the concrete field, uppercase
   micro-labels and prose mono removed, `Reveal` mounted in `SiteHeader`. Their layouts are

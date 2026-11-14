@@ -9,8 +9,8 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
   // Unmount when closed. `opacity-0 + pointer-events-none` hides it from sight
   // only: the subtree stayed in the accessibility tree, so its 13 headings ran
   // ahead of the page's own <h1> in the outline, and its close button was still
-  // tabbable — keyboard users landed inside an invisible dialog. SiteHeader and
-  // SiteFooter each render one, so both effects happened twice per page.
+  // tabbable — keyboard users landed inside an invisible dialog. (SiteHeader and
+  // SiteFooter each rendered one then; SecurityBadge is the only caller now.)
   if (!isOpen) return null;
   // Never reached during SSR while `isOpen` starts false, but the guard keeps
   // that an implementation detail rather than a load-bearing assumption.
@@ -18,7 +18,7 @@ export function SecurityModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
 
   // Portalled to <body>. `position: fixed` resolves against the nearest ancestor
   // carrying a filter, backdrop-filter or transform — not the viewport — and
-  // this renders inside SiteHeader, which is `backdrop-blur-xl`. The overlay was
+  // it used to render inside SiteHeader, then `backdrop-blur-xl`. The overlay was
   // laid out against the 64px header bar: measured 1265×64 on a 1280×800
   // viewport. Inside the mobile drawer it was worse, clipped to that panel's
   // 319px column by the panel's reveal transform.
