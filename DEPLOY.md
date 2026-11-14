@@ -106,49 +106,15 @@ mv Caddyfile Caddyfile.dev
 mv Caddyfile.prod Caddyfile
 ```
 
-Edit `Caddyfile` — replace `yourdomain.com` and `your-email@example.com`:
+The site address and ACME email are environment placeholders,
+`{$DOMAIN:yourdomain.com}` and `{$ACME_EMAIL:your-email@example.com}`. Either
+edit the two defaults in `Caddyfile`, or pass `DOMAIN` and `ACME_EMAIL` to the
+`caddy` service (`docker-compose.oracle.yml` does this from `.env`; on Oracle
+Cloud follow `docs/DEPLOY_ORACLE.md` instead of renaming files).
 
-```caddy
-yourdomain.com {
-    redir https://{host}{uri}
-}
-
-yourdomain.com:443 {
-    tls your-email@example.com
-
-    header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-        X-Content-Type-Options "nosniff"
-        X-Frame-Options "DENY"
-        Referrer-Policy "strict-origin-when-cross-origin"
-        Permissions-Policy "geolocation=(), microphone=(), camera=()"
-    }
-
-    handle /api/health {
-        reverse_proxy https://backend:8000 {
-            transport http { tls_insecure_skip_verify }
-        }
-    }
-
-    handle /api/* {
-        reverse_proxy https://backend:8000 {
-            transport http { tls_insecure_skip_verify }
-        }
-    }
-
-    handle /ws/* {
-        reverse_proxy https://backend:8000 {
-            transport http { tls_insecure_skip_verify }
-        }
-    }
-
-    handle {
-        reverse_proxy https://frontend:3000 {
-            transport http { tls_insecure_skip_verify }
-        }
-    }
-}
-```
+Do not add a separate `yourdomain.com { redir https://... }` block. Auto-HTTPS
+already redirects port 80, and a bare-domain block also binds `:443` ahead of
+the proxy routes, so every HTTPS request redirects to itself.
 
 Caddy automatically obtains and renews Let's Encrypt certificates.
 
