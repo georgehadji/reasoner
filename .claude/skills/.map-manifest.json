@@ -1336,6 +1336,7 @@
       "tests/unit/test_sse_phase_error_fatal.py",
       "tests/unit/test_stakes_patterns.py",
       "tests/unit/test_stakes_policy.py",
+      "tests/unit/test_stakes_scope.py",
       "tests/unit/test_start_all_signals.py",
       "tests/unit/test_streaming_failure_signals.py",
       "tests/unit/test_synthesis_prose_fallback.py",
