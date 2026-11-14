@@ -57,6 +57,7 @@ folders:
 | `spans.py` | `detect_protected_spans` — never scrub inside code fences, inline code, URLs, or markdown link targets. |
 | `report.py` | Frozen report objects: `CharHit`, `TextInspectReport`, `ScrubStats`, `ScrubResult`. |
 | `divergence.py` | Bigram-Jaccard lexical divergence for Layer B rewrite candidates; `select_most_diverged`. |
+| `stakes.py` | Frozen `StakesProfile`/`Jurisdiction`/`StakesDomain`: how costly a wrong answer is (health, legal, financial). Stdlib only. |
 
 ## Key entry points & gotchas
 

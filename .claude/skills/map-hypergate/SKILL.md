@@ -32,6 +32,8 @@ folders:
 | `method_classifier.py` (8.5KB) | Picks the reasoning method using the opaque B–U letter taxonomy. Owns `_TAXONOMY` + `_DESCRIPTIONS` → `CATEGORY_LIST`, the single source the TieBreaker also renders. |
 | `tie_breaker.py` | Resolves conflicts / all-low-confidence; sees the full `HyperContext`; validates action + method. |
 | `image_model_selector.py` | On-demand only (image endpoint): maps an image prompt to capability family + cost tier. Not part of the parallel five. |
+| `stakes_patterns.py` | `match_stakes(text)`: accent-folded English+Greek regex for health/law/finance, with near-miss guards. |
+| `stakes_policy.py` | `apply_stakes_policy(decision, profile)`: pure reroute of direct/web_search to a grounded pipeline; never touches tier. Called once at the end of `HyperGateAgent.decide` under `STAKES_POLICY_MODE`. |
 
 ## Key entry points & gotchas
 

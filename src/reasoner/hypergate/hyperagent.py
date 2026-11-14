@@ -22,9 +22,12 @@ from reasoner.core.constants import (
     HYPERGATE_METHOD_THRESHOLD,
     HYPERGATE_WEB_THRESHOLD,
 )
+from reasoner.domain.stakes import StakesDomain, StakesProfile
 from reasoner.hypergate import jev_router
 from reasoner.hypergate.gate_agent import GateDecision
 from reasoner.hypergate.models import HyperContext, SubAgentInput, SubAgentOutput
+from reasoner.hypergate.stakes_patterns import match_stakes
+from reasoner.hypergate.stakes_policy import apply_stakes_policy
 from reasoner.hypergate.sub_agents import (
     ComplexityEstimatorSubAgent,
     DirectDetectorSubAgent,
@@ -355,7 +358,36 @@ class HyperGateAgent:
 
         Uncached by design; see the class comment. Callers that want the decision
         cached call gate_service.run_gate_cached instead of this directly.
+
+        The single choke point for the stakes policy: every route below (fast
+        paths, jev, sub-agents, tiebreaker) passes through it.
         """
+        decision = await self._decide(problem)
+        return self._apply_stakes(problem, decision)
+
+    @staticmethod
+    def _apply_stakes(problem: str, decision: GateDecision) -> GateDecision:
+        from reasoner.core.settings import settings
+
+        mode = settings.STAKES_POLICY_MODE
+        if mode not in ("shadow", "active") or named_method(problem):
+            return decision  # off, a typo, or a method the user chose
+        domain = match_stakes(problem)
+        if domain is StakesDomain.NONE:
+            return decision
+        profile = StakesProfile(domain=domain, confidence=1.0, source="regex")
+        rerouted = apply_stakes_policy(decision, profile)
+        logger.info(
+            "HyperGate stakes mode=%s domain=%s action=%s->%s method=%s->%s",
+            mode, domain.value, decision.action, rerouted.action,
+            decision.method, rerouted.method,
+        )
+        # shadow: log only, but still record the profile for observers.
+        return rerouted if mode == "active" else decision.model_copy(
+            update={"stakes": profile.to_dict()}
+        )
+
+    async def _decide(self, problem: str) -> GateDecision:
         problem_hash = hashlib.sha256(problem.encode()).hexdigest()
 
         fast = fast_path(problem)
