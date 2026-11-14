@@ -94,7 +94,6 @@ _MULTI_PERSPECTIVE_PRESETS = {
 }
 
 
-
 def _method_type(preset_name: str | None) -> MethodType:
     if preset_name in _DEBATE_PRESETS:       return MethodType.DEBATE
     if preset_name in _RESEARCH_PRESETS:     return MethodType.RESEARCH
@@ -128,10 +127,8 @@ def _label_color(label: ClaimLabel) -> str:
     }.get(label, "white")
 
 
-
 def _duration(state: PipelineState) -> float:
     return (datetime.now(UTC) - state.started_at).total_seconds()
-
 
 
 def _render_stress(state: PipelineState, section_title: str = "Phase 4 — Stress Tests") -> None:
@@ -146,7 +143,6 @@ def _render_stress(state: PipelineState, section_title: str = "Phase 4 — Stres
         stress_text.append(f"  Failure: {sr.failure_mode}\n", style="dim")
         stress_text.append(f"  Recovery: {sr.recovery_path}\n\n", style="dim cyan")
     console.print(Panel(stress_text, title=f"[cyan]{section_title}[/cyan]", box=box.ROUNDED))
-
 
 
 def _render_action_blueprint(state: PipelineState, title: str = "Action Blueprint") -> None:
@@ -176,7 +172,6 @@ def _render_action_blueprint(state: PipelineState, title: str = "Action Blueprin
         elif step is not None and str(step).strip():
             table.add_row("", str(step), "", "", "")
     console.print(table)
-
 
 
 def _render_errors(state: PipelineState) -> None:
@@ -369,39 +364,4 @@ def export_to_json(state: PipelineState, path: str) -> None:
 
 # ── CoVe RENDERER ────────────────────────────────────────────────────
 
-
-def render_perspective_content(content: str) -> str:
-    """Convert non-standard perspective JSON to human-readable markdown.
-
-    If the content is a JSON string with nested objects (e.g., from a
-    destructive perspective that ignored the schema), flatten it to
-    markdown bullet points. Otherwise return as-is.
-    """
-    try:
-        data = json.loads(content)
-    except (json.JSONDecodeError, TypeError):
-        return content  # Not JSON — return raw
-
-    if not isinstance(data, dict):
-        return content  # JSON array/primitive — return raw
-
-    if "core_analysis" in data:
-        return content  # Standard schema — return raw
-
-    # Non-standard nested dict — flatten to markdown
-    lines = []
-    for category, items in data.items():
-        lines.append(f"**{category.replace('_', ' ').title()}**")
-        if isinstance(items, dict):
-            for sub_key, sub_val in items.items():
-                title = sub_key.replace('_', ' ').title()
-                if isinstance(sub_val, dict):
-                    val_text = sub_val.get('risk', sub_val.get('incorrect_assumption', str(sub_val)))
-                else:
-                    val_text = str(sub_val)
-                lines.append(f"- **{title}**: {val_text}")
-        else:
-            lines.append(str(items))
-        lines.append("")
-    return "\n".join(lines)
 

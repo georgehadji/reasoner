@@ -69,74 +69,6 @@ class EventStore:
     async def _run_in_executor(self, func: Callable, *args: Any) -> Any:
         return await self.conn.run_in_executor(func, *args)
 
-    def _init_db(self) -> None:
-        """Initialize database schema."""
-        conn = self._get_connection()
-
-        conn.executescript("""
-            -- Events table (append-only log)
-            CREATE TABLE IF NOT EXISTS events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                event_id TEXT UNIQUE NOT NULL,
-                event_type TEXT NOT NULL,
-                aggregate_id TEXT NOT NULL,
-                aggregate_type TEXT NOT NULL DEFAULT 'pipeline',
-                version INTEGER NOT NULL,
-                timestamp REAL NOT NULL,
-                payload TEXT NOT NULL,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
-                -- UNIQUE(aggregate_id, version) removed: version always 1, see GH-###
-            );
-            
-            -- Indexes for common queries
-            CREATE INDEX IF NOT EXISTS idx_events_aggregate 
-                ON events(aggregate_id, version);
-            CREATE INDEX IF NOT EXISTS idx_events_type 
-                ON events(event_type);
-            CREATE INDEX IF NOT EXISTS idx_events_timestamp 
-                ON events(timestamp);
-            CREATE INDEX IF NOT EXISTS idx_events_created 
-                ON events(created_at);
-            
-            -- Aggregates table (current state snapshot)
-            CREATE TABLE IF NOT EXISTS aggregates (
-                aggregate_id TEXT PRIMARY KEY,
-                aggregate_type TEXT NOT NULL,
-                current_version INTEGER NOT NULL DEFAULT 0,
-                status TEXT NOT NULL DEFAULT 'pending',
-                problem TEXT,
-                preset TEXT,
-                method TEXT,
-                created_at TEXT NOT NULL DEFAULT (datetime('now')),
-                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-            );
-            
-            -- Index for listing aggregates
-            CREATE INDEX IF NOT EXISTS idx_aggregates_status 
-                ON aggregates(status);
-            CREATE INDEX IF NOT EXISTS idx_aggregates_created 
-                ON aggregates(created_at);
-            
-            -- Snapshots table (for faster aggregate reconstruction)
-            CREATE TABLE IF NOT EXISTS snapshots (
-                aggregate_id TEXT PRIMARY KEY,
-                version INTEGER NOT NULL,
-                state TEXT NOT NULL,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
-            );
-
-            -- Dead-letter queue for un-persistable events (DM8)
-            CREATE TABLE IF NOT EXISTS dead_letter_queue (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                event_id TEXT,
-                event_type TEXT NOT NULL,
-                raw_payload TEXT NOT NULL,
-                error TEXT NOT NULL,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
-            );
-        """)
-
-        conn.commit()
 
     async def save_events(self, events: list[DomainEvent]) -> None:
         """
@@ -644,13 +576,6 @@ class EventStore:
 
         return await self._run_in_executor(_get_snapshot_sync)
 
-    async def get_events_since(
-        self,
-        aggregate_id: str,
-        since_version: int,
-    ) -> list[DomainEvent]:
-        """Get events since a specific version (for sync/resume)."""
-        return await self.get_events(aggregate_id, since_version)
 
     async def count_events(self, aggregate_id: str) -> int:
         """

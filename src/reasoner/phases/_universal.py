@@ -262,9 +262,6 @@ CRITICAL VETTING RULES:
 6.  **Default to "Flag":** If you are uncertain about the quality or relevance of a source, ERR ON THE SIDE OF CAUTION and flag it for removal. It is better to have fewer high-quality sources than many noisy ones.
 7.  If the text is a high-quality, relevant, and factual source, return an empty list for its flags."""
 
-def cot_detection_prompt(state: PipelineState, retrieved_text: str) -> str:
-    return f'{get_language_instruction(state)}\n\nProblem: {_wrap_user_input(state.problem)}\n\nReview the following retrieved text. Identify ONLY statements that are clearly factually incorrect, unsubstantiated, or overly speculative. Do NOT flag minor simplifications or educational summaries. If no clear issues are found, return an empty list.\n\nRetrieved Text:\n{_wrap_external_content(retrieved_text)}\n\nOutput JSON: {{"flags": [{{"statement": "<problematic statement>", "reasoning": "<why it\'s problematic>"}}]}}'
-
 
 def cot_detection_batch_prompt(state: PipelineState, snippets: list[dict]) -> str:
     """Batch vetting prompt — vet multiple search snippets in a single LLM call."""
@@ -299,25 +296,6 @@ ITERATIVE_PREPLAN_SYSTEM = (
     "targeted search queries. Do NOT rely on your internal knowledge — always plan "
     "to search for external sources. Output ONLY valid JSON."
 )
-
-def iterative_context_prompt(state: PipelineState, current_results: list[dict], iteration: int, max_iterations: int) -> str:
-    results_str = json.dumps(current_results, indent=2) if current_results else "No results yet."
-    source_count = len(current_results)
-    return (
-        f'{get_language_instruction(state)}\n\n'
-        f'Problem: {_wrap_user_input(state.problem)}\n\n'
-        f'Iteration: {iteration} of {max_iterations}\n'
-        f'Sources gathered so far: {source_count}\n\n'
-        f'Current Search Results:\n{results_str}\n\n'
-        f'RULES:\n'
-        f'1. You MUST continue searching until you have at least 3-5 relevant, '
-        f'high-quality external sources, OR until maximum iterations are reached.\n'
-        f'2. Do NOT declare "done" just because you have internal knowledge on the topic.\n'
-        f'3. Generate up to 3 highly specific, targeted search queries.\n'
-        f'4. Avoid generic queries (e.g., "AI", "technology", "video"). Be specific to the problem.\n'
-        f'5. Prefer authoritative sources: academic papers, reputable news, expert analyses.\n\n'
-        f'Output JSON: {{"action": "search|done", "queries": ["<query1>", "<query2>"], "reasoning": "<why you need more info or have enough>"}}'
-    )
 
 
 def iterative_preplan_prompt(state: PipelineState) -> str:

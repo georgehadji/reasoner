@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
@@ -368,8 +367,6 @@ rate_limiter = get_rate_limiter(RateLimitConfig(
 # Initialize auth manager
 auth_manager = get_auth_manager()
 
-from reasoner.infrastructure.llm.registry import _REGISTRY
-
 # Neuro Integration
 from reasoner.neuro.server import create_neuro_router
 
@@ -424,17 +421,6 @@ def get_architecture_components():
 
     return _event_store, _handler_registry
 
-
-def _filter_routing(routing: dict[str, str], primary_id: str) -> dict[str, str]:
-    """Drop routing entries whose API key is missing; fall back to primary."""
-    filtered = {}
-    for role, model_id in routing.items():
-        entry = _REGISTRY.get(model_id, {})
-        env = entry.get("env")
-        if env and not os.environ.get(env):
-            continue  # no key → omit, ProviderRouter falls back to primary
-        filtered[role] = model_id
-    return filtered
 
 # Per-run cancellation tracking.
 # Encapsulated in RunStateManager for testability and safe async locking.
@@ -990,7 +976,6 @@ app.add_api_route("/api/metrics", metrics_endpoint, methods=["GET"], dependencie
 # ─────────────────────────────────────────────────────────────────────
 
 
-
 # Note: 'resource' module is Unix-only, not available on Windows
 # Memory limits use psutil instead
 
@@ -1030,7 +1015,6 @@ async def root():
 
 
 # ─────────────────────────────────────────────────────────────────────
-
 
 
 # ─────────────────────────────────────────────────────────────────────

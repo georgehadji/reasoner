@@ -572,17 +572,6 @@ def get_all_circuit_breakers() -> dict[str, dict[str, Any]]:
         return {**memory, **redis}
 
 
-async def reset_all_circuits() -> None:
-    """Reset all circuit breakers (both memory and Redis-backed)."""
-    with _circuit_breaker_lock:
-        memory_cbs = list(_circuit_breakers.values())
-        redis_cbs = list(_redis_circuit_breakers.values())
-    for cb in memory_cbs:
-        await cb.reset()
-    for cb in redis_cbs:
-        await cb.reset()
-
-
 # Helper for dataclass
 def asdict(obj: Any) -> dict:
     """Simple asdict replacement for dataclasses."""

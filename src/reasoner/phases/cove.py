@@ -73,18 +73,6 @@ def cove_answer_prompt(state: PipelineState) -> str:
         f'"reasoning": "<why>"'
         f'}}]}}'
     )
-def cove_answer_prompt_single(question: dict) -> str:
-    """Factored variant (CoVE paper Sec 3.3). One question per call, no baseline draft."""
-    return (
-        f'Question: {question.get("question", "")}\n\n'
-        f'Answer this question accurately using your own knowledge. '
-        f'Do NOT refer to any previous draft or response.\n\n'
-        f'Output JSON: {{'
-        f'"answer": "<your answer>", '
-        f'"confidence": 0.8, '
-        f'"reasoning": "<why>"'
-        f'}}'
-    )
 
 # Factor+Revise Cross-Check (CoVE paper, Sec 3.4)
 COVE_CROSSCHECK_SYSTEM = (
@@ -92,24 +80,6 @@ COVE_CROSSCHECK_SYSTEM = (
     "original claims and report mismatches. " + JSON_ONLY_FOOTER
 )
 
-def cove_crosscheck_prompt(state: PipelineState) -> str:
-    """Generate a cross-check prompt to detect inconsistencies between
-    independent verification answers and the original draft claims."""
-    draft = state.cove_state.get("draft_answer", "")
-    answers = state.cove_state.get("verification_answers", [])
-    return (
-        f'{get_language_instruction(state)}\n\n'
-        f'Original Draft:\n{_wrap_external_content(draft)}\n\n'
-        f'Verification Results:\n{_wrap_external_content(json.dumps(answers, indent=2))}\n\n'
-        f'For EACH verification result, determine if the answer contradicts '
-        f'the original draft claim. Report any inconsistencies found.\n\n'
-        f'Output JSON: {{"inconsistencies": [{{'
-        f'"claim": "<original claim>", '
-        f'"verification_answer": "<what was found>", '
-        f'"is_contradiction": true, '
-        f'"resolution": "<suggested fix>"'
-        f'}}]}}'
-    )
 
 # Few-Shot Demonstrations (CoVE paper, Sec 3.4)
 COVE_FEW_SHOT = (

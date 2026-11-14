@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 
 from fastapi import Depends, HTTPException, Request, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from reasoner.api.client_ip import get_client_ip
 from reasoner.api.csrf import verify_csrf_token
 from reasoner.auth import AuthenticationError, get_auth_manager
 from reasoner.domain.api_keys import looks_like_api_key
@@ -47,7 +45,6 @@ def _get_auth_manager_instance_auth_deps() -> AuthManager:
     return _auth_manager_instance_auth_deps
 
 
-
 async def _is_authenticated_api_key_request(request: Request) -> bool:
     """Whether this request presents a valid Reasoner API key.
 
@@ -76,14 +73,6 @@ async def _is_authenticated_api_key_request(request: Request) -> bool:
     except Exception as exc:
         logger.warning("API key CSRF exemption check failed: %s", exc)
         return False
-
-
-async def get_client_id(request: Request) -> str:
-    """Extract client ID from request (IP + User-Agent)."""
-    ip = get_client_ip(request)
-    user_agent = request.headers.get("User-Agent", "")
-    # SHA-256 with 16 hex chars (64-bit) to make collision-based bypass impractical
-    return f"{ip}:{hashlib.sha256(user_agent.encode()).hexdigest()[:16]}"
 
 
 def _auth_failure(detail: str = "Authentication required") -> HTTPException:

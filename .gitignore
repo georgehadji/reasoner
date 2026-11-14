@@ -97,6 +97,7 @@ reasonix.toml
 
 # Runtime upload artifacts (created by the file-upload endpoint at runtime)
 src/reasoner/infrastructure/uploads/
+src/reasoner/uploads/
 src/reasoner/infrastructure/.upload_hash_index.json
 
 # Pipeline ownership map — runtime state written on every run by

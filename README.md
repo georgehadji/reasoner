@@ -323,7 +323,6 @@ Reasoner records structured runtime telemetry to optimize pricing, route around 
 | E2 | Phase telemetry store | App-level `TelemetryStore` (SQLite/PostgreSQL) recording model, cost, and duration per phase. |
 | E3 | Context compression | `smart_compress` applied at pipeline handoffs to minimize token cost. |
 | E4 | Fallback surfacing | `ProviderRouter` detects model failures and fires `on_fallback()` callbacks to route around dead endpoints. |
-| E5 | Healing exporter | `healing/telemetry_exporter.py` connects runtime context to static analysis tooling in CI. |
 
 Querying telemetry programmatically:
 

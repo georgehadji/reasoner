@@ -11,26 +11,14 @@
 # boundary (providers/openai_compat.py::_translate, providers/direct.py::
 # _translate).
 #
-# This package used to hold a second BaseLLMProvider in ports.py with an
-# incompatible interface and no complete_with_retry(), plus three more LLMError
-# classes in ports.py, exceptions.py and base.py, none a subclass of the
-# others. Both traps had been sprung: NoopProvider and two dummy providers
-# subclassed the ports base, and an infrastructure LLMError raised from a
-# provider was not caught by the fallback chain. The duplicates are deleted;
-# infrastructure/llm/exceptions.py is a deprecated alias shim.
-#
-# LLMConfig, LLMResponse and Message below are the data types ports.py still
-# owns; import them from .ports when writing to the LLMProvider Protocol.
+# A second BaseLLMProvider and three more LLMError trees used to live here;
+# P2 deleted them (tests/test_defect_hunt_fixes.py guards the result).
 
 from reasoner.infrastructure.llm.base import BaseLLMProvider, LLMError
 from reasoner.infrastructure.llm.executor import LLMExecutor
-from reasoner.infrastructure.llm.ports import LLMConfig, LLMResponse, Message
 
 __all__ = [
     "BaseLLMProvider",
-    "LLMResponse",
-    "LLMConfig",
-    "Message",
     "LLMError",
     "LLMExecutor",
 ]

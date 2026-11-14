@@ -28,9 +28,6 @@ from reasoner.core.events.domain_events import (
     PipelineFailed,
     PipelineStarted,
     StressTestCompleted,
-    WidgetDetected,
-    WidgetExecuted,
-    WidgetFailed,
 )
 from reasoner.core.ports.metrics_port import count_illegal_transition
 from reasoner.core.state_machine import Machine
@@ -440,61 +437,3 @@ class WidgetStateData:
     logs: list[str] = field(default_factory=list)
 
 
-class WidgetAggregate(Aggregate):
-    """
-    Event-sourced aggregate for widget execution.
-    
-    Tracks widget lifecycle from detection through execution.
-    """
-
-    def __init__(self, aggregate_id: str):
-        super().__init__(aggregate_id)
-        self._state_data = WidgetStateData()
-
-    def _apply_event(self, event: DomainEvent) -> None:
-        """Apply event-specific state changes."""
-
-        from reasoner.core.events.domain_events import WidgetDetected, WidgetExecuted, WidgetFailed
-
-        if isinstance(event, WidgetDetected):
-            self._apply_widget_detected(event)
-        elif isinstance(event, WidgetExecuted):
-            self._apply_widget_executed(event)
-        elif isinstance(event, WidgetFailed):
-            self._apply_widget_failed(event)
-
-    def _apply_widget_detected(self, event: WidgetDetected) -> None:
-        self._state_data.widget_type = event.widget_type
-        self._state_data.status = "detected"
-        self._state_data.logs.append(f"Widget detected: {event.widget_type}")
-
-    def _apply_widget_executed(self, event: WidgetExecuted) -> None:
-        self._state_data.result = event.result
-        self._state_data.status = "completed"
-        self._state_data.end_time = event.timestamp
-        self._state_data.duration_seconds = event.duration_seconds
-        self._state_data.logs.append(
-            f"Widget completed: {event.widget_type} "
-            f"({event.duration_seconds:.2f}s)"
-        )
-
-    def _apply_widget_failed(self, event: WidgetFailed) -> None:
-        self._state_data.status = "failed"
-        self._state_data.error = event.error
-        self._state_data.end_time = event.timestamp
-        self._state_data.logs.append(f"Widget failed: {event.error}")
-
-    @property
-    def state_data(self) -> WidgetStateData:
-        """Get current widget state."""
-        return self._state_data
-
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize state to dictionary."""
-        from dataclasses import asdict
-        return {
-            'aggregate_id': self.aggregate_id,
-            'version': self.version,
-            'state': asdict(self._state_data),
-            'pending_events': [e.to_dict() for e in self.get_pending_events()],
-        }

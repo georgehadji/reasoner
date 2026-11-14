@@ -43,12 +43,10 @@ DEFAULT_SOURCE_TYPE: Literal["general", "academic", "social", "news", "code"] = 
 DEFAULT_NUM_SUGGESTIONS: int = 5
 DEFAULT_SEARCH_RESULTS: int = 10
 DEFAULT_MAX_DECOMPOSED_QUERIES: int = 3
-DEFAULT_CIRCUIT_BREAKER_THRESHOLD: int = 3
 DEFAULT_MAX_RETRIES: int = 3
 DEFAULT_BACKOFF_BASE: int = 2
 DEFAULT_BACKOFF_DELAY: float = 1.0
 DEFAULT_HEARTBEAT_INTERVAL: float = 30.0
-DEFAULT_SNAPSHOT_INTERVAL: float = 60.0
 DEFAULT_DB_COMMAND_TIMEOUT: int = 60
 CORS_MAX_AGE_SECONDS: int = 86400
 MAX_CACHE_FILES: int = 1000
@@ -67,8 +65,6 @@ VALIDATION_TEST_MAX_TOKENS: int = 1
 GATE_MAX_TOKENS: int = 256
 GATE_TEMPERATURE: float = 0.0
 GATE_TIMEOUT_SECONDS: float = 5.0
-GATE_CONFIDENCE_THRESHOLD: float = 0.70
-GATE_DEFAULT_MODEL: str = MODEL_GROK_43  # non-OpenAI model that supports temperature=0
 
 # ═════════════════════════════════════════════════════════════════════
 # HYPERGATE AGENT (sub-agent orchestrator replacing GateAgent)
@@ -357,14 +353,6 @@ SEARCH_METHOD_CHAINS: dict[str, dict[str, list[str]]] = {
     },
 }
 
-# ── Plan Contract / Feedback Router (#5) ──
-# Maximum number of validation commands in a plan contract.
-MAX_VALIDATION_COMMANDS: int = 10
-# Keywords that flag a coding operation as risky (triggers review).
-RISKY_OP_KEYWORDS: tuple[str, ...] = (
-    "drop table", "delete from", "rm -rf", "sudo",
-    "chmod 777", "format", "mkfs", "dd if=",
-)
 
 # ── Evidence Bundle Promotion Tiers (#3) ──
 # Sources eligible for VERIFIED status (deterministic/grounded only).
@@ -552,7 +540,6 @@ JSON_ONLY_FOOTER: str = "Output ONLY valid JSON."
 
 IMAGE_GEN_BUDGET_PRESET: str = "image-gen-budget"
 IMAGE_GEN_PREMIUM_PRESET: str = "image-gen-premium"
-IMAGE_GEN_PRESET_ALIASES: tuple[str, str] = ("budget", "premium")
 IMAGE_GEN_ALLOWED_PRESETS: tuple[str, str] = (
     IMAGE_GEN_BUDGET_PRESET,
     IMAGE_GEN_PREMIUM_PRESET,
@@ -693,22 +680,17 @@ ARTICLE_CRITIC_MAX_WORDS: int = 4000
 # DIRECT ANSWER / STREAMING DEFAULTS
 # ═════════════════════════════════════════════════════════════════════
 
-CREATIVE_MAX_TOKENS: int = 4096
 DIRECT_ANSWER_MAX_TOKENS: int = 2048
 CREATIVE_TEMPERATURE: float = 0.8
 DIRECT_ANSWER_TEMPERATURE: float = 0.7
-MAX_PROBLEM_DISPLAY_CHARS: int = 120
 
 # ═════════════════════════════════════════════════════════════════════
 # CALCULATION WIDGET LIMITS
 # ═════════════════════════════════════════════════════════════════════
 
-MAX_EXPRESSION_DEPTH: int = 100
-MAX_EXPRESSION_LENGTH: int = 10000
 
 # ── Event Store Compaction ──────────────────────────────────────────
 EVENT_RETENTION_DAYS: int = 365
-SNAPSHOT_RETENTION_COUNT: int = 3   # reserved — current schema supports only 1 snapshot/aggregate
 COMPACTION_BATCH_SIZE: int = 500
 
 # ═════════════════════════════════════════════════════════════════════

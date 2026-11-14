@@ -11,7 +11,7 @@ export const CAPABILITIES = {
   directModels: 156,
   routableModels: 515,
   providerAdapters: 8,
-  testFiles: 361,
+  testFiles: 360,
   generatedAt: '2026-11-14',
 } as const;
 

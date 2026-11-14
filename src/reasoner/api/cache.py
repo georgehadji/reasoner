@@ -40,20 +40,6 @@ _cache_misses: int = 0
 _cache_evictions: int = 0  # Track evictions for metric
 
 
-def get_cache_stats() -> dict[str, int | float]:
-    """Return memory cache telemetry."""
-    total = _cache_hits + _cache_misses
-    return {
-        "hits": _cache_hits,
-        "misses": _cache_misses,
-        "evictions": _cache_evictions,
-        "total": total,
-        "hit_rate": (_cache_hits / total) if total > 0 else 0.0,
-        "current_size": len(_MEMORY_CACHE),
-        "max_size": _MEMORY_CACHE_MAX_SIZE,
-    }
-
-
 def _prune_memory_cache_locked() -> None:
     """FIFO eviction for the in-memory cache.
 
@@ -79,12 +65,6 @@ def _prune_memory_cache_locked() -> None:
                 REASONER_CACHE_EVICTIONS.set(_cache_evictions)
             except Exception:
                 pass
-
-
-def _prune_memory_cache() -> None:
-    """Simple FIFO eviction for the in-memory cache (thread-safe)."""
-    with _memory_cache_lock:
-        _prune_memory_cache_locked()
 
 
 def _mem_key(key: str, user_id: str | None) -> str:

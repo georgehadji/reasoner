@@ -43,12 +43,6 @@ def _with_reasoning(system_prompt: str, focus: str) -> str:
     )
 
 
-def strip_reasoning_from_code(raw_code: str) -> str:
-    """Strip <think> blocks from generated code before writing to file."""
-    import re
-    return re.sub(r"<think>[\s\S]*?</think>", "", raw_code).strip()
-
-
 # ── Quality contract appended to every generation prompt ──────────────────────
 _CODE_QUALITY_CONTRACT = (
     "\n\nPRODUCTION CODE CONTRACT — every file you write MUST satisfy ALL of these:\n"
