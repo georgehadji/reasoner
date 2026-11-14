@@ -215,6 +215,16 @@ control, the pinned pilot fragment changing state. All of it collapses under
   credit figures from `lib/credits.ts`, not from copy. The "Or" rule became the words "or with
   your email". Inspector: 0 FAIL at 1440, 768 and 390 with `few-pictures,still-page` allowed (a
   one-screen form has nothing to picture or animate); axe clean at 320 and 1440.
+- Dashboard rebuilt as the first app screen (2026-11-14): app style `true-black-flat` (seed
+  363159695) in the site palette and type. Depth comes from lightness alone (--site-bg, --site-surface,
+  --site-surface-2), cards have no borders, the accent sits only on data (the quota meter), and
+  the primary action "Start a run" is an ink pill. Its question: how many credits are left, and
+  what will they buy? The balance is the largest figure, read as runs per `RUN_COSTS` beside it,
+  and the title line says the same in words. Shell: the site header, not a sidebar, since the
+  account pages are two screens. Corrected: anonymous visitors saw a made-up "0 / 20" quota (now
+  `useRequireAuth`), and the "Recent Activity" chart plotted tokens per history entry under date
+  labels, which is neither what is billed nor per day; it is gone, and the credit ledger answers
+  that question. Inspector `--app`: 0 FAIL, 0 WARN at 1440, 768 and 390 on sample data; axe clean.
 - Site chrome simplified (2026-11-14, Maeda's laws of simplicity): the header lost its theme
   toggle (a `.site` page is charcoal in both schemes; `/settings` still passes `themeToggle`),
   its "Secure" badge (/security makes that case), and its glass and shadow when scrolled (now a
