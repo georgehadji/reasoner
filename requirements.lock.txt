@@ -40,10 +40,6 @@ anyio==4.16.0 \
     #   openai
     #   starlette
     #   watchfiles
-asteval==1.0.10 \
-    --hash=sha256:46a4ed13cc2e4a29a21418f89dedd57db70d98eb96db0fb4c441d4edb2f5afed \
-    --hash=sha256:8d805fa8084aa12204715f799430f0012a0db38b42e997f9f11a9637ad59855f
-    # via -r requirements.txt
 asyncpg==0.32.0 \
     --hash=sha256:0549af18b697221d1992b7def18aa61652a85ecbe6e19ba2a75277560efe6016 \
     --hash=sha256:057ed2455e4e14ad9949f1ac1829112c7d0454c9810b124f36de1486febe6824 \
