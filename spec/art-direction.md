@@ -136,6 +136,13 @@ control, the pinned pilot fragment changing state. All of it collapses under
   matches the corrected security wording (no training on user data, providers have their own
   terms); "20 questions a month" became the 500 free credits from `TIER_CREDITS`.
   Inspector: 0 FAIL.
+- /faq rebuilt (2026-11-14): "Asked first, answered here." beside an index of every question,
+  then the answers printed in full (no accordion) in four `ArgumentSection`s grouped by the new
+  `topic` field in `lib/faq.ts`, with fragments for the credit table, a streamed agent run and
+  what the erase endpoint removes. Claims corrected: the API answer named `POST /api/run`,
+  which takes CSRF, not a bearer key (now `/api/agent/run` and `/run/sync`); Neuro Memory
+  "can be cleared at any time" became "erased with your data through the API". Inspector:
+  0 FAIL.
 - Rolled out (2026-11-13, tokens and chrome only): `.site` on every marketing page root,
   `SiteFooter` is now the quiet line, inverted bands flip to the concrete field, uppercase
   micro-labels and prose mono removed, `Reveal` mounted in `SiteHeader`. Their layouts are
