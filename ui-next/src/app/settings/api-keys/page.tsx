@@ -209,9 +209,9 @@ export default function ApiKeysPage() {
   const atLimit = Boolean(limits && keys.length >= limits.max_keys);
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
-      <SiteHeader themeToggle />
-      <main id="main-content" className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 pt-24">
+    <div className="site flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
+      <SiteHeader />
+      <main id="main-content" className="mx-auto w-full max-w-[var(--site-max)] flex-1 px-[var(--site-margin)] pb-[var(--space-16)] pt-[var(--space-24)]">
         <EmailVerifyBanner />
         <nav className="mb-6 text-[length:var(--text-sm)] text-[var(--text-muted)]">
           <Link href="/settings" className="transition-colors hover:text-[var(--text)]">
@@ -225,7 +225,7 @@ export default function ApiKeysPage() {
 
         <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="font-display text-[length:var(--text-3xl)] font-bold">API keys</h1>
+            <h1 className="font-display text-[length:var(--text-2xl)] leading-[var(--site-lh-head)]">API keys</h1>
             <p className="mt-2 max-w-xl text-[var(--text-muted)]">
               Authenticate scripts, agents, and backend services. See the{' '}
               <Link href="/docs/api-keys" className="text-[var(--accent)] hover:underline">

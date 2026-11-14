@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useAppStore } from '@/stores/app-store';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useRouter } from 'next/navigation';
@@ -9,9 +9,48 @@ import { supabase } from '@/lib/supabase';
 import { deleteAccount } from '@/lib/api-client';
 import { deleteHistory } from '@/lib/db';
 import Link from 'next/link';
-import { User, ShieldAlert, ShieldCheck, Database, Key } from 'lucide-react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
+
+/*
+ * Account settings in the app style the dashboard set ("true-black-flat" in
+ * the site palette): groups as cards one lightness step above the ground, no
+ * borders, rows of label on the left and value or control on the right.
+ * Usage lives on the dashboard; this screen links there instead of repeating it.
+ */
+const CARD = 'rounded-[var(--radius-lg)] bg-[var(--site-surface)] px-[var(--space-6)] py-[var(--space-2)]';
+const MUTED = 'text-[var(--site-muted)]';
+const LINK = 'site-link font-semibold text-current';
+// Filled one lightness step up rather than outlined (the style's depth is lightness alone);
+// hover inverts, the same move as the dashboard's primary pill.
+const PILL =
+  'inline-flex min-h-[var(--space-10)] shrink-0 items-center justify-center rounded-full px-[var(--space-4)] font-semibold transition-colors duration-[var(--dur-micro)] disabled:cursor-not-allowed disabled:opacity-60';
+const BUTTON = `${PILL} bg-[var(--site-surface-2)] hover:bg-[var(--site-ink)] hover:text-[var(--site-bg)]`;
+const DANGER = `${PILL} bg-[var(--red-bg)] text-[var(--red)] hover:bg-[var(--red)] hover:text-[var(--site-bg)]`;
+
+function Group({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  return (
+    <section aria-labelledby={id} className="grid gap-[var(--space-3)] lg:grid-cols-3 lg:gap-[var(--space-4)]">
+      <h2 id={id} className="pt-[var(--space-4)] font-semibold">
+        {title}
+      </h2>
+      <div className={`${CARD} lg:col-span-2`}>{children}</div>
+    </section>
+  );
+}
+
+/** One setting: what it is on the left, its value or control on the right. */
+function Row({ label, detail, children }: { label: string; detail?: ReactNode; children?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-[var(--space-6)] gap-y-[var(--space-3)] border-t border-[var(--site-line)] py-[var(--space-4)] first:border-t-0">
+      <div className="min-w-0 flex-1 basis-[30ch]">
+        <p className="font-semibold">{label}</p>
+        {detail && <p className={`mt-[var(--space-1)] ${MUTED}`}>{detail}</p>}
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const user = useAppStore((s) => s.user);
@@ -26,16 +65,19 @@ export default function SettingsPage() {
   if (status !== 'authenticated' || !user) return null;
 
   const handleResetPassword = async () => {
-    setLoading(true);
     setMessage({ type: '', text: '' });
-    if (!supabase) return;
-    
+    // Without a configured auth client there is nothing to send; say so rather than spin.
+    if (!supabase) {
+      setMessage({ type: 'error', text: 'Password reset is not available right now.' });
+      return;
+    }
+    setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(user.email!, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
       if (error) throw error;
-      setMessage({ type: 'success', text: 'Password reset email sent!' });
+      setMessage({ type: 'success', text: `We sent a reset link to ${user.email}.` });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to send reset email';
       setMessage({ type: 'error', text: msg });
@@ -45,7 +87,7 @@ export default function SettingsPage() {
   };
 
   const handleDeleteAccount = async () => {
-    const confirmed = window.confirm("Are you sure? This action cannot be undone and will delete all your data.");
+    const confirmed = window.confirm('Are you sure? This action cannot be undone and will delete all your data.');
     if (!confirmed) return;
 
     setLoading(true);
@@ -78,143 +120,83 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
-      <SiteHeader themeToggle />
-      <main className="flex-1 w-full">
-        {/* ── Masthead ───────────────────────────────────────────
-            No label above the h1 and no lede here, this is an account-management page, not a
-            pitch, so there is nothing genuine to put in one. */}
-        <header className="mx-auto w-full max-w-3xl px-[var(--gutter)] pb-[var(--space-8)] pt-[var(--space-48)]">
-          <div>
-            <h1 className="min-w-0 font-display text-[length:var(--text-3xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
-              Account settings.
-            </h1>
-          </div>
-        </header>
+    <div className="site flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
+      <SiteHeader />
+      <main id="main-content" className="flex-1">
+        <div className="mx-auto w-full max-w-[var(--site-max)] px-[var(--site-margin)] pb-[var(--space-16)] pt-[var(--space-24)] text-[length:var(--site-small)] leading-[var(--lh-ui)]">
+          <h1 className="font-display text-[length:var(--text-2xl)] leading-[var(--site-lh-head)]">Settings</h1>
+          <p className="mt-[var(--space-3)] break-words text-[length:var(--site-body)]">Signed in as {user.email}.</p>
 
-      <div className="mx-auto max-w-3xl px-[var(--gutter)] pb-[var(--space-12)] w-full">
-      {message.text && (
-        <div className={`mb-6 rounded-lg p-4 text-[length:var(--text-sm)] ${message.type === 'error' ? 'bg-[var(--red-bg)] text-[var(--red)]' : 'bg-[var(--surface-2)] font-medium text-[var(--text)]'}`}>
-          {message.text}
+          {message.text && (
+            <p
+              role={message.type === 'error' ? 'alert' : 'status'}
+              className={`mt-[var(--space-6)] rounded-[var(--radius)] p-[var(--space-3)] ${
+                message.type === 'error' ? 'bg-[var(--red-bg)] text-[var(--red)]' : 'bg-[var(--site-surface-2)]'
+              }`}
+            >
+              {message.text}
+            </p>
+          )}
+
+          <div className="mt-[var(--space-10)] space-y-[var(--space-10)]">
+            <Group id="account-h" title="Account">
+              {/* No Email row: the line under the title already says who is signed in. */}
+              <Row label="Plan" detail="Your balance, queries and credit activity are on the dashboard.">
+                <span className="flex items-baseline gap-[var(--space-4)]">
+                  <span className="capitalize">{subscription?.tier || 'Free'}</span>
+                  <Link href="/dashboard" className={LINK}>
+                    Open the dashboard
+                  </Link>
+                </span>
+              </Row>
+              <Row label="Password" detail="We email you a link to choose a new one.">
+                <button type="button" onClick={handleResetPassword} disabled={loading} className={BUTTON}>
+                  Send reset link
+                </button>
+              </Row>
+            </Group>
+
+            <Group id="developer-h" title="Developer access">
+              <Row label="API keys" detail="Call Reasoner from your own code with scoped, revocable keys.">
+                <Link href="/settings/api-keys" className={BUTTON}>
+                  Manage keys
+                </Link>
+              </Row>
+            </Group>
+
+            <Group id="privacy-h" title="Privacy and data">
+              <Row
+                label="Encryption"
+                detail="Stored runs, uploads and their search index are encrypted per field at rest, and connections use HTTPS with HSTS. This is not end-to-end: the model provider decrypts a request to answer it."
+              />
+              <Row
+                label="Zero-retention mode"
+                detail={
+                  <>
+                    Not available yet. To request deletion of stored data today, use{' '}
+                    <Link href="/contact" className={LINK}>
+                      Contact
+                    </Link>
+                    .
+                  </>
+                }
+              />
+            </Group>
+
+            <Group id="delete-h" title="Delete account">
+              <Row label="Delete your account" detail="Permanently deletes your account and all its data. This cannot be undone.">
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  disabled={loading}
+                  className={DANGER}
+                >
+                  Delete account
+                </button>
+              </Row>
+            </Group>
+          </div>
         </div>
-      )}
-
-      <div className="space-y-8">
-        {/* Profile Section */}
-        <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
-          <h2 className="mb-4 flex items-center gap-2 text-[length:var(--text-xl)] font-semibold">
-            <User className="h-5 w-5 text-[var(--accent)]" /> Profile
-          </h2>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-[length:var(--text-sm)] font-medium text-[var(--text-muted)]">Email Address</label>
-              <div className="rounded-lg bg-[var(--surface-2)] p-3 text-[var(--text)]">{user.email}</div>
-            </div>
-            <div>
-              <label className="mb-1 block text-[length:var(--text-sm)] font-medium text-[var(--text-muted)]">Current Plan</label>
-              <div className="flex items-center justify-between rounded-lg bg-[var(--surface-2)] p-3 text-[var(--text)] capitalize">
-                {subscription?.tier || 'Free'}
-                <button onClick={() => router.push('/dashboard')} className="text-[length:var(--text-sm)] text-[var(--accent)] hover:underline">Manage</button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Privacy & Data Section */}
-        <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
-          <h2 className="mb-4 flex items-center gap-2 text-[length:var(--text-xl)] font-semibold text-[var(--text)]">
-            <Database className="h-5 w-5 text-[var(--accent)]" /> Privacy & Data
-          </h2>
-          
-          <div className="space-y-6">
-            <div className="flex items-center justify-between gap-4 border-b border-[var(--border)] pb-6 opacity-60">
-              <div>
-                <p className="font-medium text-[var(--text)]">Zero-Retention Mode</p>
-                <p className="text-[length:var(--text-sm)] text-[var(--text-muted)]">Coming soon — not yet available. To request deletion of stored data today, use <a href="/contact" className="underline hover:text-[var(--accent)]">Contact</a>.</p>
-              </div>
-              <button
-                type="button"
-                disabled
-                aria-disabled="true"
-                title="Coming soon"
-                className="relative inline-flex h-6 w-11 shrink-0 cursor-not-allowed rounded-full border-2 border-transparent bg-[var(--surface-3)]"
-              >
-                <span className="inline-block h-5 w-5 translate-x-0 transform rounded-full bg-[var(--surface)] shadow ring-0" />
-              </button>
-            </div>
-
-            <div className="flex items-start gap-3 rounded-lg bg-[var(--surface-2)] p-4 border border-[var(--border)]">
-              <ShieldCheck className="h-5 w-5 text-[var(--text)] shrink-0 mt-0.5" />
-              <div>
-                <p className="text-[length:var(--text-sm)] font-semibold text-[var(--text)]">Encryption</p>
-                <p className="text-[length:var(--text-xs)] text-[var(--text-muted)] leading-relaxed mt-1">
-                  Stored runs, uploads and their search index are encrypted per field at rest, and connections use HTTPS with HSTS. This is not end-to-end: the model provider decrypts a request to answer it.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Developer Access */}
-        <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
-          <h2 className="mb-4 flex items-center gap-2 text-[length:var(--text-xl)] font-semibold">
-            <Key className="h-5 w-5 text-[var(--accent)]" /> Developer access
-          </h2>
-          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-            <div>
-              <p className="font-medium text-[var(--text)]">API keys</p>
-              <p className="text-[length:var(--text-sm)] text-[var(--text-muted)]">
-                Call Reasoner from your own code with scoped, revocable keys.
-              </p>
-            </div>
-            <Link
-              href="/settings/api-keys"
-              className="whitespace-nowrap rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-[length:var(--text-sm)] font-medium transition-colors hover:bg-[var(--surface-3)]"
-            >
-              Manage keys
-            </Link>
-          </div>
-        </section>
-
-        {/* Security Section */}
-        <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
-          <h2 className="mb-4 text-[length:var(--text-xl)] font-semibold">Security</h2>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <p className="font-medium text-[var(--text)]">Password</p>
-              <p className="text-[length:var(--text-sm)] text-[var(--text-muted)]">Receive an email to reset your password.</p>
-            </div>
-            <button
-              onClick={handleResetPassword}
-              disabled={loading}
-              className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-[length:var(--text-sm)] font-medium hover:bg-[var(--surface-3)] transition-colors disabled:opacity-50"
-            >
-              Reset Password
-            </button>
-          </div>
-        </section>
-
-        {/* Danger Zone */}
-        <section className="rounded-xl border border-[var(--red-border)] bg-[var(--red-bg)] p-6">
-          <h2 className="mb-4 flex items-center gap-2 text-[length:var(--text-xl)] font-semibold text-[var(--red)]">
-            <ShieldAlert className="h-5 w-5" /> Danger Zone
-          </h2>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <p className="font-medium text-[var(--text)]">Delete Account</p>
-              <p className="text-[length:var(--text-sm)] text-[var(--text-muted)]">Permanently delete your account and all associated data.</p>
-            </div>
-            <button
-              onClick={handleDeleteAccount}
-              disabled={loading}
-              className="rounded-lg bg-[var(--red)] px-4 py-2 text-[length:var(--text-sm)] font-medium text-[var(--bg)] hover:bg-[color-mix(in_oklab,var(--red)_86%,var(--text))] transition-colors disabled:opacity-50 whitespace-nowrap"
-            >
-              Delete Account
-            </button>
-          </div>
-        </section>
-      </div>
-      </div>
       </main>
       <SiteFooter />
     </div>

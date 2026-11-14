@@ -29,8 +29,9 @@ const PRIMARY =
   'whitespace-nowrap flex h-10 items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] font-semibold text-[var(--accent-text)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--accent-hover)] active:scale-[0.97]';
 
 /**
- * `themeToggle`: only for pages outside the site world (/settings). A `.site`
- * page is charcoal in both colour schemes, so a toggle there changes nothing.
+ * `themeToggle`: only for pages outside the site world; since /settings moved
+ * into `.site` (2026-11-14) no page passes it. A `.site` page is charcoal in
+ * both colour schemes, so a toggle there changes nothing.
  */
 export function SiteHeader({ themeToggle = false }: { themeToggle?: boolean } = {}) {
   const user = useAppStore((s) => s.user);

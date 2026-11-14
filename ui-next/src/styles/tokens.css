@@ -329,6 +329,22 @@
     --ok:            #6CC4C0;
     --warn:          #E0A458;
     --unknown:       #C9C9C3;
+    /* The app's dark-scheme red: a .site page is charcoal in both schemes, so the
+       light-scheme #B3122E would fall to about 2.5:1 here. */
+    --red:           #FF7A7A;
+    --red-bg:        rgb(255 122 122 / 0.10);
+    --red-border:    rgb(255 122 122 / 0.26);
+    /* The app's second accent (the composer's busy border) was the overprint
+       pink. Here it is the bone neutral: one accent hue on the page, and busy
+       still reads apart from the sage focus ring. */
+    --accent-2:      var(--unknown);
+    --accent-2-dim:  rgb(201 201 195 / 0.16);
+    /* The sidebar shares the canvas: depth from the site's lightness steps,
+       not the app's cooler near-black. */
+    --sidebar-bg:     var(--site-bg);
+    --sidebar-hover:  var(--site-surface);
+    --sidebar-active: var(--site-surface-2);
+    --sidebar-field:  var(--site-surface);
     --ink-pink:      transparent;  /* Overprint drum: off in this world */
     --grain-opacity: 0;
 

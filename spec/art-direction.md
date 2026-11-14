@@ -225,8 +225,40 @@ control, the pinned pilot fragment changing state. All of it collapses under
   `useRequireAuth`), and the "Recent Activity" chart plotted tokens per history entry under date
   labels, which is neither what is billed nor per day; it is gone, and the credit ledger answers
   that question. Inspector `--app`: 0 FAIL, 0 WARN at 1440, 768 and 390 on sample data; axe clean.
+- Settings moved into the same app style (2026-11-14). `/settings` is groups (Account, Developer
+  access, Privacy and data, Delete account): a label on the left and a borderless card on the right,
+  with rows of setting and control. Buttons are filled one lightness step up and invert on hover;
+  delete is the red tint. No usage figures: the Plan row links to the dashboard. The Email row
+  went, because the line under the title already names the account. `/settings/api-keys` got the
+  shell only (`.site`, site margins, h1 size); its list and form are unchanged. Neither page passes
+  `themeToggle` now.
+  Fixed on the way:
+  - `.site` never remapped `--red`, so error text in a light system scheme was #B3122E on
+    charcoal, about 2.5:1. It is now the app's dark red, 5.2–6.8:1 on the three grounds.
+  - Password reset with no auth client left the page stuck in loading.
+  - The signed-in account menu's tier badge (accent on its tint) failed contrast, and its
+    `aria-label` dropped the visible tier. The badge is now ink, and the visible text is the name.
+  Inspector `--app` on sample data: settings 0 FAIL, 0 WARN. API keys has 0 FAIL and one WARN,
+  `hero-void`: a two-key list above the footer, an honest short list. axe clean at 320 and 1440,
+  signed in.
+- `/chat` joined the site palette (2026-11-14), re-skinned rather than rebuilt: `.site` on its
+  root, so the product is charcoal in both schemes and its theme toggle and "Secure" badge are
+  gone. `.site` now also remaps the sidebar onto the site's lightness steps (it was a cooler
+  near-black) and `--accent-2`, the composer's busy border, from the overprint pink to the bone
+  neutral, so the page keeps one accent hue. The composer lost its drop shadow and the lifted
+  shadow in its focus ring.
+  Fixed on the way:
+  - A phone landed on the open sidebar drawer, because its open state is persisted from desktop.
+    Below `sm` it now closes on mount, without pulling focus.
+  - The phone's "Open sidebar" button sat mid-edge, over the centred composer. It is top-left at
+    every width, and the header makes room for it.
+  - Sidebar accent text on its hover ground failed contrast (axe, 5 nodes); clean on the new ground.
+  Inspector `--app`: 0 FAIL, 2 WARN at 1440, 768 and 390. `font-count` is the two text faces
+  plus the mono CLAUDE.md allows; `app-title-size` is the 49px empty-state greeting, kept as
+  the one large thing on an empty screen. axe clean at 320 and 1440. Not checked: a run in
+  progress and the phase cards, which need a billed run.
 - Site chrome simplified (2026-11-14, Maeda's laws of simplicity): the header lost its theme
-  toggle (a `.site` page is charcoal in both schemes; `/settings` still passes `themeToggle`),
+  toggle (a `.site` page is charcoal in both schemes),
   its "Secure" badge (/security makes that case), and its glass and shadow when scrolled (now a
   flat ground and a hairline). Its one action reads "Open the app" signed in or out, and every
   header action is a `<Link>`, so it prefetches and opens in a new tab. The footer's 14 links

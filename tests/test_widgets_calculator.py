@@ -101,3 +101,13 @@ class TestCalculatorWidget:
 
     def test_trigger_patterns_reject_non_math(self, widget):
         assert not any(p.match("hello world") for p in widget.trigger_patterns)
+
+    @pytest.mark.parametrize("expr", ["(-8)**0.5", "(9999**1000)*(9999**1000)"])
+    def test_results_json_cannot_carry_are_rejected(self, expr):
+        import json
+
+        from reasoner.infrastructure.widgets.calculator import calculate_expression
+
+        out = calculate_expression(expr)
+        assert out["valid"] is False
+        json.dumps(out)
