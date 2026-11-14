@@ -206,7 +206,7 @@ async def test_admit_run_refunds_an_anonymous_run_refused_after_the_cap(monkeypa
     from reasoner.api import run_admission as ra
     from reasoner.application.services.anonymous_trial_policy import AnonymousTrialCharge
 
-    monkeypatch.setattr("reasoner.core.settings.settings.ENABLE_LEGACY_API_KEY", True, raising=False)
+    monkeypatch.setattr("reasoner.core.settings.settings.ALLOW_ANONYMOUS_RUNS", True, raising=False)
     charge = AnonymousTrialCharge(key="k", credits=10)
     refund = AsyncMock()
     with patch.object(ra, "enforce_anonymous_trial_cap", AsyncMock(return_value=charge)), \

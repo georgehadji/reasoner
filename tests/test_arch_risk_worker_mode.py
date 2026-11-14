@@ -115,17 +115,6 @@ def test_settings_default_ratelimiter_mode_is_redis() -> None:
 # ── Auth persistence mode validation ─────────────────────────────────
 
 
-def test_auth_persistence_disabled_by_default() -> None:
-    """Auth persistence should be opt-in. Default false prevents
-    silent SQLite auth store creation in multi-worker deployments."""
-    from reasoner.core.settings import settings
-
-    assert settings.AUTH_PERSISTENCE_ENABLED is False, (
-        "AUTH_PERSISTENCE_ENABLED should default to False. "
-        "True creates a local SQLite that doesn't share across workers."
-    )
-
-
 # ── Rate limit config values are reasonable ──────────────────────────
 
 

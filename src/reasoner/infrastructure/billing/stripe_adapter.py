@@ -329,4 +329,4 @@ def _subscription_repo():
     )
 
     dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-    return PostgresSubscriptionRepository(dsn, pool_size=10)
+    return PostgresSubscriptionRepository(dsn)

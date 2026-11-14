@@ -7,15 +7,14 @@ All write operations are transactional to prevent race conditions.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import os
 from datetime import datetime
 
 import asyncpg
 
 from reasoner.application.ports.quota_repository import QuotaRepository
 from reasoner.domain.saas import QuotaResult, SubscriptionTier, UsageQuota
+from reasoner.infrastructure.persistence.pg_pool import get_shared_pool
 
 logger = logging.getLogger(__name__)
 
@@ -23,30 +22,13 @@ logger = logging.getLogger(__name__)
 class PostgresQuotaRepository(QuotaRepository):
     """Atomic quota storage in PostgreSQL."""
 
-    _pool: asyncpg.Pool | None = None
-    _pool_lock: asyncio.Lock | None = None
-
     def __init__(self, dsn: str, pool_size: int | None = None):
+        # pool_size is accepted for compatibility and ignored: the pool is the
+        # shared per-worker one (pg_pool), sized by DB_POOL_SIZE.
         self._dsn = dsn
-        self._pool_size = pool_size if pool_size is not None else int(
-            os.environ.get("DB_POOL_SIZE", "10")
-        )
 
     async def _get_pool(self) -> asyncpg.Pool:
-        if PostgresQuotaRepository._pool_lock is None:
-            PostgresQuotaRepository._pool_lock = asyncio.Lock()
-
-        if PostgresQuotaRepository._pool is not None:
-            return PostgresQuotaRepository._pool
-
-        async with PostgresQuotaRepository._pool_lock:
-            if PostgresQuotaRepository._pool is None:
-                PostgresQuotaRepository._pool = await asyncpg.create_pool(
-                    self._dsn,
-                    min_size=1,
-                    max_size=self._pool_size,
-                )
-            return PostgresQuotaRepository._pool
+        return await get_shared_pool(self._dsn)
 
     async def get_quota(self, user_id: str) -> UsageQuota:
         pool = await self._get_pool()

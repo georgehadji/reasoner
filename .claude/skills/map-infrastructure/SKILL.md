@@ -78,7 +78,6 @@ folders:
 | `telemetry_store.py` | Per-phase and per-run telemetry tables for cross-run analytics. |
 | `error_store.py` | SQLite error persistence + stats. |
 | `feedback_store.py` | SQLite feedback store (migrates legacy JSONL on first init). |
-| `auth_store.py` | Durable API key storage via aiosqlite. |
 | `api_key_repo_postgres.py` / `api_key_repo_memory.py` | `ApiKeyRepository` adapters. |
 | `credit_repo_postgres.py` / `credit_repo_memory.py` | `CreditRepository` adapters; Postgres locks the balance row (`SELECT … FOR UPDATE`). |
 | `quota_repo_postgres.py` | `QuotaRepository` on asyncpg, transactional writes. |
@@ -109,7 +108,6 @@ folders:
 |------|--------------|
 | `circuit_breaker.py` (21KB) | `CircuitBreaker` + `RedisCircuitBreaker`, states, stats, registry. |
 | `rate_limiter.py` (21KB) | Token-bucket rate limiter with sliding window; in-process with optional Redis backing. |
-| `auth_legacy.py` | Legacy API-key auth: `AuthManager`, `APIKey`, `Scope`, `DEFAULT_SCOPES`. |
 | `auth/__init__.py` | `get_auth_adapter` factory — picks by environment. |
 | `auth/supabase_adapter.py` | Production `AuthPort` (JWT validation against Supabase). |
 | `auth/local_adapter.py` | Local JWT signing for dev/tests. |

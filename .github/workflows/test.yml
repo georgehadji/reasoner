@@ -126,15 +126,15 @@ jobs:
           # 2145: Western-only tier wrapped a long preset_service line (net -1).
           # 2122: audit-6 fixes deleted dead subagent packages and helpers (net -23).
           # 2109: one widget stack deleted widgets_legacy.py and its shim (net -13).
-          python scripts/ruff_ratchet.py --max 2059
+          python scripts/ruff_ratchet.py --max 2053
 
       - name: Security scan (bandit)
         run: |
           bandit -r src/ -t B307,B308,B102 -f txt
 
-      - name: Type check auth_legacy (mypy --strict)
+      - name: Type check domain/auth (mypy --strict)
         run: |
-          mypy --strict src/reasoner/infrastructure/auth_legacy.py --ignore-missing-imports
+          mypy --strict src/reasoner/domain/auth.py --ignore-missing-imports
 
       - name: Type check src/ (mypy, ratcheted)
         run: |
@@ -334,7 +334,7 @@ jobs:
           # 95: one widget stack. widgets_legacy.py was deleted with its
           # handlers, and DiscoverWidget._search_web's bare `return []` now goes
           # through degraded(), as the legacy search_web did.
-          python scripts/silent_failure_ratchet.py --max 92
+          python scripts/silent_failure_ratchet.py --max 91
 
       - name: Dead-code ratchet (vulture, ADVISORY)
         # P-5 (docs/plans/phaseoutput-retirement-2026-09-12.md): advisory for

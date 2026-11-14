@@ -8,10 +8,10 @@ import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from reasoner.api.auth_deps import optional_auth, require_auth, require_csrf
-from reasoner.api.dependencies import check_rate_limit, get_current_user
-from reasoner.auth import Scope
+from reasoner.api.auth_deps import require_csrf
+from reasoner.api.dependencies import check_rate_limit, get_current_user, require_admin_scope
 from reasoner.core.constants import TIMEOUTS, VALIDATION_TEST_MAX_TOKENS
+from reasoner.domain.auth import Scope
 from reasoner.domain.saas import User
 from reasoner.infrastructure.llm.registry import (
     _REGISTRY,
@@ -26,7 +26,6 @@ router = APIRouter()
 @router.get("/api/keys/status")
 async def get_api_keys_status(
     user: User = Depends(get_current_user),
-    authenticated=Depends(optional_auth),
 ):
     """
     Get status of all configured LLM provider API keys.
@@ -90,7 +89,7 @@ async def get_api_keys_status(
 @router.post("/api/keys/validate", dependencies=[Depends(check_rate_limit)])
 async def validate_api_keys(
     request: Request,
-    authenticated=Depends(require_auth),
+    admin: User = Depends(require_admin_scope),
     csrf_checked=Depends(require_csrf),
 ):
     """

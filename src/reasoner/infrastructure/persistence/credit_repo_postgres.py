@@ -9,9 +9,7 @@ index on ``(user_id, reference_id)``.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import os
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
@@ -27,6 +25,7 @@ from reasoner.domain.credits import (
     LedgerWrite,
     can_afford,
 )
+from reasoner.infrastructure.persistence.pg_pool import get_shared_pool
 
 logger = logging.getLogger(__name__)
 
@@ -55,32 +54,13 @@ def _to_entry(row: asyncpg.Record) -> CreditLedgerEntry:
 class PostgresCreditRepository(CreditRepository):
     """Atomic credit ledger storage in PostgreSQL."""
 
-    _pool: asyncpg.Pool | None = None
-    _pool_lock: asyncio.Lock | None = None
-
     def __init__(self, dsn: str, pool_size: int | None = None):
+        # pool_size is accepted for compatibility and ignored: the pool is the
+        # shared per-worker one (pg_pool), sized by DB_POOL_SIZE.
         self._dsn = dsn
-        self._pool_size = (
-            pool_size
-            if pool_size is not None
-            else int(os.environ.get("DB_POOL_SIZE", "10"))
-        )
 
     async def _get_pool(self) -> asyncpg.Pool:
-        if PostgresCreditRepository._pool_lock is None:
-            PostgresCreditRepository._pool_lock = asyncio.Lock()
-
-        if PostgresCreditRepository._pool is not None:
-            return PostgresCreditRepository._pool
-
-        async with PostgresCreditRepository._pool_lock:
-            if PostgresCreditRepository._pool is None:
-                PostgresCreditRepository._pool = await asyncpg.create_pool(
-                    self._dsn,
-                    min_size=1,
-                    max_size=self._pool_size,
-                )
-            return PostgresCreditRepository._pool
+        return await get_shared_pool(self._dsn)
 
     # ── Reads ──────────────────────────────────────────────────────────
 

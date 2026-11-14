@@ -11,6 +11,7 @@ import pytest
 
 from reasoner.application.services.billing_service import BillingService, _paypal_cancel
 from reasoner.domain.saas import SubscriptionStatus
+from reasoner.infrastructure.persistence.pg_pool import close_shared_pools
 from tests.integration.test_alembic_schema_contract import (
     DSN,
     _alembic_upgrade,
@@ -41,7 +42,7 @@ async def test_paypal_cancel_before_activate_stays_cancelled():
             assert not await repo.upsert_subscription(_pp(uid, "I-1"), T1)  # older ACTIVATED
             current = await repo.get_subscription_by_user(uid)
         finally:
-            await repo.close()
+            await close_shared_pools()
     assert current.status is SubscriptionStatus.CANCELLED
 
 
@@ -56,7 +57,7 @@ async def test_get_subscription_prefers_live_row():
             await repo.set_subscription_status("sub_b", "cancelled", T2)
             current = await repo.get_subscription_by_user(uid)
         finally:
-            await repo.close()
+            await close_shared_pools()
     assert current.stripe_subscription_id == "sub_a"
 
 
@@ -75,7 +76,7 @@ async def test_concurrent_checkouts_store_one_live_subscription():
                 for i in range(4)
             ))
         finally:
-            await repo.close()
+            await close_shared_pools()
         conn = await asyncpg.connect(dsn)
         try:
             live = await conn.fetchval(
@@ -104,7 +105,6 @@ async def test_reset_monthly_is_utc_month_start_conditional_and_keeps_tier_usage
             )
         finally:
             await conn.close()
-        PostgresQuotaRepository._pool = None
         quota = PostgresQuotaRepository(dsn, pool_size=2)
         sub_repo = _subscription_repo(dsn)
         try:
@@ -129,10 +129,8 @@ async def test_reset_monthly_is_utc_month_start_conditional_and_keeps_tier_usage
             assert await pool.fetchval(
                 "SELECT used_queries FROM usage_quotas WHERE user_id = $1", uid) == 1
         finally:
-            await sub_repo.close()
-            if PostgresQuotaRepository._pool is not None:
-                await PostgresQuotaRepository._pool.close()
-            PostgresQuotaRepository._pool = None
+            await close_shared_pools()
+            await close_shared_pools()
 
 
 async def test_release_after_the_month_reset_does_not_take_from_the_new_month():
@@ -164,7 +162,5 @@ async def test_release_after_the_month_reset_does_not_take_from_the_new_month():
             freed = await conn.fetchval(q, uid)
         finally:
             await conn.close()
-            if PostgresQuotaRepository._pool is not None:
-                await PostgresQuotaRepository._pool.close()
-                PostgresQuotaRepository._pool = None
+            await close_shared_pools()
     assert (kept, freed) == (1, 0)

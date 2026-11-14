@@ -16,7 +16,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 
 from reasoner.api import dependencies
 from reasoner.api.run_admission import admit_run, require_credentials_resolved
-from reasoner.auth import AuthenticationError
+from reasoner.domain.auth import AuthenticationError
 from reasoner.core.settings import settings
 from reasoner.domain.saas import User
 
@@ -83,7 +83,7 @@ def test_resolved_check_lets_true_anonymous_and_signed_in_callers_through():
 @pytest.mark.asyncio
 @pytest.mark.parametrize(("failure", "status"), [("rejected", 401), ("unavailable", 503)])
 async def test_admit_run_refuses_even_with_legacy_access_enabled(monkeypatch, failure, status):
-    monkeypatch.setattr(settings, "ENABLE_LEGACY_API_KEY", True)
+    monkeypatch.setattr(settings, "ALLOW_ANONYMOUS_RUNS", True)
     with pytest.raises(HTTPException) as exc:
         await admit_run(_request(auth_failure=failure), user=None, problem="p", preset="x")
     assert exc.value.status_code == status

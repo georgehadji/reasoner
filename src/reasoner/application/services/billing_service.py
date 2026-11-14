@@ -159,7 +159,6 @@ class BillingService:
 
         repo = PostgresSubscriptionRepository(
             settings.DATABASE_URL.replace("+asyncpg", ""),
-            pool_size=10,
         )
 
         event_type = event.get("type", "")

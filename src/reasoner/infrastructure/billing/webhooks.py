@@ -101,18 +101,16 @@ _webhook_pool = None
 
 
 async def _get_webhook_pool():
-    """Lazy-initialize a small asyncpg pool for webhook idempotency writes."""
+    """The shared per-worker pool, after ensuring the idempotency table exists."""
     global _webhook_pool
     if _webhook_pool is not None:
         return _webhook_pool
     try:
-        import asyncpg
-
         from reasoner.core.settings import settings
+        from reasoner.infrastructure.persistence.pg_pool import get_shared_pool
         if not settings.DATABASE_URL:
             return None
-        dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-        _webhook_pool = await asyncpg.create_pool(dsn, min_size=1, max_size=3)
+        _webhook_pool = await get_shared_pool(settings.DATABASE_URL)
         async with _webhook_pool.acquire() as conn:
             # Same DDL as migration 20261021_000200: a database the app booted
             # on before migrations ran must still have the lease columns.

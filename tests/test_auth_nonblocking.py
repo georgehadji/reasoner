@@ -95,7 +95,7 @@ async def test_a_verified_token_is_cached_but_never_past_its_exp():
     ids=["garbage", "expired", "no-exp"],
 )
 async def test_bad_tokens_never_reach_supabase(token):
-    from reasoner.auth import AuthenticationError
+    from reasoner.domain.auth import AuthenticationError
 
     adapter = _adapter()
     with pytest.raises(AuthenticationError):
@@ -105,7 +105,7 @@ async def test_bad_tokens_never_reach_supabase(token):
 
 @pytest.mark.asyncio
 async def test_a_token_supabase_rejected_is_not_asked_again():
-    from reasoner.auth import AuthenticationError
+    from reasoner.domain.auth import AuthenticationError
 
     adapter = _adapter()
     adapter._client.auth.get_user = lambda t: SimpleNamespace(user=None)

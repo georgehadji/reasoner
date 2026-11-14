@@ -1,5 +1,5 @@
 """Auth findings from the ponytail audit: grant needs the admin key, MCP binds
-legacy-key scopes, legacy keys honour another worker's revocation."""
+key scopes."""
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ def test_grant_needs_the_admin_key_not_just_the_scope(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_mcp_scope_check_covers_legacy_keys(monkeypatch):
+async def test_mcp_scope_check_covers_keys(monkeypatch):
     from reasoner.api.mcp import context
     from reasoner.api.mcp.context import McpAuthError, resolve_caller
 
@@ -54,30 +54,6 @@ async def test_mcp_scope_check_covers_legacy_keys(monkeypatch):
         return legacy
 
     monkeypatch.setattr(deps, "_resolve_auth_token", _resolve)
-    monkeypatch.setattr(context, "_bearer_token_from_context", lambda ctx: "plain-legacy-key")
+    monkeypatch.setattr(context, "_bearer_token_from_context", lambda ctx: "rsn_live_key")
     with pytest.raises(McpAuthError, match="lacks the 'run' scope"):
         await resolve_caller(object(), scope="run")
-
-
-@pytest.mark.asyncio
-async def test_legacy_key_revoked_elsewhere_is_refused(monkeypatch):
-    from reasoner.auth import AuthenticationError
-    from reasoner.infrastructure.auth_legacy import AuthManager
-
-    mgr = AuthManager()
-    raw = await mgr.generate_key("k")
-    await mgr.authenticate(raw)  # warm every in-process copy
-
-    row = {"key_hash": mgr._hash_key(raw), "name": "k", "is_active": False, "expires_at": None,
-           "created_at": mgr._keys[mgr._hash_key(raw)].created_at, "scopes": {"read"}}
-
-    class _Store:  # another worker already revoked it in the shared DB
-        async def get_by_hash(self, h):
-            return row
-
-        async def update_usage(self, h):
-            pass
-
-    mgr._store = _Store()
-    with pytest.raises(AuthenticationError, match="deactivated"):
-        await mgr.authenticate(raw)

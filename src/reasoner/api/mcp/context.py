@@ -68,7 +68,7 @@ async def resolve_caller(ctx, *, scope: str | None = None) -> User:
         except HTTPException as exc:
             raise McpAuthError(str(exc.detail)) from exc
     granted = getattr(user, "scopes", set())
-    # Every non-JWT credential is a key (rsn_ or legacy), so scopes bind all of them.
+    # Every non-JWT credential is a key (rsn_), so scopes bind all of them.
     if scope and not _looks_like_jwt(token) and not key_allows(granted, scope):
         raise McpAuthError(f"API key lacks the '{scope}' scope")
     return user

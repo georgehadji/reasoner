@@ -32,7 +32,7 @@ async def _pg_pool():
     from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
 
     dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-    return await PostgresQuotaRepository(dsn, pool_size=2)._get_pool()
+    return await PostgresQuotaRepository(dsn)._get_pool()
 
 
 class _IdentityStore:

@@ -21,7 +21,7 @@ from reasoner.api.run_admission import MeteredSSEResponse, admit_run
 from reasoner.api.run_observability import CreditSink, PrometheusObserver
 from reasoner.application.queries import GetPipelineStatusQuery
 from reasoner.application.services.run_metering import metered
-from reasoner.auth import Scope
+from reasoner.domain.auth import Scope
 from reasoner.domain.api_keys import RUN_SCOPE
 from reasoner.domain.saas import User
 

@@ -388,7 +388,7 @@ def _get_subscription_repo():
         )
 
         dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-        pg_repo = PostgresSubscriptionRepository(dsn, pool_size=settings.DB_POOL_SIZE)
+        pg_repo = PostgresSubscriptionRepository(dsn)
         _subscription_repo = CachedSubscriptionRepository(pg_repo)
     return _subscription_repo
 

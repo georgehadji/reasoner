@@ -18,11 +18,12 @@ usage lives on the same volume as the files it counts.
 from __future__ import annotations
 
 import asyncio
-import os
 import sqlite3
 from pathlib import Path
 
 import asyncpg
+
+from reasoner.infrastructure.persistence.pg_pool import get_shared_pool
 
 _RESERVE_SQL = """
     INSERT INTO upload_usage (user_id, bytes) VALUES ({p1}, {p2})
@@ -86,26 +87,13 @@ class SqliteUploadUsageRepository:
 
 
 class PostgresUploadUsageRepository:
-    _pool: asyncpg.Pool | None = None
-    _pool_lock: asyncio.Lock | None = None
-
     def __init__(self, dsn: str, pool_size: int | None = None) -> None:
+        # pool_size is accepted for compatibility and ignored: the pool is the
+        # shared per-worker one (pg_pool), sized by DB_POOL_SIZE.
         self._dsn = dsn
-        self._pool_size = (
-            pool_size if pool_size is not None else int(os.environ.get("DB_POOL_SIZE", "10"))
-        )
 
     async def _get_pool(self) -> asyncpg.Pool:
-        cls = PostgresUploadUsageRepository
-        if cls._pool_lock is None:
-            cls._pool_lock = asyncio.Lock()
-        if cls._pool is None:
-            async with cls._pool_lock:
-                if cls._pool is None:
-                    cls._pool = await asyncpg.create_pool(
-                        self._dsn, min_size=1, max_size=self._pool_size
-                    )
-        return cls._pool
+        return await get_shared_pool(self._dsn)
 
     async def reserve(self, user_id: str, n: int, cap: int) -> bool:
         if n > cap:

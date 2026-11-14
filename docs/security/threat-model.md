@@ -88,7 +88,7 @@ Trust boundaries:
 |--------|-------|------|------------|--------|
 | Admin endpoint access without key | System control | High | Dual auth: JWT admin scope + `X-Admin-Key`; `secrets.compare_digest()` | ✅ Implemented |
 | Tier bypass via force_pipeline flag | Premium features | Medium | Preset tier enforcement in `require_tier` dependency | ⚠️ Placeholder (fails closed in prod) |
-| Legacy API key abuse | Auth bypass | Low | `ENABLE_LEGACY_API_KEY` disabled by default; migration path documented | ✅ Implemented |
+| Legacy API key abuse | Auth bypass | Low | Legacy key auth removed; only `rsn_` keys and JWTs authenticate | ✅ Implemented |
 | Path traversal in save/load | File system | Low | `Path(path).parts` traversal check in `PipelineState.save()` and `.load()` | ✅ Implemented |
 | Dependency vulnerability | Supply chain | Medium | `pip-audit` in CI; scheduled nightly scans | ✅ Implemented (Phase 4.4) |
 

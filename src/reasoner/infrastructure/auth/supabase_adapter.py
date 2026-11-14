@@ -19,7 +19,7 @@ from uuid import UUID
 import jwt
 
 from reasoner.application.ports.auth_port import AuthPort
-from reasoner.auth import AuthenticationError
+from reasoner.domain.auth import AuthenticationError
 from reasoner.domain.saas import User
 
 logger = logging.getLogger(__name__)

@@ -98,18 +98,6 @@ class TestCsrfSecretConsistency:
 class TestQuotaRepoPoolRaceCondition:
     """Verify that concurrent calls to _get_pool() create only ONE asyncpg pool."""
 
-    @pytest.fixture(autouse=True)
-    def _reset_pool_singleton(self):
-        """_pool/_pool_lock are class attributes (a deliberate process-wide
-        singleton pool), so they leak across tests in the same process unless
-        reset here."""
-        from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
-        PostgresQuotaRepository._pool = None
-        PostgresQuotaRepository._pool_lock = None
-        yield
-        PostgresQuotaRepository._pool = None
-        PostgresQuotaRepository._pool_lock = None
-
     @pytest.mark.asyncio
     async def test_concurrent_get_pool_creates_single_pool(self, monkeypatch):
         """Multiple concurrent _get_pool() calls must result in exactly one create_pool."""

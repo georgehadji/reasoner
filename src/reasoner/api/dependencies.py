@@ -8,7 +8,6 @@ polluting route handlers with auth logic.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import re
 import time
@@ -23,7 +22,6 @@ if TYPE_CHECKING:
     from reasoner.application.services.credit_service import CreditService
     from reasoner.rate_limiter import RateLimiter
 
-import asyncio
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -38,9 +36,9 @@ from reasoner.application.services.preset_service import PresetService
 from reasoner.application.services.quota_service import QuotaService
 from reasoner.application.services.search_service import SearchService
 from reasoner.application.services.watermark_service import WatermarkService
-from reasoner.auth import AuthenticationError as LegacyAuthError
 from reasoner.core.settings import settings
 from reasoner.domain.api_keys import key_allows, looks_like_api_key
+from reasoner.domain.auth import AuthenticationError
 from reasoner.domain.saas import QuotaResult, SubscriptionTier, User
 from reasoner.infrastructure.auth import get_auth_adapter
 from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
@@ -65,8 +63,6 @@ def _get_rate_limiter_instance() -> RateLimiter:
 security = HTTPBearer(auto_error=False)
 
 # ── User Provisioning Singleton ──
-_user_provision_pool: asyncpg.Pool | None = None
-_user_provision_lock = asyncio.Lock()
 
 # Ids this worker provisioned recently, with when. Bounded and expiring: the
 # old unbounded set let a deleted account run on any worker that had cached
@@ -84,16 +80,10 @@ def forget_provisioned_user(user_id: UUID) -> None:
 
 
 async def _get_provision_pool() -> asyncpg.Pool:
-    """Singleton pool for lightweight user provisioning upserts."""
-    global _user_provision_pool
-    if _user_provision_pool is not None:
-        return _user_provision_pool
-    async with _user_provision_lock:
-        if _user_provision_pool is None:
-            import asyncpg
-            dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-            _user_provision_pool = await asyncpg.create_pool(dsn, min_size=1, max_size=5)
-        return _user_provision_pool
+    """The shared per-worker pool, for lightweight user provisioning upserts."""
+    from reasoner.infrastructure.persistence.pg_pool import get_shared_pool
+
+    return await get_shared_pool(settings.DATABASE_URL)
 
 
 #: The route a half-finished account deletion is resumed through (SM-M7).
@@ -290,8 +280,7 @@ async def _resolve_auth_token(token: str) -> User:
     Strategy:
     1. If token is a Reasoner API key (rsn_*) → route to ApiKeyService
     2. Else if token looks like JWT → route to AuthPort (Supabase/Local)
-    3. Else if ENABLE_LEGACY_API_KEY=true → route to legacy AuthManager
-    4. Else → reject
+    3. Else → reject
     """
     if looks_like_api_key(token):
         return await _resolve_api_key(token)
@@ -309,32 +298,6 @@ async def _resolve_auth_token(token: str) -> User:
         extra = admin_scopes(user.id, settings.ADMIN_USER_IDS)
         return replace(user, scopes=set(user.scopes) | extra) if extra else user
 
-    # Legacy API key path (only if explicitly enabled)
-    if settings.ENABLE_LEGACY_API_KEY:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.warning(
-            "Legacy API key authentication is enabled. This is deprecated and will be removed in v2.3. "
-            "Migrate to JWT authentication."
-        )
-        from reasoner.auth import get_auth_manager
-        auth_manager = get_auth_manager()
-        try:
-            api_key = await auth_manager.authenticate(token)
-            # Map legacy API key to canonical User
-            # Safe deterministic UUID from key hash (SHA-256, take first 16 bytes)
-            return User(
-                id=UUID(bytes=hashlib.sha256(api_key.key_hash.encode()).digest()[:16]),
-                email=f"apikey-{api_key.key_hash[:8]}@internal",
-                display_name=api_key.name,
-                # Admin never rides a key (SEC-6); the rest narrows the key.
-                scopes={s for s in api_key.scopes if s != "admin"},
-                # Operator-issued and deprecated, with no address to verify.
-                email_verified=True,
-            )
-        except LegacyAuthError as exc:
-            raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
-
     raise HTTPException(
         status_code=401,
         detail="Invalid authentication credentials",
@@ -347,7 +310,7 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> User:
     """
-    Require valid authentication (JWT or legacy API key).
+    Require valid authentication (JWT or rsn_ API key).
 
     Raises HTTPException 401 if missing or invalid.
     Stores resolved user in request.state for audit middleware.
@@ -403,7 +366,7 @@ async def get_optional_user(
         request.state.user = user
         request.state.auth_method = _auth_method(credentials.credentials)
         return user
-    except (HTTPException, LegacyAuthError):
+    except (HTTPException, AuthenticationError):
         request.state.auth_failure = "rejected"
         return None
     except Exception:
@@ -412,19 +375,19 @@ async def get_optional_user(
         return None
 
 
-#: Resolved through a bearer secret (rsn_ key or legacy key): scopes apply.
-KEY_AUTH_METHODS = frozenset({"api_key", "legacy_key"})
+#: Resolved through a bearer secret (rsn_ key): scopes apply.
+KEY_AUTH_METHODS = frozenset({"api_key"})
 
 
 def _auth_method(token: str) -> str:
-    """How a bearer token authenticated: ``api_key``, ``bearer`` (JWT) or ``legacy_key``."""
+    """How a bearer token authenticated: ``api_key`` or ``bearer`` (JWT)."""
     if looks_like_api_key(token):
         return "api_key"
-    return "bearer" if _looks_like_jwt(token) else "legacy_key"
+    return "bearer"
 
 
 def require_key_scope(scope: str):
-    """Route guard: a key caller (rsn_ or legacy) must hold ``scope``. Returns the user.
+    """Route guard: an rsn_ key caller must hold ``scope``. Returns the user.
 
     Session and JWT callers always pass, because scopes only narrow what a key
     may do. Before this guard, scopes were attached to the User and never read,
@@ -444,7 +407,7 @@ def require_key_scope(scope: str):
 
 async def require_admin_scope(user: User = Depends(get_current_user)) -> User:
     """Route guard: the caller must hold the admin scope. Returns the user."""
-    from reasoner.auth import Scope
+    from reasoner.domain.auth import Scope
 
     if Scope.ADMIN.value not in user.scopes:
         raise HTTPException(status_code=403, detail="Admin scope required")
@@ -460,12 +423,12 @@ async def require_auth_if_legacy_disabled(
     pipeline endpoint.  Keeping it in the shared dependency module prevents
     chargeable routes from accidentally implementing different auth semantics.
     """
-    if user is None and not settings.ENABLE_LEGACY_API_KEY:
+    if user is None and not settings.ALLOW_ANONYMOUS_RUNS:
         raise HTTPException(
             status_code=401,
             detail=(
-                "Authentication required. Set ENABLE_LEGACY_API_KEY=true "
-                "for v1 backward compatibility."
+                "Authentication required. Sign in, or set ALLOW_ANONYMOUS_RUNS=true "
+                "to allow anonymous runs."
             ),
             headers={"WWW-Authenticate": "Bearer"},
         )
@@ -502,15 +465,13 @@ async def run_tier_label(user: User | None, request: Request | None = None) -> s
 
 
 async def close_tier_lookup() -> None:
-    """Close the subscription pool behind tier lookups (app shutdown)."""
+    """Close the shared Postgres pool behind every adapter (app shutdown)."""
     try:
-        from reasoner.infrastructure.persistence.subscription_repo import (
-            PostgresSubscriptionRepository,
-        )
+        from reasoner.infrastructure.persistence.pg_pool import close_shared_pools
 
-        await PostgresSubscriptionRepository.close()
+        await close_shared_pools()
     except Exception as exc:
-        logger.warning("Subscription pool close failed: %s", exc)
+        logger.warning("Shared Postgres pool close failed: %s", exc)
 
 
 def require_tier(min_tier: SubscriptionTier):
@@ -611,7 +572,7 @@ def _get_quota_service() -> QuotaService:
         from reasoner.infrastructure.persistence.cached_quota_repo import CachedQuotaRepository
         from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
         dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-        pg_repo = PostgresQuotaRepository(dsn, pool_size=settings.DB_POOL_SIZE)
+        pg_repo = PostgresQuotaRepository(dsn)
         cached_repo = CachedQuotaRepository(pg_repo)
         _quota_service = QuotaService(cached_repo)
     return _quota_service
@@ -650,7 +611,7 @@ def _get_credit_service() -> CreditService:
                 PostgresCreditRepository,
             )
             dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-            repo = PostgresCreditRepository(dsn, pool_size=settings.DB_POOL_SIZE)
+            repo = PostgresCreditRepository(dsn)
         else:
             from reasoner.infrastructure.persistence.credit_repo_memory import (
                 InMemoryCreditRepository,
@@ -675,7 +636,7 @@ def _get_api_key_service() -> ApiKeyService:
                 PostgresApiKeyRepository,
             )
             dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-            repo = PostgresApiKeyRepository(dsn, pool_size=settings.DB_POOL_SIZE)
+            repo = PostgresApiKeyRepository(dsn)
         else:
             from reasoner.infrastructure.persistence.api_key_repo_memory import (
                 InMemoryApiKeyRepository,
@@ -1093,7 +1054,7 @@ async def check_preset_access_if_authenticated(
     string annotation, so FastAPI would treat it as a query parameter.
 
     Mirrors check_quota_if_authenticated -- anonymous access is governed by
-    ENABLE_LEGACY_API_KEY at the route, so there is no subscription to check.
+    ALLOW_ANONYMOUS_RUNS at the route, so there is no subscription to check.
     """
     if user is None:
         return

@@ -10,9 +10,10 @@ from reasoner.core.settings import Settings
 
 class TestDBPoolSize:
     def test_default_pool_size(self) -> None:
-        # Bumped 10 -> 50 in 2d5d2a2 for higher concurrency.
+        # One shared pool per worker: 8 workers x (8 + 2 health probe) = 80 < 100.
         settings = Settings()
-        assert settings.DB_POOL_SIZE == 5
+        assert settings.DB_POOL_SIZE == 8
+        assert 8 * (settings.DB_POOL_SIZE + 2) < 100
 
     def test_pool_size_is_int(self) -> None:
         settings = Settings()

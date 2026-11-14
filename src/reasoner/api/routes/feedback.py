@@ -67,7 +67,7 @@ async def feedback_stats(
     """Admin-only endpoint returning feedback statistics."""
     if not settings.ADMIN_API_KEY:
         raise HTTPException(status_code=503, detail="Admin endpoint not configured")
-    from reasoner.auth import Scope
+    from reasoner.domain.auth import Scope
     user_scopes = getattr(user, "scopes", set())
     if Scope.ADMIN.value not in user_scopes:
         raise HTTPException(status_code=403, detail="Admin scope required")

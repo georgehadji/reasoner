@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-os.environ.setdefault("ENABLE_LEGACY_API_KEY", "true")
+os.environ.setdefault("ALLOW_ANONYMOUS_RUNS", "true")
 os.environ.setdefault("ENVIRONMENT", "testing")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-do-not-use-in-production")
 os.environ.setdefault("STRIPE_SECRET_KEY", "sk_test_123")

@@ -17,7 +17,7 @@ from reasoner.api.dependencies import (
     get_current_user,
     require_key_scope,
 )
-from reasoner.auth import Scope
+from reasoner.domain.auth import Scope
 from reasoner.domain.credits import (
     CREDITS_PER_USD,
     TIER_MONTHLY_CREDITS,
