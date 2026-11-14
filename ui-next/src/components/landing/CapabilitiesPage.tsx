@@ -1,45 +1,57 @@
 import Link from 'next/link';
-import { Aside, Body, Heading, Lede, Section } from '@/components/landing/prose';
+import type { ReactNode } from 'react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { CAPABILITIES, SYCOPHANCY_CONTROLS } from '@/lib/capabilities.generated';
+import { EPISTEMIC_TAG, epistemicClassName } from '@/lib/remark-epistemic';
 
 /**
- * The mechanism argument, in eight parts.
- *
- * These sections used to run down the home page. They were moved here because
- * the home page has one job — state the claim, show the product's own output,
- * ask for the click — and nine sections of mechanism between the masthead and
- * the exhibits buried both. The anchors and the copy survived that move
- * unchanged, so an inbound link to #sycophancy still lands on the section it
- * was written for, one URL over.
- *
- * Ideation (#brainstorming) has since gone back to the home page: its three
- * tiers are an exhibit rather than an essay, which is the test that page
- * applies. The §n markers here closed up over the gap it left, so the marker a
- * section carries is no longer the one it had on the home page. The anchors did
- * not move, and they are what links are written against — never renumber by
- * changing an id.
+ * /capabilities in the site world "The product performs" (spec/art-direction.md):
+ * the mechanism argument, in eight parts.
  *
  * Every section is the same claim from a different angle: Reasoner runs work
  * past models that disagree, then makes the disagreement part of the output.
- * Ordering is by strength of evidence, not by glamour. §1 leads because it is
- * the only claim here that is a deterministic guarantee rather than a
- * tendency — a rule in code, with no model in the loop. The proof for all of
- * it is one click away at /how-it-works, which is a captured production run.
+ * Ordering is by strength of evidence, not by glamour. Epistemic labelling
+ * leads because it is the only deterministic guarantee here: a rule in code,
+ * with no model in the loop. The proof for all of it is /how-it-works, a
+ * captured production run. The hero fragment says, for each section, what
+ * holds it: a rule in code, a test, or a brief given to a model.
+ *
+ * Anchors are what inbound links are written against (several moved here from
+ * the home page). Never rename an id.
  *
  * Copy discipline: every figure comes from `capabilities.generated.ts`, which
- * is regenerated from the live registry on each commit. Nothing here is typed
- * by hand, and nothing claims enforcement the code does not perform — see
+ * is regenerated from the live registry on each commit. Nothing here claims
+ * enforcement the code does not perform. See
  * docs/plans/landing-capability-pivot.md §3 for the claim-to-code table.
  */
 
 /* ── Content ──────────────────────────────────────────────────────── */
 
+/** What holds each section's claim. Read from the copy below; keep in step with it. */
+const MECHANISMS = [
+  { id: 'hallucination', name: 'Epistemic labelling', held: 'A rule in code' },
+  { id: 'bias', name: 'Cross-bloc routing', held: 'A validator and a test' },
+  { id: 'image-making', name: 'Image routing', held: 'Code, after one model reading' },
+  { id: 'propagation', name: 'Propagation resistance', held: 'Prompts, held by tests' },
+  { id: 'sycophancy', name: 'Sycophancy controls', held: 'Code and prompts' },
+  { id: 'voice', name: 'Prose standards', held: 'A brief to the model' },
+  { id: 'research', name: 'Agentic research', held: 'A model choosing each step' },
+  { id: 'methods', name: 'Reasoning methods', held: 'A pipeline per method' },
+];
+
+/** How a claim's label is decided (the downgrade rule in the synthesis path). */
+const LABEL_RULE = [
+  { backing: 'Only the model that wrote it', label: 'HYPOTHESIS' },
+  { backing: 'A search result', label: 'VERIFIED' },
+  { backing: 'A document you supplied', label: 'VERIFIED' },
+  { backing: 'An executed check', label: 'VERIFIED' },
+] as const;
+
 /**
  * The four search actions the research loop can choose between at each
- * iteration (phases/_prism.py). "done" is omitted — it is a terminator, not
- * a capability.
+ * iteration (phases/_prism.py), plus uploaded documents. "done" is omitted:
+ * it is a terminator, not a capability.
  */
 const RESEARCH_ACTIONS = [
   { name: 'General web', desc: 'Broad search across the open web.' },
@@ -65,9 +77,9 @@ const QUERY_PROGRESSION = [
  * a floor rather than as a category of its own.
  */
 const IMAGE_FAMILIES = [
-  { name: 'Vector', desc: 'Logos, icons, flat marks — routed to a model that emits real SVG.' },
-  { name: 'Photoreal', desc: 'People, products, scenes. Anything that has to survive being looked at closely.' },
-  { name: 'Text in image', desc: 'Posters, signage, labels — only the models that can actually spell.' },
+  { name: 'Vector', desc: 'Logos, icons, flat marks, routed to a model that emits real SVG.' },
+  { name: 'Photoreal', desc: 'People, products, scenes. Anything that has to survive close looking.' },
+  { name: 'Text in image', desc: 'Posters, signage, labels: only the models that can spell.' },
   { name: 'Design', desc: 'Layouts and brand assets, where the composition is the constraint.' },
   { name: 'Reference edit', desc: 'Edits or restyles an image you supply, on models that accept one.' },
   { name: 'General', desc: 'Everything else, and where an unsure call lands rather than guessing.' },
@@ -98,7 +110,7 @@ const METHODS = [
  * Substitutions taken verbatim from HUMANIZATION_RULES (phases/_shared.py),
  * which is appended to the synthesis prompt that closes every run, to the
  * direct-answer prompts, and to every writing and article phase. Two category
- * rules, two filler cuts, and the specificity standard — chosen because each
+ * rules, two filler cuts, and the specificity standard, chosen because each
  * one is checkable against the source block rather than being a flavour of it.
  *
  * No count of the rules appears in the copy on purpose: the block is edited by
@@ -114,424 +126,472 @@ const PROSE_TELLS = [
   { tell: 'significantly improved performance', fix: 'cut latency by 40 ms' },
 ];
 
+/* ── Chrome ───────────────────────────────────────────────────────── */
+
+const BODY = 'text-[length:var(--site-body)] leading-[var(--site-lh-body)]';
+const HEAD = 'font-display text-[length:var(--site-head)] leading-[var(--site-lh-head)]';
+const CAP = 'border-b border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-3)] font-semibold';
+const FIGURE = 'w-full min-w-0 rounded-[var(--radius-lg)] border border-[var(--site-line)] bg-[var(--site-surface)] text-[var(--site-ink)]';
+const ROW = 'border-b border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-3)] last:border-b-0';
+
+/**
+ * One mechanism. With a figure: text and fragment side by side (the fragment
+ * leads on the light field). Without: the heading on the left, the argument on
+ * the right. The heading is two lines, the house rule for every headline.
+ */
+function Section({
+  id,
+  lines,
+  field = false,
+  figure,
+  children,
+}: {
+  id: string;
+  lines: [string, string];
+  field?: boolean;
+  figure?: ReactNode;
+  children: ReactNode;
+}) {
+  const heading = (
+    <h2 id={`${id}-h`} className={HEAD}>
+      <span className="block">{lines[0]}</span>
+      <span className="block">{lines[1]}</span>
+    </h2>
+  );
+  return (
+    <section
+      id={id}
+      aria-labelledby={`${id}-h`}
+      className={`scroll-mt-[var(--space-20)] ${field ? 'bg-[var(--site-field)] text-[var(--site-field-ink)]' : ''}`}
+    >
+      <div className="mx-auto grid w-full max-w-[var(--site-max)] gap-[var(--space-10)] px-[var(--site-margin)] py-[var(--space-16)] lg:grid-cols-12 lg:items-center lg:gap-[var(--space-12)] lg:py-[var(--space-24)]">
+        {figure ? (
+          <>
+            <div className={field ? 'lg:col-span-5 lg:col-start-8 lg:row-start-1' : 'lg:col-span-5'}>
+              {heading}
+              {children}
+            </div>
+            <div
+              data-reveal
+              className={`flex min-w-0 ${field ? 'lg:col-span-6 lg:col-start-1 lg:row-start-1' : 'lg:col-span-6 lg:col-start-7'}`}
+            >
+              {figure}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="self-start lg:col-span-5">{heading}</div>
+            <div className="lg:col-span-6 lg:col-start-7 [&>*:first-child]:mt-0">{children}</div>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function Body({ children }: { children: ReactNode }) {
+  return <p className={`mt-[var(--space-6)] max-w-[60ch] ${BODY}`}>{children}</p>;
+}
+
+/** The proof link at the foot of a section. */
+function More({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <p className={`mt-[var(--space-8)] ${BODY}`}>
+      {/* text-current: .site-link pins the dark-ground ink, unreadable on the light field. */}
+      <Link href={href} className="site-link text-current">
+        {children}
+      </Link>
+    </p>
+  );
+}
+
 /* ── Page ─────────────────────────────────────────────────────────── */
 
 export default function CapabilitiesPage() {
   return (
-    <div className="site min-h-dvh bg-[var(--bg)] text-[var(--text)]">
+    <div className="site flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
 
-      <main id="main-content">
-        {/* ── Masthead ───────────────────────────────────────────
-            Short on purpose. A reader who arrives here has already been
-            told what Reasoner is, either by the home page or by a link
-            straight into a §. The job of this block is to say what kind
-            of document follows, and then get out of the way of §1. */}
-        <header className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] pb-[var(--section-y)] pt-[var(--space-48)]">
-          <div>
-            <div className="min-w-0">
-              <h1 className="max-w-[20ch] text-balance font-display text-[length:var(--text-4xl)] font-normal leading-[var(--lh-display)] sm:text-[length:var(--text-6xl)] tracking-[var(--tracking-tight)] text-[var(--text)]">
-                Eight mechanisms, and what holds each one.
-              </h1>
-              <p className="prose-measure mt-[var(--space-6)] text-[length:var(--text-2xl)] leading-[var(--lh-body)] text-[var(--text-2)]">
-                Every section below is the same argument from a different angle: run the work past
-                models that disagree, then keep the disagreement. Each says which part is a rule in
-                code and which part is a brief given to a model, because the difference is the
-                whole of what a claim like this is worth.
+      <main id="main-content" className="flex-1">
+        {/* ── Hero: the claim (left), what holds each mechanism (right) ── */}
+        <header className="grid min-h-[var(--site-hero-h)] lg:grid-cols-2">
+          <div className="flex flex-col justify-end px-[var(--site-margin)] pb-[var(--space-12)] pt-[var(--space-32)] lg:pb-[var(--space-16)]">
+            <h1 className="font-display text-[length:var(--site-display)] leading-[var(--site-lh-display)]">
+              <span className="site-line">
+                <span>What holds</span>
+              </span>
+              <span className="site-line">
+                <span>each claim.</span>
+              </span>
+            </h1>
+            <div className="site-after-headline">
+              <p className="mt-[var(--space-8)] max-w-[40ch] text-[length:var(--site-lead)] leading-[var(--site-lh-body)]">
+                Eight mechanisms, one argument: run the work past models that disagree, then keep the
+                disagreement. Each says whether a rule in code holds it, or a brief to a model.
               </p>
-              <Aside href="/how-it-works">Read a complete run instead &rarr;</Aside>
+              <p className={`mt-[var(--space-4)] max-w-[52ch] ${BODY}`}>
+                The difference is the whole of what a claim like this is worth.
+              </p>
+              <div className="mt-[var(--space-8)] flex flex-wrap items-center gap-x-[var(--space-8)] gap-y-[var(--space-4)]">
+                <Link href="/chat" className="site-button">
+                  Ask a question
+                </Link>
+                <Link href="/how-it-works" className={`site-link ${BODY}`}>
+                  Read a complete run
+                </Link>
+              </div>
             </div>
+          </div>
+
+          <div className="flex items-center justify-center bg-[var(--site-surface)] px-[var(--site-margin)] py-[var(--space-16)] lg:pt-[var(--space-24)]">
+            <figure
+              data-ui
+              className="w-full rounded-[var(--radius-lg)] border border-[var(--site-line)] bg-[var(--site-bg)] lg:max-w-[var(--site-fragment)]"
+            >
+              <figcaption className={CAP}>What holds each one</figcaption>
+              <ol className="list-none">
+                {MECHANISMS.map(({ id, name, held }) => (
+                  <li key={id} className="border-b border-[var(--site-line)]">
+                    <a
+                      href={`#${id}`}
+                      className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-[var(--space-3)] px-[var(--space-4)] py-[var(--space-3)] hover:bg-[var(--site-surface)]"
+                    >
+                      <span className="font-semibold">{name}</span>
+                      <span className="text-right text-[var(--site-muted)]">{held}</span>
+                    </a>
+                  </li>
+                ))}
+              </ol>
+              <p className="px-[var(--space-4)] py-[var(--space-3)] text-[var(--site-muted)]">
+                A rule in code runs with no model in the loop. A brief is an instruction a model can
+                still miss.
+              </p>
+            </figure>
           </div>
         </header>
 
-        {/* ── §1 Hallucination ──────────────────────────────────
-            Leads the page because it is the only deterministic
-            guarantee on it. */}
-        <Section id="hallucination">
-          <Heading>A model cannot vouch for itself.</Heading>
-          <Lede>
-            Most products ask a model whether it is confident and print the answer. Reasoner does
-            not accept it. If a claim&rsquo;s only backing is the model that produced it, the label
-            is downgraded from VERIFIED to HYPOTHESIS in code, before it reaches you.
-          </Lede>
+        {/* ── Epistemic labelling: leads because it is the only
+            deterministic guarantee on the page. ── */}
+        <Section
+          id="hallucination"
+          lines={['A model cannot', 'vouch for itself.']}
+          figure={
+            <figure data-ui className={FIGURE}>
+              <figcaption className={CAP}>How a claim gets its label</figcaption>
+              <ul className="list-none">
+                {LABEL_RULE.map(({ backing, label }) => (
+                  <li key={backing} className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-[var(--space-3)] ${ROW}`}>
+                    <span>{backing}</span>
+                    <span className={epistemicClassName(EPISTEMIC_TAG[label])}>{label}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="border-t border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-3)] text-[var(--site-muted)]">
+                Applied in code before the answer reaches you. No model is consulted.
+              </p>
+            </figure>
+          }
+        >
           <Body>
-            VERIFIED is reserved for claims a non-model source can carry: a search result, a
-            document you supplied, an executed check. This is a rule, not a prompt: no model is
-            consulted when it runs, so no model can talk its way around it.
+            Most products ask a model whether it is confident and print the answer. Reasoner does not
+            accept it. If a claim&rsquo;s only backing is the model that produced it, the label is
+            downgraded from verified to hypothesis in code, before it reaches you.
           </Body>
-
-          <dl className="mt-[var(--space-10)] grid gap-[var(--space-6)] sm:grid-cols-2">
-            <div className="border-t border-[var(--border)] pt-[var(--space-4)]">
-              <dt className="epistemic-hypothesis pl-[var(--space-3)] font-sans text-[length:var(--text-2xs)] font-semibold leading-[var(--lh-ui)]">
-                Hypothesis
-              </dt>
-              <dd className="mt-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-                The model asserted it and nothing else backs it. Plausible, reasoned, unconfirmed,
-                and never dressed up as more.
-              </dd>
-            </div>
-            <div className="border-t border-[var(--border)] pt-[var(--space-4)]">
-              <dt className="epistemic-verified pl-[var(--space-3)] font-sans text-[length:var(--text-2xs)] font-semibold leading-[var(--lh-ui)]">
-                Verified
-              </dt>
-              <dd className="mt-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-                A source outside the model carries it. Cited, and traceable back to the thing that
-                carried it.
-              </dd>
-            </div>
-          </dl>
-
-          <Aside href="/how-it-works#synthesis">See the labels on a real synthesis →</Aside>
+          <Body>
+            Verified is reserved for claims a non-model source can carry: a search result, a document
+            you supplied, an executed check. This is a rule, not a prompt: no model is consulted when it
+            runs, so no model can talk its way around it.
+          </Body>
+          <More href="/how-it-works#synthesis">See the labels on a real answer</More>
         </Section>
 
-        {/* ── §2 Bias ───────────────────────────────────────────── */}
-        <Section id="bias">
-          <Heading>Scored by a model from a different bloc.</Heading>
-          <Lede>
-            Cross-lab is not enough. Two labs in the same country share an ideological prior, so
-            routing a question past both proves less than it appears to. Reasoner routes so the
-            model writing the final answer and the model pruning it never come from the same
-            geopolitical bloc, and so the generators span at least two.
-          </Lede>
+        {/* ── Cross-bloc routing ── */}
+        <Section id="bias" lines={['Scored from', 'a different bloc.']} field>
           <Body>
-            The constraint is grounded in published work: Buyl et al., <em>npj AI</em>{' '}
-            2026, which
-            finds the creator&rsquo;s bloc to be the dominant axis of a model&rsquo;s ideological
-            bias. It is held by a validator and a test rather than by good intentions, so a preset
-            that violates it fails the build.
+            Cross-lab is not enough. Two labs in the same country share an ideological prior, so
+            routing a question past both proves less than it appears to. Reasoner routes so the model
+            writing the final answer and the model pruning it never come from the same geopolitical
+            bloc, and so the generators span at least two.
+          </Body>
+          <Body>
+            The constraint is grounded in published work: Buyl et al., <em>npj AI</em> 2026, which
+            finds the creator&rsquo;s bloc to be the dominant axis of a model&rsquo;s ideological bias.
+            It is held by a validator and a test rather than by good intentions, so a preset that
+            violates it fails the build.
           </Body>
           <Body>
             Separately, a dedicated critic tags each candidate answer with typed bias flags and
             subtracts a severity-weighted penalty from its score. Flagged candidates lose on the
             arithmetic, and you can see which flags they drew.
           </Body>
-
-          <Aside href="/how-it-works#adjudication">See the score matrix and its bias flags →</Aside>
+          <More href="/how-it-works#adjudication">See the scores and their bias flags</More>
         </Section>
 
-        {/* ── §3 Image making ───────────────────────────────────
-            Sits here because §2 has just established that which
-            models see a request is decided by rule rather than by
-            preference, and images are where that is easiest to
-            watch working: the family a prompt lands in changes the
-            models, the output format and the price.
-
-            The exhibit lives on the home page. This section is the
-            mechanism and that one is the evidence; collapsing them
-            would leave either the four images unexplained or the
-            explanation unproven. Every claim below maps to code —
-            hypergate/sub_agents/image_model_selector.py (families,
-            tier hint, no model names in the prompt),
-            infrastructure/llm/image_model_catalogue.py (the
-            ranking, one primary per lab, the vector exemption) and
-            infrastructure/llm/image_generation.py (fallback
-            hand-off, policy rewrite, retry). The family call is the
-            only judgement here that a model makes. */}
-        <Section id="image-making">
-          <Heading>No house model, and no favourite lab.</Heading>
-          <Lede>
-            An image prompt is read for what it is asking for — a logo, a photograph, a poster, an
-            edit of something you supplied — and that reading is what picks the models. The
-            classifier never sees a model name, only the capability the picture needs, so nothing
-            can be routed to a favourite on reputation.
-          </Lede>
-
-          <dl className="mt-[var(--space-8)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-3">
-            {IMAGE_FAMILIES.map(({ name, desc }) => (
-              <div key={name} className="border-t border-[var(--border)] pt-[var(--space-3)]">
-                <dt className="font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
-                  {name}
-                </dt>
-                <dd className="mt-[var(--space-1)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-                  {desc}
-                </dd>
-              </div>
-            ))}
-          </dl>
-
+        {/* ── Image routing ──────────────────────────────────────
+            Follows cross-bloc routing because that section establishes that
+            which models see a request is decided by rule rather than
+            preference, and images are where that is easiest to watch. The
+            exhibit lives on the home page (#images); this is the mechanism.
+            Every claim maps to code: hypergate/sub_agents/image_model_selector.py
+            (families, tier hint, no model names in the prompt),
+            infrastructure/llm/image_model_catalogue.py (the ranking, one
+            primary per lab, the vector exemption) and
+            infrastructure/llm/image_generation.py (fallback hand-off, policy
+            rewrite, retry). The family call is the only judgement here a model
+            makes. */}
+        <Section
+          id="image-making"
+          lines={['No house model,', 'no favourite lab.']}
+          figure={
+            <figure data-ui className={FIGURE}>
+              <figcaption className={CAP}>The families a prompt is read into</figcaption>
+              <dl>
+                {IMAGE_FAMILIES.map(({ name, desc }) => (
+                  <div key={name} className={ROW}>
+                    <dt className="font-semibold">{name}</dt>
+                    <dd className="text-[var(--site-muted)]">{desc}</dd>
+                  </div>
+                ))}
+              </dl>
+            </figure>
+          }
+        >
           <Body>
-            Which model then serves that family is decided in code, with no model in the loop. Each
-            candidate ranks itself out of its own identifier — the size word and version number the
-            lab published it under — so one listed this morning takes its place with no edit here
-            and no opinion about whose house is best. Price is measured from the live catalogue: on
-            the budget tier it leads, on the premium tier it only breaks ties.
+            An image prompt is read for what it asks for (a logo, a photograph, a poster, an edit of
+            something you supplied) and that reading picks the models. The classifier never sees a
+            model name, only the capability the picture needs, so nothing is routed to a favourite on
+            reputation.
           </Body>
           <Body>
-            Primaries are taken one per lab, and a family too thin to fill the slots widens rather
-            than quietly returning fewer. Vector is the one deliberate exception. A single lab
-            ships SVG generators, so there diversity loses to format, and you get fewer images
-            rather than a raster answering to the name of a vector.
+            Which model then serves that family is decided in code. Each candidate ranks itself from
+            its own identifier, the size word and version number its lab published it under, so a new
+            one takes its place with no edit here. Price comes from the live catalogue: on the budget
+            tier it leads, on premium it only breaks ties. Primaries are taken one per lab. Vector is
+            the one exception: a single lab ships SVG generators, so you get fewer images rather than a
+            raster answering to the name of a vector.
           </Body>
           <Body>
-            A refusal is treated as routing rather than as an error. A primary that fails hands off
-            to the fallback behind it mid-run, and a content-policy block sends the prompt back to
-            be rewritten — the studio&rsquo;s name replaced by a description of the thing you were
-            actually after — with the whole selection tried again before anything is returned to
-            you as a failure.
+            A refusal is routing, not an error. A primary that fails hands off to the fallback behind
+            it, and a content-policy block sends the prompt back to be rewritten, with the whole
+            selection tried again before anything is returned as a failure.
           </Body>
-
-          <Aside href="/#images">See four labs answer the same prompt →</Aside>
+          <More href="/#images">See four labs answer the same prompt</More>
         </Section>
 
-        {/* ── §4 Propagation ────────────────────────────────────── */}
-        <Section id="propagation">
-          <Heading>An idea does not get to spread itself here.</Heading>
-          <Lede>
-            Systems that pass work between models have a failure mode a single model does not.
-            Text that persuades one stage to carry it into the next can ride the whole pipeline
-            and settle into what the system remembers. Reasoner is built so it has nowhere to
-            travel.
-          </Lede>
+        {/* ── Propagation resistance ── */}
+        <Section id="propagation" lines={['An idea cannot', 'spread itself here.']} field>
           <Body>
-            Every stage that reads outside text (a web page, an earlier model, a recalled memory,
-            an API caller) is told in its system prompt that such text is data and never
-            instruction, and that anything asking to be repeated, preserved, or passed onward is a
-            finding to report rather than an order to obey. The four generators never read each
-            other, so nothing moves sideways between them. Recalled memory enters as a user
-            message, never as an instruction, carrying the run and model it came from.
+            Systems that pass work between models have a failure mode a single model does not. Text
+            that persuades one stage to carry it into the next can ride the whole pipeline and settle
+            into what the system remembers. Reasoner is built so it has nowhere to travel.
+          </Body>
+          <Body>
+            Every stage that reads outside text (a web page, an earlier model, a recalled memory, an
+            API caller) is told in its system prompt that such text is data and never instruction, and
+            that anything asking to be repeated, preserved, or passed onward is a finding to report
+            rather than an order to obey. The four generators never read each other, so nothing moves
+            sideways between them. Recalled memory enters as a user message, never as an instruction,
+            carrying the run and model it came from.
           </Body>
           <Body>
             The design follows Papadopoulos et al., <em>Mind Viruses: Self-Propagating Ideas in
-            Multi-Agent LLM Systems</em> (2026), which measures each of these controls
-            independently. The system-prompt warning is the one that held against fifteen
-            generations of adversarial payloads; keeping memory out of the instruction channel is
-            the difference the paper measures between most propagation succeeding and almost none
-            of it. Both are held by tests, so a change that reopens either fails the build.
+            Multi-Agent LLM Systems</em> (2026), which measures each of these controls independently.
+            The system-prompt warning is the one that held against fifteen generations of adversarial
+            payloads; keeping memory out of the instruction channel is the difference the paper
+            measures between most propagation succeeding and almost none of it. Both are held by
+            tests, so a change that reopens either fails the build.
           </Body>
-
-          <Aside href="/how-it-works#synthesis">See what a recalled memory looks like in a run →</Aside>
         </Section>
 
-        {/* ── §5 Sycophancy ─────────────────────────────────────────
-            Last of the four Mechanism failures because it is the only one
-            where the reader is the source of the distortion, and the page
-            has spent five sections earning the standing to say so. Every
-            Body paragraph below must correspond to a true
-            SYCOPHANCY_CONTROLS entry — see MechanismDiagram's stage-03
-            comment and tests/test_site_capabilities_sync.py. Do not add a
-            paragraph here without adding its detector to
+        {/* ── Sycophancy ─────────────────────────────────────────
+            The only section where the reader is the source of the
+            distortion. Every Body paragraph below must correspond to a true
+            SYCOPHANCY_CONTROLS entry and sit behind its guard: see
+            MechanismDiagram's stage-03 comment and
+            tests/test_site_capabilities_sync.py, which parses this section.
+            Do not add a paragraph here without adding its detector to
             scripts/update_mindmap_meta.py first. */}
-        <Section id="sycophancy">
-          <Heading>It is not built to be agreed with.</Heading>
-          <Lede>
+        <Section id="sycophancy" lines={['Not built to', 'be agreed with.']}>
+          <p className={`mt-[var(--space-6)] max-w-[60ch] ${BODY}`}>
             Assistants trained on human approval learn that agreement scores well. Across five
-            preregistered studies, Ibrahim et al. found sycophantic AI gave no better advice than
-            a neutral system. The entire gain was in how understood people felt, and three weeks
-            of it left them measurably less satisfied with the people in their lives.
-          </Lede>
+            preregistered studies, Ibrahim et al. found sycophantic AI gave no better advice than a
+            neutral system. The entire gain was in how understood people felt, and three weeks of it
+            left them measurably less satisfied with the people in their lives.
+          </p>
           {SYCOPHANCY_CONTROLS.noApprovalGradient && SYCOPHANCY_CONTROLS.confidencePenalty && (
             <Body>
               Reasoner has no approval gradient to climb. The signal that decides which models get
-              used is built from completion, schema validity, critique score and stress-test
-              survival; a rating you give is recorded for you and never reaches it. Every run also
-              carries a generator whose only instruction is to find flaws, and the critic
-              subtracts a penalty from any answer that states unsupported claims confidently. In
-              the arithmetic, honest uncertainty outscores false confidence.
+              used is built from completion, schema validity, critique score and stress-test survival;
+              a rating you give is recorded for you and never reaches it. Every run also carries a
+              generator whose only instruction is to find flaws, and the critic subtracts a penalty
+              from any answer that states unsupported claims confidently. In the arithmetic, honest
+              uncertainty outscores false confidence.
             </Body>
           )}
           {SYCOPHANCY_CONTROLS.noStyleSelector && (
             <Body>
-              There is no warmth slider and no personality picker. Offered three unlabelled styles
-              in that study, a majority chose the flattering one, and not for its advice. They
-              chose it because it was easiest to talk to. Choosing a tone is not a control we
-              intend to sell you.
+              There is no warmth slider and no personality picker. Offered three unlabelled styles in
+              that study, a majority chose the flattering one, and not for its advice. They chose it
+              because it was easiest to talk to. Choosing a tone is not a control we intend to sell
+              you.
             </Body>
           )}
           {SYCOPHANCY_CONTROLS.directPathEpistemicRules && SYCOPHANCY_CONTROLS.premiseAudit && (
             <Body>
-              A stated conclusion is treated as a claim to evaluate, not a premise to build on —
-              on the direct-answer path by system prompt, and inside the full pipeline by an
-              explicit audit of Phase 1&rsquo;s assumptions. A claim about another person&rsquo;s
-              motives that
-              only you supplied cannot be marked verified on your word alone; the destructive
-              perspective is instructed to attack exactly those claims, not you.
+              A stated conclusion is treated as a claim to evaluate, not a premise to build on: on the
+              direct-answer path by system prompt, and inside the full pipeline by an explicit audit of
+              Phase 1&rsquo;s assumptions. A claim about another person&rsquo;s motives that only you
+              supplied cannot be marked verified on your word alone; the destructive perspective is
+              instructed to attack exactly those claims, not you.
             </Body>
           )}
-
-          <Aside href="/how-it-works#adjudication">See the penalty on a real score matrix →</Aside>
+          <More href="/how-it-works#adjudication">See the penalty on real scores</More>
         </Section>
 
-        {/* ── §6 Voice ─────────────────────────────────
-            Sits after the four Mechanism failures rather than among them,
-            because it is the only section on the page whose subject is not a
-            wrong answer. The prose can be flawless and still read as machine
-            output, and that is the objection this answers.
-
+        {/* ── Prose standards ────────────────────────────────────
             Copy discipline: the humanization block is a brief given to the
-            models, NOT a validator — nothing diffs the finished text against
-            it. The third paragraph says so in as many words, and must keep
-            saying so. The only enforcement claimed is the article pipeline's
-            dedicated style pass (role article_humanize), which is a real
-            phase with a real model behind it. No count of the rules appears
-            here; see the PROSE_TELLS comment for why.
-
-            Audited 2026-08-27, when this section carried three claims the
-            code did not support. Two were fixed in code:
-            HUMANIZATION_RULES reached only the synthesis, and now also
-            ARTICLE_DRAFT_SYSTEM; the tell-quoting pass was dead
-            (writing_humanize_prompt, zero call sites) and now runs as
-            article phase 6a. Hence "the drafting prompt" below rather than
-            the older, wrong "every phase of an article" — the developmental
-            and copy edits are told NOT to change voice or word choice, so
-            the rules cannot go there without contradicting them.
-
-            The third claim was removed and must not return: author and
-            publication voice matching. style_brief is populated by tests
-            only, there is no API field for it, and §5 on this page says a
-            tone control is not something we intend to sell. */}
-        <Section id="voice">
-          <Heading>A model cannot hear how it sounds.</Heading>
-          <Lede>
+            models, NOT a validator; nothing diffs the finished text against
+            it. The third paragraph says so and must keep saying so. The only
+            enforcement claimed is the article pipeline's style pass (role
+            article_humanize, phase 6a), a real phase with a real model.
+            "The drafting prompt" is deliberate: the developmental and copy
+            edits are told NOT to change word choice, so the rules cannot go
+            there. Author and publication voice matching was removed on
+            2026-08-27 and must not return: style_brief is populated by tests
+            only and has no API field. */}
+        <Section
+          id="voice"
+          lines={['A model cannot', 'hear how it sounds.']}
+          field
+          figure={
+            <figure data-ui className={FIGURE}>
+              <figcaption className={CAP}>Named in the brief, and what replaces them</figcaption>
+              <dl>
+                {PROSE_TELLS.map(({ tell, fix }) => (
+                  <div key={tell} className={`grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-[var(--space-3)] ${ROW}`}>
+                    <dt className="text-[var(--site-muted)]">
+                      <s>
+                        <code>{tell}</code>
+                      </s>
+                    </dt>
+                    <dd>
+                      <code>{fix}</code>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </figure>
+          }
+        >
+          <Body>
             Machine prose has a fingerprint, and the model producing it is the last thing able to
             notice: significance inflation, vague attribution, the reflexive rule of three,{' '}
-            <em>serves as</em> standing in for <em>is</em>. Reasoner does not ask for good writing.
-            Every model that drafts prose you will read is handed the tells by name and told not
-            to produce them.
-          </Lede>
-          <Body>
-            The list is Wikipedia&rsquo;s, kept by the editors who clean this prose out of articles
-            at volume and had to learn its signatures to do it. It arrives in four groups: the
-            words, the openers, the structural tics, and the patterns that fake depth. The same
-            block goes into the synthesis that closes a full run, into the instant answers, and
-            into the prompt that drafts an article, so the standard is not a setting on one
-            method. It goes in where the sentence is written, which is cheaper than finding the
-            tell later and asking a second model to undo it.
+            <em>serves as</em> standing in for <em>is</em>. Every model that drafts prose you will read
+            is handed the tells by name and told not to produce them. The list is Wikipedia&rsquo;s,
+            kept by the editors who clean this prose out of articles at volume.
           </Body>
-
-          <dl className="mt-[var(--space-8)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-2">
-            {PROSE_TELLS.map(({ tell, fix }) => (
-              <div key={tell} className="border-t border-[var(--border)] pt-[var(--space-3)]">
-                <dt className="font-mono text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-subtle)]">
-                  <s className="decoration-[var(--border-strong)]">{tell}</s>
-                </dt>
-                <dd className="mt-[var(--space-1)] font-mono text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
-                  <span aria-hidden="true" className="text-[var(--text-subtle)]">&rarr;{' '}</span>
-                  {fix}
-                </dd>
-              </div>
-            ))}
-          </dl>
-
           <Body>
-            A brief is not a validator, and nothing checks the finished text against the list
-            afterwards. What an article run adds is a phase whose only job is the tells that got
-            through: an editor model quotes each one it can find in the draft, and only then is it
-            allowed to rewrite the piece without them. Quoting first is the part that matters. A
-            model asked to sound more human reaches for synonyms; one made to name the pattern has
-            to deal with the sentence it just named.
+            The same block goes into the synthesis that closes a full run, the instant answers, and
+            the prompt that drafts an article. A brief is not a validator, and nothing checks the
+            finished text against the list afterwards. What an article run adds is a phase whose only
+            job is the tells that got through: an editor model quotes each one it finds, and only then
+            rewrites the piece without them.
           </Body>
-
-          <Body>
-            The editing passes on either side of it are not given the list, and that is deliberate.
-            They are told not to change word choice, so a rule ordering them to substitute words
-            would contradict the prompt it was attached to. A standard that is applied where it
-            fits and withheld where it does not is worth more than one claimed everywhere.
-          </Body>
-
-          <Aside href="/#writing">See the run that pass belongs to &rarr;</Aside>
+          <More href="/#writing">See the run that pass belongs to</More>
         </Section>
 
-        {/* ── §7 Research ───────────────────────────────────────── */}
-        <Section id="research">
-          <Heading>It searches like a researcher, not a search box.</Heading>
-          <Lede>
-            A single query returns what the query deserved. Reasoner runs an agentic loop that
-            picks its own next move each iteration, goes broad before it goes narrow, and decides
-            for itself when it has enough.
-          </Lede>
-
-          <ol
-            role="list"
-            className="mt-[var(--space-8)] grid list-none gap-[var(--space-4)] font-mono text-[length:var(--text-md)] leading-[var(--lh-body)]"
-          >
-            {QUERY_PROGRESSION.map((query, i) => (
-              <li key={query} className="flex gap-[var(--space-4)]">
-                <span aria-hidden="true" className="nums-tabular shrink-0 text-[var(--text-subtle)]">
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-                <span className="text-[var(--text-2)]">{query}</span>
-              </li>
-            ))}
-          </ol>
-
+        {/* ── Agentic research ── */}
+        <Section
+          id="research"
+          lines={['It searches like', 'a researcher.']}
+          figure={
+            <figure data-ui className={FIGURE}>
+              <figcaption className={CAP}>One loop, broad before narrow</figcaption>
+              <ol className="list-none">
+                {QUERY_PROGRESSION.map((query, i) => (
+                  <li key={query} className={`flex items-baseline gap-[var(--space-3)] ${ROW}`}>
+                    <span className="shrink-0 text-[var(--site-muted)]">Step {i + 1}</span>
+                    <code>{query}</code>
+                  </li>
+                ))}
+              </ol>
+              <p className="border-t border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-3)] font-semibold">
+                Five kinds of retrieval to choose from
+              </p>
+              <dl>
+                {RESEARCH_ACTIONS.map(({ name, desc }) => (
+                  <div key={name} className={`border-t border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-3)]`}>
+                    <dt className="font-semibold">{name}</dt>
+                    <dd className="text-[var(--site-muted)]">{desc}</dd>
+                  </div>
+                ))}
+              </dl>
+            </figure>
+          }
+        >
           <Body>
-            At each step it chooses among five kinds of retrieval, then reads what it finds rather
-            than skimming a snippet. At the deepest tier it plans five or more iterations and
+            A single query returns what the query deserved. Reasoner runs an agentic loop that picks
+            its own next move each iteration, goes broad before it goes narrow, and decides for itself
+            when it has enough.
+          </Body>
+          <Body>
+            At each step it chooses among five kinds of retrieval, then reads what it finds rather than
+            skimming a snippet. At the deepest tier it plans five or more iterations and
             cross-references before it will stop.
           </Body>
-
-          <dl className="mt-[var(--space-8)] grid gap-x-[var(--space-8)] gap-y-[var(--space-4)] sm:grid-cols-2">
-            {RESEARCH_ACTIONS.map(({ name, desc }) => (
-              <div key={name} className="border-t border-[var(--border)] pt-[var(--space-3)]">
-                <dt className="font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
-                  {name}
-                </dt>
-                <dd className="mt-[var(--space-1)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-                  {desc}
-                </dd>
-              </div>
-            ))}
-          </dl>
-
-          <Aside href="/how-it-works#evidence">See what one run actually read →</Aside>
+          <More href="/how-it-works#evidence">See what one run read</More>
         </Section>
 
-        {/* ── §8 Methods ────────────────────────────────────────── */}
-        <Section id="methods">
-          <Heading>{CAPABILITIES.methods} methods. Not {CAPABILITIES.methods} prompts.</Heading>
-          <Lede>
+        {/* ── Reasoning methods ── */}
+        <Section
+          id="methods"
+          lines={[`${CAPABILITIES.methods} methods.`, `Not ${CAPABILITIES.methods} prompts.`]}
+          field
+          figure={
+            <figure data-ui className={FIGURE}>
+              <figcaption className={CAP}>Methods with a pipeline of their own</figcaption>
+              <dl className="grid sm:grid-cols-2">
+                {METHODS.map(({ name, desc }) => (
+                  <div key={name} className="border-b border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-3)]">
+                    <dt className="font-semibold">{name}</dt>
+                    <dd className="text-[var(--site-muted)]">{desc}</dd>
+                  </div>
+                ))}
+              </dl>
+            </figure>
+          }
+        >
+          <Body>
             Named reasoning techniques are usually sold as instructions bolted onto one chat
-            completion. Here each is a separate pipeline with its own phases, its own model
-            routing, and its own failure modes. Tree-of-Thoughts genuinely backtracks.
-            Program-of-Thoughts genuinely executes the code it writes.
-          </Lede>
-
-          <dl className="mt-[var(--space-10)] grid gap-x-[var(--space-8)] gap-y-[var(--space-5)] sm:grid-cols-2">
-            {METHODS.map(({ name, desc }) => (
-              <div key={name}>
-                <dt className="font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--text)]">
-                  {name}
-                </dt>
-                <dd className="mt-[var(--space-1)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-                  {desc}
-                </dd>
-              </div>
-            ))}
-          </dl>
-
+            completion. Here each is a separate pipeline with its own phases, its own model routing,
+            and its own failure modes. Tree-of-Thoughts backtracks. Program-of-Thoughts executes the
+            code it writes.
+          </Body>
           <Body>
             Each ships in a budget and a premium tier, for {CAPABILITIES.presets} routing
             configurations in total, spanning {CAPABILITIES.routableModels.toLocaleString('en-US')}{' '}
             routable models. You can pick one, or let the router pick from the question.
           </Body>
-
-          <Aside href="/docs">Read the method reference →</Aside>
+          <More href="/docs">Read the method reference</More>
         </Section>
 
-        {/* ── Close ─────────────────────────────────────────────── */}
-        <section className="mx-auto w-full max-w-[var(--width-wide)] px-[var(--gutter)] py-[var(--section-y)]">
-          <div>
-            <div className="min-w-0">
-              <Heading>Ask it something you would check by hand.</Heading>
-              <Lede>
-                The kind of question where being confidently wrong would cost you. That is the case
-                this was built for.
-              </Lede>
-              <div className="mt-[var(--space-10)] flex flex-wrap items-center gap-[var(--space-4)]">
-                <Link
-                  href="/chat"
-                  className="btn-lift flex min-h-[var(--space-12)] items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-8)] font-sans text-[length:var(--text-md)] font-semibold leading-[var(--lh-ui)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
-                >
-                  Ask a question
-                </Link>
-                <Link
-                  href="/how-it-works"
-                  className="link-smooth flex min-h-[var(--space-12)] items-center font-sans text-[length:var(--text-md)] font-medium leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 hover:text-[var(--text)]"
-                >
-                  Read a complete run
-                </Link>
-              </div>
-            </div>
+        {/* ── Close ── */}
+        <section aria-labelledby="close-h" className="mx-auto w-full max-w-[var(--site-max)] px-[var(--site-margin)] py-[var(--space-24)]">
+          <h2 id="close-h" className={HEAD}>
+            <span className="block">Ask what you</span>
+            <span className="block">would check by hand.</span>
+          </h2>
+          <p className={`mt-[var(--space-6)] max-w-[52ch] ${BODY}`}>
+            The kind of question where being confidently wrong would cost you. That is the case this
+            was built for.
+          </p>
+          <div className="mt-[var(--space-8)] flex flex-wrap items-center gap-x-[var(--space-8)] gap-y-[var(--space-4)]">
+            <Link href="/chat" className="site-button">
+              Ask a question
+            </Link>
+            <Link href="/how-it-works" className={`site-link ${BODY}`}>
+              Read a complete run
+            </Link>
           </div>
         </section>
       </main>

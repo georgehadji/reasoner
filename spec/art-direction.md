@@ -114,6 +114,14 @@ control, the pinned pilot fragment changing state. All of it collapses under
   `RunIndex` is now the hero (timing chart + contents); the synthesis reads inside a scrolling
   reader capped by `--site-reader-h`. Dropped the "Terms" block: /security owns those claims.
   The rail's "N VERIFIED" counted every label kind; it now counts each kind. Inspector: 0 FAIL.
+- /capabilities rebuilt (2026-11-14): "What holds each claim." with a fragment naming what
+  holds each of the eight mechanisms (rule in code, test, or brief to a model), then the eight
+  sections with their audited copy unchanged in substance, fragments for the label rule, image
+  families, prose tells, the research loop and the methods. `Section`/`Body` stay local so
+  `tests/test_site_capabilities_sync.py` still parses the gated #sycophancy section.
+  `.site-link` pins dark-ground ink, so links on the light field add `text-current`.
+  Inspector: 0 FAIL at 1440 and 768; 1 FAIL at 390, blank-gap past the 11-screen walk
+  (page is 14.4 screens; unscrolled `Reveal` sections stay armed), the same artifact as home.
 - Rolled out (2026-11-13, tokens and chrome only): `.site` on every marketing page root,
   `SiteFooter` is now the quiet line, inverted bands flip to the concrete field, uppercase
   micro-labels and prose mono removed, `Reveal` mounted in `SiteHeader`. Their layouts are
