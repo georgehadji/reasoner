@@ -92,13 +92,14 @@ export function DocMarkdown({ children }: { children: string }) {
             ) : (
               <code className="rounded-[var(--radius-sm)] bg-[var(--site-surface-2)] px-[var(--space-1)] font-mono">{c}</code>
             ),
+          // Both scroll sideways on a phone; tabIndex lets a keyboard user scroll them.
           pre: ({ children: c }) => (
-            <pre data-ui data-reveal className={`${FRAME} p-[var(--space-4)] text-[length:var(--site-small)]`}>
+            <pre tabIndex={0} data-ui data-reveal className={`${FRAME} p-[var(--space-4)] text-[length:var(--site-small)]`}>
               {c}
             </pre>
           ),
           table: ({ children: c }) => (
-            <div data-ui data-reveal className={FRAME}>
+            <div role="region" aria-label="Table" tabIndex={0} data-ui data-reveal className={FRAME}>
               <table className="w-full border-collapse text-left text-[length:var(--site-small)]">{c}</table>
             </div>
           ),
