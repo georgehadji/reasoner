@@ -1,8 +1,7 @@
 """Agent-facing endpoints.
 
 Authenticate with ``Authorization: Bearer <key>`` -- a Reasoner account key
-(``rsn_live_...``), a JWT, or (when ``ENABLE_LEGACY_API_KEY=true``) a
-self-hosted legacy key; ``get_current_user`` already resolves all three to the
+(``rsn_live_...``) or a JWT; ``get_current_user`` resolves both to the
 same ``User``. No CSRF token: a page cannot attach a caller's bearer key to a
 forged cross-origin request, so the attack CSRF defends against does not exist
 on this path (``require_csrf`` grants the identical exemption to ``/api/run``).

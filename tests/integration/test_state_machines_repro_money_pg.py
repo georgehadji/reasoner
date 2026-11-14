@@ -15,6 +15,7 @@ import pytest
 
 from reasoner.domain.saas import SubscriptionStatus
 from reasoner.infrastructure.billing import webhooks
+from reasoner.infrastructure.persistence.pg_pool import close_shared_pools
 from tests.integration.test_alembic_schema_contract import (
     DSN,
     _alembic_upgrade,
@@ -57,7 +58,7 @@ async def test_m1_same_second_update_does_not_revive_a_cancelled_subscription():
             await repo.upsert_subscription(_sub(uid, "sub_1"), T2)  # updated, same second
             current = await repo.get_subscription_by_user(uid)
         finally:
-            await repo.close()
+            await close_shared_pools()
     assert current.status is SubscriptionStatus.CANCELLED
 
 
@@ -83,7 +84,7 @@ async def test_m1_stripe_upsert_does_not_adopt_a_paypal_tombstone():
             finally:
                 await conn.close()
         finally:
-            await repo.close()
+            await close_shared_pools()
     assert status == "cancelled"  # the tombstone must keep guarding the PayPal id
 
 

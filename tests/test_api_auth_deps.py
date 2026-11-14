@@ -6,27 +6,10 @@ import pytest
 from fastapi import HTTPException
 
 from reasoner.api.auth_deps import (
-    _get_auth_manager_instance_auth_deps,
     _get_rate_limiter_instance_auth_deps,
-    optional_auth,
-    require_auth,
     require_csrf,
 )
 from reasoner.api.dependencies import check_rate_limit
-
-
-class TestAuthManagerInstance:
-    """Test auth manager singleton factory."""
-
-    def test_returns_same_instance(self):
-        instance1 = _get_auth_manager_instance_auth_deps()
-        instance2 = _get_auth_manager_instance_auth_deps()
-        assert instance1 is instance2
-
-    def test_has_required_methods(self):
-        auth_manager = _get_auth_manager_instance_auth_deps()
-        assert hasattr(auth_manager, "authenticate")
-        assert hasattr(auth_manager, "generate_key")
 
 
 class TestRateLimiterInstance:
@@ -40,40 +23,6 @@ class TestRateLimiterInstance:
     def test_has_required_methods(self):
         rate_limiter = _get_rate_limiter_instance_auth_deps()
         assert hasattr(rate_limiter, "is_allowed")
-
-
-class TestRequireAuth:
-    """Test require_auth dependency."""
-
-    @pytest.mark.asyncio
-    async def test_missing_credentials_raises_401(self):
-        with pytest.raises(HTTPException) as exc_info:
-            await require_auth(None)  # type: ignore[arg-type]
-        assert exc_info.value.status_code == 401
-
-    @pytest.mark.asyncio
-    async def test_invalid_credentials_raises_401(self):
-        from fastapi.security import HTTPAuthorizationCredentials
-        creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="invalid-token")
-        with pytest.raises(HTTPException) as exc_info:
-            await require_auth(creds)
-        assert exc_info.value.status_code == 401
-
-
-class TestOptionalAuth:
-    """Test optional_auth dependency."""
-
-    @pytest.mark.asyncio
-    async def test_no_credentials_returns_none(self):
-        result = await optional_auth(None)  # type: ignore[arg-type]
-        assert result is None
-
-    @pytest.mark.asyncio
-    async def test_invalid_credentials_returns_none(self):
-        from fastapi.security import HTTPAuthorizationCredentials
-        creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="invalid-token")
-        result = await optional_auth(creds)
-        assert result is None
 
 
 class TestRequireCSRF:

@@ -96,7 +96,10 @@ class Settings:
     # ── Environment / Deployment ──
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     UVICORN_WORKERS: int = int(os.getenv("UVICORN_WORKERS", "1"))
-    ENABLE_LEGACY_API_KEY: bool = os.getenv("ENABLE_LEGACY_API_KEY", "false").lower() in ("1", "true", "yes")
+    # ENABLE_LEGACY_API_KEY is the pre-rename env var; honoured so existing deploys keep behaving.
+    ALLOW_ANONYMOUS_RUNS: bool = os.getenv(
+        "ALLOW_ANONYMOUS_RUNS", os.getenv("ENABLE_LEGACY_API_KEY", "false")
+    ).lower() in ("1", "true", "yes")
     # Mounts the MCP Streamable-HTTP transport at /mcp. Off by default: most
     # installs use stdio (mcp_server.py) instead. Requires the mcp extra.
     ENABLE_MCP_HTTP: bool = os.getenv("ENABLE_MCP_HTTP", "false").lower() in ("1", "true", "yes")
@@ -187,8 +190,6 @@ class Settings:
     )
 
     # ── Auth / Supabase ──
-    AUTH_PERSISTENCE_ENABLED: bool = os.getenv("AUTH_PERSISTENCE_ENABLED", "false").lower() in ("1", "true", "yes")
-    AUTH_DB_PATH: str = os.getenv("AUTH_DB_PATH", "src/reasoner/auth_keys.db")
     SUPABASE_URL: str | None = os.getenv("SUPABASE_URL")
     SUPABASE_ANON_KEY: str | None = os.getenv("SUPABASE_ANON_KEY")
     SUPABASE_SERVICE_ROLE_KEY: str | None = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
@@ -396,7 +397,12 @@ class Settings:
     # ── Event Store Compaction ──
     COMPACTION_ENABLED: bool = os.getenv("COMPACTION_ENABLED", "true").lower() in ("1", "true", "yes")
     EVENT_RETENTION_DAYS: int = int(os.getenv("EVENT_RETENTION_DAYS", "365"))
-    DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "50"))
+    # Max connections of the ONE shared asyncpg pool per worker (see
+    # infrastructure/persistence/pg_pool.py): every Postgres adapter, including
+    # the event store, draws from it. Per worker that is this value plus the
+    # 2-connection health probe pool; 8 workers x (8 + 2) = 80, under Postgres'
+    # default max_connections of 100. Raise it only with max_connections.
+    DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "8"))
 
     # ── Persistent Data Paths ──
     # feedback.db (feedback_store.py), events.db (event_store.py /
@@ -410,6 +416,7 @@ class Settings:
     # docker-compose.yml sets them to paths under its mounted volumes.
     FEEDBACK_DB_PATH: str = os.getenv("FEEDBACK_DB_PATH", "")
     EVENT_STORE_DB_PATH: str = os.getenv("EVENT_STORE_DB_PATH", "")
+    ERROR_DB_PATH: str = os.getenv("ERROR_DB_PATH", "")
     UPLOAD_STORAGE_DIR: str = os.getenv("UPLOAD_STORAGE_DIR", "")
     HISTORY_STORAGE_DIR: str = os.getenv("HISTORY_STORAGE_DIR", "")
     RUN_CACHE_DIR: str = os.getenv("RUN_CACHE_DIR", "")
@@ -496,7 +503,7 @@ class Settings:
     SANDBOX_WORKER_TOKEN: str = os.getenv("SANDBOX_WORKER_TOKEN", "")
 
     # ── Anonymous Trial Spend Cap (Phase 2 metering) ──
-    # Anonymous runs (ENABLE_LEGACY_API_KEY=true, no account) skip the
+    # Anonymous runs (ALLOW_ANONYMOUS_RUNS=true, no account) skip the
     # per-user credit ledger entirely -- there's no account to charge. This
     # caps estimated daily spend per client IP so anonymous traffic stays
     # bounded regardless. 50 credits = $0.05/day, enough for a couple of
@@ -677,6 +684,13 @@ if settings.ENVIRONMENT == "production":
             )
     if settings.JWT_SECRET_KEY and len(settings.JWT_SECRET_KEY) < 32:
         raise RuntimeError("JWT_SECRET_KEY must be at least 32 characters in production.")
+    # A configured provider with no webhook secret 503s every paid event.
+    for provider_key, webhook_var in (
+        ("STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"),
+        ("PAYPAL_CLIENT_ID", "PAYPAL_WEBHOOK_ID"),
+    ):
+        if os.getenv(provider_key) and not os.getenv(webhook_var):
+            raise RuntimeError(f"{webhook_var} must be set in production when {provider_key} is.")
     # Without trusted proxies every caller behind the load balancer shares its
     # IP, so per-IP rate limits and the anonymous trial cap act on one bucket.
     if not settings.TRUSTED_PROXIES and os.getenv("ALLOW_NO_TRUSTED_PROXIES", "").lower() not in (

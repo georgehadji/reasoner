@@ -238,6 +238,40 @@ class StripeBillingAdapter(BillingPort):
                 return
             raise
 
+    async def refund_latest_charge(self, subscription_id: str) -> None:
+        """Refund what the subscription's latest invoice collected.
+
+        The idempotency key makes a retried or replayed webhook refund once.
+        """
+        current = to_plain(
+            await asyncio.to_thread(stripe.Subscription.retrieve, subscription_id)
+        )
+        invoice_id = current.get("latest_invoice")
+        if isinstance(invoice_id, dict):
+            invoice_id = invoice_id.get("id")
+        if not invoice_id:
+            logger.warning("No invoice to refund for subscription %s", subscription_id)
+            return
+        payments = to_plain(
+            await asyncio.to_thread(stripe.InvoicePayment.list, invoice=invoice_id, status="paid")
+        )
+        intent = next(
+            (
+                (p.get("payment") or {}).get("payment_intent")
+                for p in payments.get("data", [])
+                if (p.get("payment") or {}).get("payment_intent")
+            ),
+            None,
+        )
+        if not intent:
+            logger.warning("No paid payment found to refund for subscription %s", subscription_id)
+            return
+        await asyncio.to_thread(
+            stripe.Refund.create,
+            payment_intent=intent,
+            idempotency_key=f"duplicate-subscription-refund:{subscription_id}",
+        )
+
     async def _handle_payment_failed(self, invoice: dict) -> Subscription:
         # API 2025-03-31 moved the invoice's subscription under
         # parent.subscription_details; older endpoint versions send it top-level.
@@ -295,4 +329,4 @@ def _subscription_repo():
     )
 
     dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-    return PostgresSubscriptionRepository(dsn, pool_size=10)
+    return PostgresSubscriptionRepository(dsn)

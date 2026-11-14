@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-os.environ.setdefault("ENABLE_LEGACY_API_KEY", "true")
+os.environ.setdefault("ALLOW_ANONYMOUS_RUNS", "true")
 os.environ.setdefault("ENVIRONMENT", "testing")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-do-not-use-in-production")
 os.environ.setdefault("STRIPE_SECRET_KEY", "sk_test_123")
@@ -176,7 +176,6 @@ def test_webhook_unsigned_payload_is_ignored_when_secret_missing(client, monkeyp
 
     response = client.post("/api/billing/webhook", json=event, headers={"stripe-signature": "test"})
 
-    assert response.status_code == 200
-    assert response.json()["status"] == "misconfigured"
+    assert response.status_code == 503  # retryable: a 200 would lose the paid event
     # BillingService must NOT have been invoked
     assert len(handle_called) == 0

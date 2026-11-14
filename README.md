@@ -184,7 +184,7 @@ Reasoner is designed to be called by autonomous AI agents (Cursor, LangChain, Cr
 
 ### Option 1 — Agent API (HTTP, Bearer auth)
 
-Agent endpoints authenticate with `Authorization: Bearer <API_KEY>` and are exempt from CSRF requirements — a Reasoner account key (`rsn_live_...`), a JWT, or (self-hosted, `ENABLE_LEGACY_API_KEY=true`) a legacy admin key all resolve to the same authenticated caller. Every run is idempotency-guarded and metered identically to a web run: same credit ledger, same ownership record. This is true both self-hosted and on the SaaS deployment — there is no separate unmetered surface. The full agent guide — tool definitions, retry semantics, preset selection — lives at `/docs/agent-integration` (source: `ui-next/src/lib/docs.ts`).
+Agent endpoints authenticate with `Authorization: Bearer <API_KEY>` and are exempt from CSRF requirements — a Reasoner account key (`rsn_live_...`) or a JWT resolves to the same authenticated caller. Every run is idempotency-guarded and metered identically to a web run: same credit ledger, same ownership record. This is true both self-hosted and on the SaaS deployment — there is no separate unmetered surface. The full agent guide — tool definitions, retry semantics, preset selection — lives at `/docs/agent-integration` (source: `ui-next/src/lib/docs.ts`).
 
 | Endpoint | Method | Format | Description |
 | :--- | :--- | :--- | :--- |

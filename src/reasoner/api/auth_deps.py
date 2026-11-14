@@ -4,13 +4,10 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import Depends, HTTPException, Request, Security
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import HTTPException, Request
 
 from reasoner.api.csrf import verify_csrf_token
-from reasoner.auth import AuthenticationError, get_auth_manager
 from reasoner.domain.api_keys import looks_like_api_key
-from reasoner.infrastructure.auth_legacy import AuthManager
 
 logger = logging.getLogger(__name__)
 from reasoner.core.settings import settings
@@ -31,19 +28,6 @@ def _get_rate_limiter_instance_auth_deps() -> RateLimiter:
             )
         )
     return _rate_limiter_instance_auth_deps
-
-security = HTTPBearer(auto_error=False)
-
-# ── Auth Manager Singleton (for auth_deps) ──
-_auth_manager_instance_auth_deps: AuthManager | None = None
-
-def _get_auth_manager_instance_auth_deps() -> AuthManager:
-    """Factory for AuthManager instance within auth_deps."""
-    global _auth_manager_instance_auth_deps
-    if _auth_manager_instance_auth_deps is None:
-        _auth_manager_instance_auth_deps = get_auth_manager()
-    return _auth_manager_instance_auth_deps
-
 
 async def _is_authenticated_api_key_request(request: Request) -> bool:
     """Whether this request presents a valid Reasoner API key.
@@ -73,73 +57,6 @@ async def _is_authenticated_api_key_request(request: Request) -> bool:
     except Exception as exc:
         logger.warning("API key CSRF exemption check failed: %s", exc)
         return False
-
-
-def _auth_failure(detail: str = "Authentication required") -> HTTPException:
-    """Shared auth failure response — uniform error format for all auth deps."""
-    return HTTPException(
-        status_code=401,
-        detail=detail,
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-
-async def require_api_key(
-    credentials: HTTPAuthorizationCredentials = Security(security)
-):
-    """
-    Require valid API key for agent access.
-    Unlike require_auth, this is for headless agents that use
-    Authorization: Bearer <key> and skip CSRF entirely.
-
-    Raises HTTPException if authentication fails.
-    """
-    auth_manager = get_auth_manager()
-    if not credentials:
-        raise _auth_failure(
-            "Missing API key. Use Authorization: Bearer <key>"
-        )
-    try:
-        api_key = await auth_manager.authenticate(credentials.credentials)
-        return api_key
-    except AuthenticationError as e:
-        raise _auth_failure("Invalid API key") from e
-
-
-async def require_auth(
-    credentials: HTTPAuthorizationCredentials = Security(security)
-):
-    """
-    Require valid API key authentication.
-    Raises HTTPException if authentication fails.
-    """
-    auth_manager = _get_auth_manager_instance_auth_deps()
-    if not credentials:
-        raise _auth_failure("Missing authentication credentials")
-
-    try:
-        api_key = await auth_manager.authenticate(credentials.credentials)
-        return api_key
-    except AuthenticationError as e:
-        # Return generic error to prevent information leakage (timing attack defense)
-        raise _auth_failure("Authentication failed") from e
-
-
-async def optional_auth(
-    credentials: HTTPAuthorizationCredentials | None = Depends(HTTPBearer(auto_error=False))
-):
-    """
-    Optional authentication - returns API key if provided, None otherwise.
-    """
-    auth_manager = _get_auth_manager_instance_auth_deps()
-    if not credentials:
-        return None
-
-    try:
-        return await auth_manager.authenticate(credentials.credentials)
-    except AuthenticationError as e:
-        logger.warning("Invalid API key rejected in optional_auth: %s", e.message)
-        return None
 
 
 async def require_csrf(request: Request):

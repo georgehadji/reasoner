@@ -68,7 +68,7 @@ user's problem, to TypeSafe.
 | Variable | Default | Description |
 |---|---|---|
 | `DATABASE_URL` | — | PostgreSQL connection string |
-| `DB_POOL_SIZE` | `10` | `asyncpg` connection pool max size |
+| `DB_POOL_SIZE` | `8` | Max size of the single shared `asyncpg` pool each worker process holds (`infrastructure/persistence/pg_pool.py`); credits, quota, subscriptions, upload usage, webhooks, user provisioning, advisory locks and the event store all draw from it. Ceiling = workers × (`DB_POOL_SIZE` + 2 for the health probe pool): 8 gunicorn workers × (8 + 2) = 80, under Postgres `max_connections` (default 100, minus superuser-reserved and migration/admin sessions). Raise it only together with `max_connections` or a PgBouncer. Minimum effective value is 2 |
 | `EVENT_STORE_DB_PATH` | — (in-package default) | SQLite events.db path — event store + pipeline ownership records. Point this at a mounted volume in production; the installed package dir is replaced on every redeploy |
 | `FEEDBACK_DB_PATH` | — (in-package default) | SQLite feedback.db path. Same rationale as `EVENT_STORE_DB_PATH` |
 
@@ -81,8 +81,6 @@ user's problem, to TypeSafe.
 | `RATE_LIMIT_BURST` | `10` | Burst allowance |
 | `ADMIN_API_KEY` | — | Admin endpoint key |
 | `ADMIN_USER_IDS` | — | Comma-separated user ids whose interactive (JWT) login carries the `admin` scope. Production admin routes need it plus `X-Admin-Key`. API keys can never hold admin. |
-| `AUTH_PERSISTENCE_ENABLED` | `false` | Persist auth keys to DB |
-| `AUTH_DB_PATH` | `src/reasoner/auth_keys.db` | SQLite auth DB path. `docker-compose.yml` sets `/app/history/auth_keys.db` (a mounted volume); the in-package default is lost on redeploy |
 | `PRESET_TIER_ENFORCEMENT_ENABLED` | `false` | Return an early HTTP 403 (before credit reservation) when a caller's tier is below the preset's required tier. Premium presets are already refused at runtime either way, as an SSE `PRESET_TIER_REQUIRED` frame after reservation; this flag only changes when and how the refusal surfaces |
 | `EMAIL_VERIFICATION_MODE` | `observe` | Gate on the FREE monthly credit grant and API key creation for accounts whose email is not verified. `observe` counts them in `reasoner_unverified_access_total` and allows; `enforce` withholds the grant and refuses key creation with 403 `email_unverified`. See `docs/plans/email-verification-2026-11-12.md` |
 | `EMAIL_VERIFICATION_CUTOFF` | — | ISO-8601 UTC time. Accounts created before it skip the gate (grandfathered). Set it in the deploy that switches to `enforce`. A value that does not parse grandfathers nobody and logs an error |
@@ -95,6 +93,7 @@ user's problem, to TypeSafe.
 | `CSRF_ENFORCE_BACKEND` | `true` | Require CSRF on state-changing ops |
 | `TRUSTED_PROXIES` | — | Comma-separated proxy IPs/CIDRs whose `X-Forwarded-For` is believed. Required when `ENVIRONMENT=production`: startup is refused when empty, because every client behind the proxy would share one rate-limit and anonymous-trial bucket |
 | `ALLOW_NO_TRUSTED_PROXIES` | — | `true` lets production start with `TRUSTED_PROXIES` empty. Only for a deployment with no proxy in front |
+| `ALLOW_ANONYMOUS_RUNS` | `false` | `true` lets callers run pipelines without an account, capped per client IP. Falls back to the retired `ENABLE_LEGACY_API_KEY` when unset |
 
 ## VS (Verbalized Sampling)
 

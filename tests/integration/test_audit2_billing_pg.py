@@ -14,6 +14,7 @@ from uuid import uuid4
 import pytest
 
 from reasoner.domain.saas import Subscription, SubscriptionStatus, SubscriptionTier
+from reasoner.infrastructure.persistence.pg_pool import close_shared_pools
 from tests.integration.test_alembic_schema_contract import (
     DSN,
     _alembic_upgrade,
@@ -45,10 +46,7 @@ async def _user(dsn: str) -> str:
 def _subscription_repo(dsn: str):
     from reasoner.infrastructure.persistence.subscription_repo import PostgresSubscriptionRepository
 
-    # The class caches one pool per process; each test database needs its own.
-    PostgresSubscriptionRepository._pool = PostgresSubscriptionRepository._pool_task = None
-    PostgresSubscriptionRepository._pool_loop = None
-    return PostgresSubscriptionRepository(dsn, pool_size=2)
+    return PostgresSubscriptionRepository(dsn)
 
 
 def _sub(user_id: str, sub_id: str, status=SubscriptionStatus.ACTIVE) -> Subscription:
@@ -71,7 +69,7 @@ async def test_a_retried_older_event_cannot_reactivate_a_cancelled_plan():
             assert not await repo.set_subscription_status("sub_1", "active", T1)
             current = await repo.get_subscription_by_user(uid)
         finally:
-            await repo.close()
+            await close_shared_pools()
     assert current.status is SubscriptionStatus.CANCELLED
 
 
@@ -87,7 +85,7 @@ async def test_a_second_subscription_gets_its_own_row():
             await repo.upsert_subscription(_sub(uid, "sub_a"), T1)
             await repo.upsert_subscription(_sub(uid, "sub_b"), T2)
         finally:
-            await repo.close()
+            await close_shared_pools()
         conn = await asyncpg.connect(dsn)
         try:
             ids = {r["stripe_sub_id"] for r in await conn.fetch(
@@ -108,25 +106,23 @@ async def test_racing_duplicate_references_return_one_entry():
     async with _fresh_database() as dsn:
         _alembic_upgrade(dsn)
         uid = await _user(dsn)
-        PostgresCreditRepository._pool = None
-        repo = PostgresCreditRepository(dsn, pool_size=10)
+        repo = PostgresCreditRepository(dsn)
         try:
             await repo.record(uid, 1000, CreditReason.ADMIN_ADJUSTMENT)
             # Open the connections first: otherwise each call finishes while the
             # next is still connecting, and the race never happens.
             pool = await repo._get_pool()
-            warm = [await pool.acquire() for _ in range(10)]
+            size = pool.get_max_size()  # the shared pool; a larger warm-up would wait forever
+            warm = [await pool.acquire() for _ in range(size)]
             for conn in warm:
                 await pool.release(conn)
-            # Ten at once, so the calls really overlap on the pool's connections.
+            # One call per connection, so the calls really overlap on the pool.
             entries = await asyncio.gather(*(
                 repo.record(uid, -10, CreditReason.PIPELINE_RUN, reference_id="run-1")
-                for _ in range(10)
+                for _ in range(size)
             ))
             balance = await repo.get_balance(uid)
         finally:
-            if PostgresCreditRepository._pool is not None:
-                await PostgresCreditRepository._pool.close()
-            PostgresCreditRepository._pool = None
+            await close_shared_pools()
     assert len({e.id for e in entries}) == 1
     assert balance.balance == 990

@@ -170,7 +170,9 @@ class RunStateManager:
 
         return False
 
-    async def try_register(self, client_run_id: str, ttl: int = 3600, token: str = "1") -> bool:
+    async def try_register(
+        self, client_run_id: str, ttl: int = ACTIVE_TTL_SECONDS, token: str = "1",
+    ) -> bool:
         """Atomically register a run. Returns True if newly created, False if already exists.
 
         Uses Redis SET NX for atomic check-and-register (C2).

@@ -28,6 +28,7 @@ folders:
 | `credits.py` | Prepaid credit currency: `CreditBalance`, `CreditLedgerEntry`, `CreditReason`, `usd_to_credits`, `InsufficientCreditsError`, overdraft ceiling. |
 | `spend_limits.py` | Per-tier LLM spend ceilings: `TierSpendLimits`, `ANONYMOUS_SPEND_LIMITS`, `limits_for_tier`. A run's cost is unbounded by construction, so this caps it. |
 | `saas.py` | `User`, `Subscription`, `SubscriptionTier/Status`, `UsageQuota`, `QuotaResult`, `QueryAuditLog`. |
+| `auth.py` | Auth vocabulary shared by the auth adapters and the API: `Scope` (permission scopes) and `AuthenticationError` (carries `status_code`). Replaced the deleted `infrastructure/auth_legacy.py`. |
 | `api_keys.py` | User-owned key domain: `ApiKey`, `GeneratedKey`, `generate_key`, `hash_key`, namespaces (`rsn_live_*`), per-user key cap. |
 
 ## ACR (adaptive capability routing) value objects

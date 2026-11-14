@@ -15,6 +15,8 @@ from __future__ import annotations
 import asyncio
 import time as _time
 
+from reasoner.core.constants_limits import PIPELINE_ABSOLUTE_TIMEOUT_SECONDS
+
 CLAIM_DONE = "done"
 # Holder token for callers that do not pass one (tests, single-holder use). Not a secret.
 _ANONYMOUS_HOLDER = "1"
@@ -28,7 +30,8 @@ class RunStateStore:
     using an asyncio.Lock for async-context safety.
     """
 
-    _MAX_STALE_SECONDS: float = 600.0
+    # Above the run cap + settle so a run in postflight keeps its cancel event.
+    _MAX_STALE_SECONDS: float = PIPELINE_ABSOLUTE_TIMEOUT_SECONDS + 300.0
     _MAX_ENTRIES: int = 1000
 
     def __init__(self) -> None:
@@ -40,7 +43,10 @@ class RunStateStore:
         self._lock = asyncio.Lock()
 
     def try_register(
-        self, client_run_id: str, ttl: int = 3600, token: str = _ANONYMOUS_HOLDER
+        self,
+        client_run_id: str,
+        ttl: int = int(PIPELINE_ABSOLUTE_TIMEOUT_SECONDS) + 300,
+        token: str = _ANONYMOUS_HOLDER,
     ) -> bool:
         """Check-and-register for idempotency (C2). Non-atomic under concurrency."""
         if client_run_id in self._active_runs:

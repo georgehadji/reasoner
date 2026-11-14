@@ -202,7 +202,7 @@ async def test_anonymous_premium_preset_refused_before_cap(monkeypatch):
     monkeypatch.setattr(run_admission, "enforce_anonymous_trial_cap", cap)
     request = MagicMock()
     request.state = SimpleNamespace()
-    monkeypatch.setattr(run_admission.settings, "ENABLE_LEGACY_API_KEY", True)
+    monkeypatch.setattr(run_admission.settings, "ALLOW_ANONYMOUS_RUNS", True)
     monkeypatch.setattr(
         "reasoner.application.services.estimate_service.estimate_cost",
         AsyncMock(return_value={"estimated_cost_usd": 0.2}),

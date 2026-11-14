@@ -123,56 +123,6 @@ class TestRateLimiter:
         assert allowed is True
 
 
-class TestAuthManager:
-    """Test authentication manager works correctly."""
-
-    @pytest.mark.asyncio
-    async def test_key_generation_and_auth(self):
-        """Test key generation and authentication."""
-        from reasoner.auth import AuthManager
-
-        manager = AuthManager()
-
-        # Generate a key
-        raw_key = await manager.generate_key("test_key", expires_in_days=30, scopes={"read", "write"})
-
-        # Authenticate with the key
-        api_key = await manager.authenticate(raw_key)
-        assert api_key is not None
-        assert api_key.name == "test_key"
-        assert "read" in api_key.scopes
-        assert "write" in api_key.scopes
-
-    @pytest.mark.asyncio
-    async def test_invalid_key_rejected(self):
-        """Test that invalid keys are rejected."""
-        from reasoner.auth import AuthenticationError, AuthManager
-
-        manager = AuthManager()
-
-        with pytest.raises(AuthenticationError):
-            await manager.authenticate("invalid_key")
-
-    @pytest.mark.asyncio
-    async def test_scope_authorization(self):
-        """Test scope-based authorization."""
-        from reasoner.auth import AuthManager, AuthorizationError
-
-        manager = AuthManager()
-
-        # Generate key with only 'read' scope
-        raw_key = await manager.generate_key("read_only", scopes={"read"})
-        api_key = await manager.authenticate(raw_key)
-
-        # Read should succeed
-        assert await manager.authorize(api_key, "read") is True
-
-        # Write should fail
-        with pytest.raises(AuthorizationError) as exc_info:
-            await manager.authorize(api_key, "write")
-        assert "Insufficient permissions" in str(exc_info.value)
-
-
 class TestSecurityHeaders:
     """Test security headers are set correctly."""
 

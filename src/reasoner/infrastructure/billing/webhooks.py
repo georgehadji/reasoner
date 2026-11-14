@@ -101,18 +101,16 @@ _webhook_pool = None
 
 
 async def _get_webhook_pool():
-    """Lazy-initialize a small asyncpg pool for webhook idempotency writes."""
+    """The shared per-worker pool, after ensuring the idempotency table exists."""
     global _webhook_pool
     if _webhook_pool is not None:
         return _webhook_pool
     try:
-        import asyncpg
-
         from reasoner.core.settings import settings
+        from reasoner.infrastructure.persistence.pg_pool import get_shared_pool
         if not settings.DATABASE_URL:
             return None
-        dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-        _webhook_pool = await asyncpg.create_pool(dsn, min_size=1, max_size=3)
+        _webhook_pool = await get_shared_pool(settings.DATABASE_URL)
         async with _webhook_pool.acquire() as conn:
             # Same DDL as migration 20261021_000200: a database the app booted
             # on before migrations ran must still have the lease columns.
@@ -235,10 +233,10 @@ async def _db_webhook_is_done(event_id: str, provider: str) -> bool:
         return False
 
 
-def _retry_later() -> HTTPException:
+def _retry_later(status_code: int = 500) -> HTTPException:
     # A 5xx makes the provider retry; Stripe and PayPal both stop after about
     # three days, so this is bounded. The failure is already in the dead letter.
-    return HTTPException(status_code=500, detail="Webhook processing failed; retry")
+    return HTTPException(status_code=status_code, detail="Webhook processing failed; retry")
 
 
 async def handle_stripe_webhook(request: Request) -> dict:
@@ -269,9 +267,9 @@ async def handle_stripe_webhook(request: Request) -> dict:
             logger.warning("Stripe webhook: invalid signature")
             return {"status": "ok"}
     else:
-        logger.error("Stripe webhook: STRIPE_WEBHOOK_SECRET not configured. Event ignored.")
-        # Return 200 to prevent Stripe retries, but do NOT process the event
-        return {"status": "misconfigured"}
+        logger.error("Stripe webhook: STRIPE_WEBHOOK_SECRET not configured. Event rejected.")
+        # 503, not 200: a 200 makes Stripe stop retrying and the paid event is lost.
+        raise HTTPException(status_code=503, detail="Webhook secret not configured")
 
     # construct_event returns a StripeObject, which has no .get() since
     # stripe-python 15; everything below, and BillingService, expects a dict.
@@ -290,6 +288,7 @@ async def handle_stripe_webhook(request: Request) -> dict:
     valkey = get_valkey_pool()
     completed_key = f"stripe_webhook:{event_id}:completed"
     processing_key = f"stripe_webhook:{event_id}:processing"
+    busy = False
     try:
         if await valkey.get(completed_key):
             logger.info("Stripe webhook deduplicated (already completed): %s", event_id)
@@ -299,12 +298,18 @@ async def handle_stripe_webhook(request: Request) -> dict:
         claimed = await valkey.set(processing_key, "1", nx=True, ex=300)
         if not claimed:
             logger.info("Stripe webhook already in progress: %s", event_id)
-            return {"status": "ok"}
+            # We hold the DB lease; release it so the provider's retry is not
+            # deduplicated against a lease nobody is working.
+            busy = True
     except Exception as exc:
         logger.warning("Valkey dedup check failed (proceeding anyway): %s", exc)
+    if busy:
+        await _db_release_webhook(event_id, "stripe")
+        raise _retry_later(503)
 
     # Process the event
     success = False
+    unresolved = False
     try:
         from reasoner.application.services.billing_service import BillingService
         adapter = StripeBillingAdapter()
@@ -316,14 +321,22 @@ async def handle_stripe_webhook(request: Request) -> dict:
         # instead of a 500 retry loop that ends in the same place (BIL-13).
         logger.warning("Stripe webhook %s names no known user: %s", event_id, exc)
         await _record_webhook_failure("stripe", event_type, dict(event), str(exc))
-        success = True
+        unresolved = True
     except Exception as exc:
         logger.exception("Stripe webhook processing failed for event %s: %s", event_id, exc)
         # Record the failure durably (metric + dead-letter + event)
         await _record_webhook_failure("stripe", event_type, dict(event), str(exc))
 
     # Mark completed ONLY after successful DB commit
-    if success:
+    if unresolved:
+        # Acknowledge (200) but leave the event unfinished: replay_failed_webhooks
+        # treats a 'done' row as already applied and would never apply the fix.
+        try:
+            await valkey.delete(processing_key)
+        except Exception as exc:
+            logger.warning("Valkey processing-key delete failed: %s", exc)
+        await _db_release_webhook(event_id, "stripe")
+    elif success:
         try:
             await valkey.setex(completed_key, WEBHOOK_DEDUP_TTL_SECONDS, "1")
             await valkey.delete(processing_key)
@@ -360,8 +373,8 @@ async def handle_paypal_webhook(request: Request) -> dict:
     logger.info("PayPal webhook received: %s (id=%s)", event_type, event_id)
 
     if not os.environ.get("PAYPAL_WEBHOOK_ID"):
-        logger.error("PayPal webhook: PAYPAL_WEBHOOK_ID not configured. Event ignored.")
-        return {"status": "misconfigured"}
+        logger.error("PayPal webhook: PAYPAL_WEBHOOK_ID not configured. Event rejected.")
+        raise HTTPException(status_code=503, detail="Webhook id not configured")
 
     # Fail closed: only a SUCCESS answer from PayPal lets the event through.
     adapter = PayPalBillingAdapter()
@@ -387,6 +400,7 @@ async def handle_paypal_webhook(request: Request) -> dict:
     valkey = get_valkey_pool()
     completed_key = f"paypal_webhook:{event_id}:completed"
     processing_key = f"paypal_webhook:{event_id}:processing"
+    busy = False
     try:
         if await valkey.get(completed_key):
             logger.info("PayPal webhook deduplicated (already completed): %s", event_id)
@@ -396,12 +410,18 @@ async def handle_paypal_webhook(request: Request) -> dict:
         claimed = await valkey.set(processing_key, "1", nx=True, ex=300)
         if not claimed:
             logger.info("PayPal webhook already in progress: %s", event_id)
-            return {"status": "ok"}
+            # We hold the DB lease; release it so the provider's retry is not
+            # deduplicated against a lease nobody is working.
+            busy = True
     except Exception as exc:
         logger.warning("Valkey dedup check failed (proceeding anyway): %s", exc)
+    if busy:
+        await _db_release_webhook(event_id, "paypal")
+        raise _retry_later(503)
 
     # Process the event
     success = False
+    unresolved = False
     try:
         from reasoner.application.services.billing_service import BillingService
         service = BillingService(adapter)
@@ -412,13 +432,21 @@ async def handle_paypal_webhook(request: Request) -> dict:
         # instead of a 500 retry loop that ends in the same place (BIL-13).
         logger.warning("PayPal webhook %s names no known user: %s", event_id, exc)
         await _record_webhook_failure("paypal", event_type, dict(event), str(exc))
-        success = True
+        unresolved = True
     except Exception as exc:
         logger.exception("PayPal webhook processing failed for event %s: %s", event_id, exc)
         # Record the failure durably (metric + dead-letter + event)
         await _record_webhook_failure("paypal", event_type, dict(event), str(exc))
 
-    if success:
+    if unresolved:
+        # Acknowledge (200) but leave the event unfinished: replay_failed_webhooks
+        # treats a 'done' row as already applied and would never apply the fix.
+        try:
+            await valkey.delete(processing_key)
+        except Exception as exc:
+            logger.warning("Valkey processing-key delete failed: %s", exc)
+        await _db_release_webhook(event_id, "paypal")
+    elif success:
         try:
             await valkey.setex(completed_key, WEBHOOK_DEDUP_TTL_SECONDS, "1")
             await valkey.delete(processing_key)

@@ -109,7 +109,7 @@ async def test_anonymous_flat_charge_hits_trial_cap(monkeypatch):
         return None
 
     monkeypatch.setattr(run_admission, "enforce_anonymous_trial_cap", cap)
-    monkeypatch.setattr(run_admission.settings, "ENABLE_LEGACY_API_KEY", True)
+    monkeypatch.setattr(run_admission.settings, "ALLOW_ANONYMOUS_RUNS", True)
     monkeypatch.setattr("reasoner.api.client_ip.get_client_ip", lambda request: "1.2.3.4")
 
     charge = await admit_flat_charge(_request(), user=None, cost_usd=0.022, kind="smart-search")

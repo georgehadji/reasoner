@@ -66,7 +66,7 @@ async def _log_auth_event(
     """Insert an auth audit log row (Critical Enhancement 6.3)."""
     from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
     dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-    repo = PostgresQuotaRepository(dsn, pool_size=2)
+    repo = PostgresQuotaRepository(dsn)
     pool = await repo._get_pool()
     await pool.execute(
         """
@@ -177,7 +177,7 @@ async def delete_account(
     """
     from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
     dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-    repo = PostgresQuotaRepository(dsn, pool_size=2)
+    repo = PostgresQuotaRepository(dsn)
     pool = await repo._get_pool()
 
     ip = _anonymize_ip(request.client.host if request.client else None)

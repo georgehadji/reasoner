@@ -143,13 +143,13 @@ class Admission:
 
 
 def require_auth_if_legacy_disabled(user: User | None) -> None:
-    """Backward-compat gate: require auth when legacy API key mode is disabled."""
-    if user is None and not settings.ENABLE_LEGACY_API_KEY:
+    """Require an account unless ALLOW_ANONYMOUS_RUNS is set."""
+    if user is None and not settings.ALLOW_ANONYMOUS_RUNS:
         raise HTTPException(
             status_code=401,
             detail=(
                 "Authentication required. "
-                "Set ENABLE_LEGACY_API_KEY=true for v1 backward compatibility."
+                "Sign in, or set ALLOW_ANONYMOUS_RUNS=true to allow anonymous runs."
             ),
         )
 
@@ -158,7 +158,7 @@ def require_credentials_resolved(request: Request, user: User | None) -> None:
     """Refuse a run whose credentials were sent but did not resolve.
 
     ``get_optional_user`` returns None for a revoked key, an expired token and a
-    database error alike, so with legacy access enabled all three ran anonymously,
+    database error alike, so with anonymous runs enabled all three ran anonymously,
     unreserved and unbilled. Callers who sent nothing are unchanged.
     """
     if user is not None:

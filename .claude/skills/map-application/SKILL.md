@@ -27,7 +27,6 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 | `factory.py` | `WorkflowFactory` — method name to strategy. |
 | `runner.py` | `WorkflowRunner` — executes a strategy with retry/robustness. |
 | `services.py` | `PipelineWorkflowServices` — concrete service bundle handed to flows. |
-| `pipeline_flow.py` | Phase sequence registry/dispatcher; `PipelineFlow`, `execute_phases_dag`. |
 | `multi_perspective.py` / `perspective_phases.py` | Default orchestrated method: perspectives, critique, stress test, hallucination-keyword guard. |
 | `debate.py` / `debate_phases.py` | Opening, rebuttal, cross-examine, judge, evidence search. |
 | `jury.py` / `jury_phases.py` | Generate, critique, verify + meta-eval, weighted ranking, recovery path. |
@@ -118,7 +117,6 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 | `ws_ticket.py` | Short-lived single-use WebSocket tickets (HMAC with embedded expiry). |
 | `notification_subscriber.py` | EventBus subscriber sending transactional email on critical SaaS events. |
 | `data_eraser.py` | `UserDataEraser` / `UserDataExporter`: run one ordered sequence of `UserDataStore`s (export is all-or-nothing, erase is best-effort per store with a receipt `{status, erased, failed}`) (DAT-10/11). |
-| `audit_service.py` | Publishes query-execution audit events off the hot path. |
 
 ## services/ — misc
 
@@ -140,7 +138,7 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 
 ## Key entry points & gotchas
 
-- Adding a reasoning method touches six places: prompts in `phases/`, a `<method>.py` strategy plus `<method>_phases.py` here, registration in `flows/factory.py` and `flows/pipeline_flow.py`, presets in `domain/preset_registry.py`, a renderer in `services/renderers/`, and serializer support in `services/serializers.py`.
+- Adding a reasoning method touches six places: prompts in `phases/`, a `<method>.py` strategy plus `<method>_phases.py` here, registration in `flows/factory.py`, presets in `domain/preset_registry.py`, a renderer in `services/renderers/`, and serializer support in `services/serializers.py`.
 - `serializers.py` defines what the frontend receives — any field change there is a frontend-visible change.
 - Services must not import `infrastructure` directly; consume the ports injected at startup.
 - `orchestrator.py` and `services/preset_service.py` use `core/ports/model_registry_port.py`, injected via `set_model_registry_port()` in `api/__init__.py`, `main.py`, `headless.py`. Do not reintroduce a direct registry import — import-linter will fail.

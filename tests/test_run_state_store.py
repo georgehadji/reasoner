@@ -125,3 +125,14 @@ class TestRunStateStore:
 
         assert store.is_active("run-1") is False
         await store.reset()
+
+
+def test_run_windows_outlast_the_pipeline_cap():
+    import inspect
+
+    from reasoner.core.constants_limits import PIPELINE_ABSOLUTE_TIMEOUT_SECONDS as CAP
+    from reasoner.infrastructure.redis.in_memory import RunStateStore
+    from reasoner.infrastructure.redis.run_state import _run_state_manager as mgr
+
+    assert RunStateStore._MAX_STALE_SECONDS > CAP
+    assert inspect.signature(mgr.try_register).parameters["ttl"].default > CAP

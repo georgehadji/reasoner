@@ -28,11 +28,47 @@ async def test_memory_cache_returns_data_without_disk_read():
     key = "test-mem-001"
     events = [{"type": "start"}, {"type": "done"}]
 
-    # Seed memory directly
+    # Seed memory directly; a memory hit is only honoured while the disk file
+    # exists (another worker's erase deletes it), so the file must be there too.
     _MEMORY_CACHE[key] = events
+    (CACHE_DIR / f"{key}.json").write_text(json.dumps(["on-disk"]), encoding="utf-8")
 
     result = await _load_cache(key)
     assert result == events
+
+
+@pytest.mark.asyncio
+async def test_memory_hit_is_dropped_when_another_worker_erased_the_file():
+    key = "test-mem-erased"
+    await _save_cache(key, [{"type": "done"}])
+    (CACHE_DIR / f"{key}.json").unlink()  # what erase_owner_cache does in a sibling worker
+
+    assert await _load_cache(key) is None
+    assert key not in _MEMORY_CACHE
+
+
+@pytest.mark.asyncio
+async def test_prune_runs_every_n_saves_and_tolerates_vanishing_files(monkeypatch):
+    import reasoner.api.cache as cache
+
+    calls: list[int] = []
+    monkeypatch.setattr(cache, "_prune_disk_cache", lambda: calls.append(1))
+    monkeypatch.setattr(cache, "_PRUNE_EVERY_SAVES", 3)
+    monkeypatch.setattr(cache, "_saves_since_prune", 0)
+    for i in range(7):
+        await _save_cache(f"test-mem-prune-{i}", [])
+    assert len(calls) == 2
+
+    monkeypatch.undo()
+    real_stat = type(CACHE_DIR / "x").stat
+
+    def flaky(self, *a, **k):
+        if self.name == "test-mem-prune-0.json":
+            raise FileNotFoundError(self)
+        return real_stat(self, *a, **k)
+
+    monkeypatch.setattr(type(CACHE_DIR / "x"), "stat", flaky)
+    cache._prune_disk_cache()  # must not raise
 
 
 @pytest.mark.asyncio

@@ -228,11 +228,6 @@ ALLOWED_INFRASTRUCTURE_ERRORS: dict[str, str] = {
     # call was never attempted.
     "infrastructure/circuit_breaker.py::CircuitOpenError":
         "breaker control flow; predates the port split",
-    # Legacy auth adapter, superseded by api/auth_deps.py.
-    "infrastructure/auth_legacy.py::AuthenticationError":
-        "legacy adapter, scheduled for deletion",
-    "infrastructure/auth_legacy.py::AuthorizationError":
-        "legacy adapter, scheduled for deletion",
     # Non-LLM adapters with no domain vocabulary to translate into yet.
     "infrastructure/llm/image_generation.py::ImageGenerationError":
         "image lane has no domain error tree yet",

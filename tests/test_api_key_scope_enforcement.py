@@ -126,3 +126,21 @@ async def test_key_without_scope_is_refused_by_guard():
     with pytest.raises(HTTPException) as exc:
         await guard(_Req("api_key"), user)
     assert exc.value.status_code == 403
+
+
+def test_resume_needs_run_scope(monkeypatch):
+    """/resume restarts a pipeline, so a read-only key must not reach it."""
+    monkeypatch.setattr(settings, "CSRF_ENFORCE_BACKEND", False)
+    user = User(id=uuid4(), email="k@example.com", scopes={"read"}, auth_provider="api_key")
+
+    def as_key(request: Request) -> User:
+        request.state.user = user
+        request.state.auth_method = "api_key"
+        return user
+
+    app.dependency_overrides[deps.get_current_user] = as_key
+    try:
+        resp = TestClient(app, raise_server_exceptions=False).post("/api/pipelines/p1/resume")
+    finally:
+        app.dependency_overrides.pop(deps.get_current_user, None)
+    assert resp.status_code == 403 and "lacks the 'run' scope" in resp.text
