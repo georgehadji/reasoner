@@ -30,7 +30,6 @@ folders:
 
 | File | Points at |
 |------|-----------|
-| `auth.py` | `infrastructure/auth_legacy.py` |
 | `circuit_breaker.py` | `infrastructure/circuit_breaker.py` |
 | `clients.py` | `infrastructure/clients.py` |
 | `exceptions.py` | `core/exceptions.py` |

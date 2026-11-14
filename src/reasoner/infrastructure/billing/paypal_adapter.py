@@ -30,6 +30,10 @@ PAYPAL_EVENT_STATUS: dict[str, SubscriptionStatus] = {
     # A successful retry after a failure; resource.billing_agreement_id is the
     # subscription id.
     "PAYMENT.SALE.COMPLETED": SubscriptionStatus.ACTIVE,
+    # Money taken back; BillingService claws the credits back. resource.id is the
+    # refund/reversal id, resource.amount {total, currency} what was returned.
+    "PAYMENT.SALE.REFUNDED": SubscriptionStatus.PAST_DUE,
+    "PAYMENT.SALE.REVERSED": SubscriptionStatus.PAST_DUE,
 }
 
 # verify-webhook-signature request field -> delivery header carrying it.
@@ -146,7 +150,7 @@ class PayPalBillingAdapter(BillingPort):
         resource = provider_event.get("resource", {})
 
         status = PAYPAL_EVENT_STATUS.get(event_type)
-        if event_type == "PAYMENT.SALE.COMPLETED":
+        if event_type.startswith("PAYMENT.SALE."):
             resource = {"id": resource.get("billing_agreement_id")}
         if status is not None:
             return self._paypal_sub_to_domain(resource, status=status)
@@ -232,6 +236,15 @@ class PayPalBillingAdapter(BillingPort):
             ):
                 return
             resp.raise_for_status()
+
+    async def refund_latest_charge(self, paypal_subscription_id: str) -> None:
+        # shortcut: PayPal refunds need a sale id from the subscription's
+        # transactions list. Only Stripe checkouts get the duplicate check that
+        # calls this, so it is a logged no-op until PayPal grows one.
+        logger.warning(
+            "PayPal refund of %s not implemented; refund it in the PayPal dashboard",
+            paypal_subscription_id,
+        )
 
     async def verify_webhook_signature(self, headers: dict, body: str) -> bool:
         """Verify a webhook delivery with PayPal's verify-webhook-signature API.

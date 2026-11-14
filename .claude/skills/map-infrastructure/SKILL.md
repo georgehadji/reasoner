@@ -19,7 +19,6 @@ folders:
 | `executor.py` (36KB) | `LLMExecutor` — temperature resolution from phase configs, token-aware truncation, retry, response handling. Extracted out of `ReasonerPipeline`. |
 | `base.py` | `BaseLLMProvider` + `LLMError`. |
 | `ports.py` | Provider-side types: `Message`, `MessageRole`, `LLMResponse`, `DegradedLLMResponse`, `LLMConfig`, `ProviderHealth`, `ProviderInfo`. |
-| `exceptions.py` | Infrastructure error taxonomy: auth, rate limit, model-not-found, timeout, unavailable, credits exhausted. |
 | `caching.py` | Prompt-caching helpers; distinguishes automatic-cache providers from ones needing explicit `cache_control` breakpoints. |
 | `pricing_resolver.py` | Alias-aware pricing lookup — maps registry aliases to served model ids before hitting `domain/pricing.py`. |
 | `spend_tracker.py` | In-process monthly spend tracker keyed by billing subject. |
@@ -78,8 +77,8 @@ folders:
 | `telemetry_store.py` | Per-phase and per-run telemetry tables for cross-run analytics. |
 | `error_store.py` | SQLite error persistence + stats. |
 | `feedback_store.py` | SQLite feedback store (migrates legacy JSONL on first init). |
-| `auth_store.py` | Durable API key storage via aiosqlite. |
 | `api_key_repo_postgres.py` / `api_key_repo_memory.py` | `ApiKeyRepository` adapters. |
+| `pg_pool.py` | One asyncpg pool per worker, keyed by DSN and bound to the running loop: `get_shared_pool`, `advisory_lock` (lock/unlock on one pooled connection, holders capped at `DB_POOL_SIZE // 2`), `close_shared_pools`. Every Postgres repo, the webhook guard and the event store acquire from it; `DB_POOL_SIZE` is the per-worker total. |
 | `credit_repo_postgres.py` / `credit_repo_memory.py` | `CreditRepository` adapters; Postgres locks the balance row (`SELECT … FOR UPDATE`). |
 | `quota_repo_postgres.py` | `QuotaRepository` on asyncpg, transactional writes. |
 | `upload_usage_repo.py` | Per-user upload bytes (`upload_usage`): atomic `reserve` against the cap, `adjust` to bytes really written, `forget` on account deletion. Postgres when configured, else SQLite in `UPLOAD_DIR` (PER-8). |
@@ -109,7 +108,6 @@ folders:
 |------|--------------|
 | `circuit_breaker.py` (21KB) | `CircuitBreaker` + `RedisCircuitBreaker`, states, stats, registry. |
 | `rate_limiter.py` (21KB) | Token-bucket rate limiter with sliding window; in-process with optional Redis backing. |
-| `auth_legacy.py` | Legacy API-key auth: `AuthManager`, `APIKey`, `Scope`, `DEFAULT_SCOPES`. |
 | `auth/__init__.py` | `get_auth_adapter` factory — picks by environment. |
 | `auth/supabase_adapter.py` | Production `AuthPort` (JWT validation against Supabase). |
 | `auth/local_adapter.py` | Local JWT signing for dev/tests. |

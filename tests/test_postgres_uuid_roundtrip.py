@@ -34,26 +34,22 @@ from reasoner.infrastructure.persistence.subscription_repo import PostgresSubscr
 
 
 @pytest.fixture
-def quota_repo():
-    """Patch the CLASS attribute: _get_pool() reads _pool off the class."""
+def quota_repo(monkeypatch):
+    """The repo's _get_pool() delegates to get_shared_pool; hand it a mock."""
+    from reasoner.infrastructure.persistence import quota_repo_postgres as mod
+
     pool = AsyncMock()
-    original = PostgresQuotaRepository._pool
-    PostgresQuotaRepository._pool = pool
-    try:
-        yield PostgresQuotaRepository("postgresql://test"), pool
-    finally:
-        PostgresQuotaRepository._pool = original
+    monkeypatch.setattr(mod, "get_shared_pool", AsyncMock(return_value=pool))
+    return PostgresQuotaRepository("postgresql://test"), pool
 
 
 @pytest.fixture
-def subscription_repo():
+def subscription_repo(monkeypatch):
+    from reasoner.infrastructure.persistence import subscription_repo as mod
+
     pool = AsyncMock()
-    original = PostgresSubscriptionRepository._pool
-    PostgresSubscriptionRepository._pool = pool
-    try:
-        yield PostgresSubscriptionRepository("postgresql://test"), pool
-    finally:
-        PostgresSubscriptionRepository._pool = original
+    monkeypatch.setattr(mod, "get_shared_pool", AsyncMock(return_value=pool))
+    return PostgresSubscriptionRepository("postgresql://test"), pool
 
 
 @pytest.mark.asyncio

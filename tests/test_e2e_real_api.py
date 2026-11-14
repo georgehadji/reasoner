@@ -50,7 +50,7 @@ async def client():
     from reasoner.core.settings import settings
 
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(settings, "ENABLE_LEGACY_API_KEY", True)
+        mp.setattr(settings, "ALLOW_ANONYMOUS_RUNS", True)
         # Anonymous callers default to the free plan, whose $0.07 per-run cap
         # refuses research-budget (~$0.073) with 403. This tests streaming, not
         # pricing, so run as pro.

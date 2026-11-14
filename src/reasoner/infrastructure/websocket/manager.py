@@ -45,6 +45,9 @@ WS_BRIDGE_CHANNEL = "reasoner:ws:events"
 WS_SEND_TIMEOUT_S = 5.0
 
 
+_TERMINAL_EVENT_TYPES = frozenset({"done", "cancelled"})
+
+
 class ReplayState(StrEnum):
     """Lifecycle of one pipeline's replay buffer."""
 
@@ -289,7 +292,7 @@ class WebSocketManager:
         Delivers to this worker's subscribers, then (unless the message came
         from the bridge) publishes it so other workers deliver to theirs.
         """
-        await self._deliver_local(pipeline_id, message)
+        await self._deliver_local(pipeline_id, message, from_bridge=_from_bridge)
         if self._bridge_enabled and not _from_bridge:
             await self._publish(pipeline_id, message)
 
@@ -353,8 +356,25 @@ class WebSocketManager:
         self._bridge_enabled = True
         self._bridge_task = asyncio.create_task(self._bridge_loop())
 
-    async def _deliver_local(self, pipeline_id: str, message: WebSocketMessage) -> None:
+    async def _deliver_local(
+        self, pipeline_id: str, message: WebSocketMessage, *, from_bridge: bool = False
+    ) -> None:
         async with self._lock:
+            # Every worker hears every run; only the one with a subscriber needs it.
+            # shortcut: a late subscriber on another worker gets live events but no
+            # replay; upgrade by replaying from the event store on subscribe.
+            if from_bridge and pipeline_id not in self.subscriptions:
+                return
+            # SSE runs never send "complete"; their terminal event is done/cancelled.
+            run_ended = (
+                message.type == "event"
+                and isinstance(message.data, dict)
+                and message.data.get("type") in _TERMINAL_EVENT_TYPES
+            )
+            if run_ended and pipeline_id not in self.subscriptions:
+                self._drop_replay_locked(pipeline_id)
+                return
+            terminal = run_ended or message.type == "complete"
             state = self._replay_state.get(pipeline_id, ReplayState.OPEN)
             if state is ReplayState.COMPLETE:
                 # A late event must not append to a finished run's buffer: a
@@ -366,7 +386,7 @@ class WebSocketManager:
             # Buffer event for late-joining subscribers
             if pipeline_id not in self._replay_buffers:
                 self._replay_buffers[pipeline_id] = deque(maxlen=self._max_replay_events)
-            if message.type == "complete":
+            if terminal:
                 state = WS_REPLAY.move(state, ReplayState.COMPLETE)
             self._replay_state[pipeline_id] = state
             self._replay_buffers[pipeline_id].append(message)

@@ -99,8 +99,8 @@ def erase_owner_cache(user_id: str) -> int:
     """Delete the owner's replay cache from disk and from this process's memory.
 
     Returns the number of files that could not be removed. Other workers keep
-    their own in-memory copy until it is evicted; there is no shared channel to
-    tell them (the disk copy, which they reload from, is gone).
+    their own in-memory copy, but _load_cache serves a memory hit only while its
+    disk file exists, so the deletion here is what erases it for them.
     """
     prefix = f"{owner_key(user_id)}:"
     with _memory_cache_lock:
@@ -187,18 +187,25 @@ async def _load_cache(key: str, user_id: str | None = None) -> list[dict] | None
     global _cache_hits, _cache_misses
     mem_key = _mem_key(key, user_id)
     # 1. Check in-memory hot cache first (under lock for consistency)
+    path = _disk_path(key, user_id)
     with _memory_cache_lock:
-        if mem_key in _MEMORY_CACHE:
+        hit = _MEMORY_CACHE.get(mem_key)
+    # Another worker's erase (GDPR) deletes the file but cannot reach this
+    # worker's memory, so a hit only counts while the file is still there.
+    if hit is not None and await asyncio.to_thread(path.exists):
+        with _memory_cache_lock:
             _cache_hits += 1
             if _METRICS_AVAILABLE:
                 total = _cache_hits + _cache_misses
                 REASONER_CACHE_HIT_RATE.set(_cache_hits / total if total > 0 else 0.0)
                 REASONER_CACHE_ENTRIES.set(len(_MEMORY_CACHE))
-            return _MEMORY_CACHE[mem_key]
+        return hit
+    if hit is not None:
+        with _memory_cache_lock:
+            _MEMORY_CACHE.pop(mem_key, None)
 
     # 2. Fall back to disk
-    path = _disk_path(key, user_id)
-    if path.exists():
+    if await asyncio.to_thread(path.exists):
         try:
             data = json.loads(await asyncio.to_thread(path.read_text, encoding="utf-8"))
             with _memory_cache_lock:
@@ -222,15 +229,21 @@ async def _load_cache(key: str, user_id: str | None = None) -> list[dict] | None
 
 
 _MAX_CACHE_FILES: int = 1000
+# A prune globs and stats every file, so run it every N saves, not every save.
+_PRUNE_EVERY_SAVES: int = 20
+_saves_since_prune: int = 0
 
 
 def _prune_disk_cache() -> None:
     """Remove oldest cache files if the directory exceeds the max size."""
-    files = sorted(
-        [*CACHE_DIR.glob("*.json"), *CACHE_DIR.glob("u-*/*.json")], key=lambda p: p.stat().st_mtime
-    )
-    excess = len(files) - _MAX_CACHE_FILES
-    for f in files[:excess]:
+    aged: list[tuple[float, Path]] = []
+    for p in [*CACHE_DIR.glob("*.json"), *CACHE_DIR.glob("u-*/*.json")]:
+        try:
+            aged.append((p.stat().st_mtime, p))
+        except OSError:  # another worker deleted it between glob and stat
+            continue
+    aged.sort(key=lambda e: e[0])
+    for _, f in aged[: max(0, len(aged) - _MAX_CACHE_FILES)]:
         try:
             f.unlink(missing_ok=True)
         except OSError:
@@ -238,6 +251,7 @@ def _prune_disk_cache() -> None:
 
 
 async def _save_cache(key: str, events: list[dict], user_id: str | None = None) -> None:
+    global _saves_since_prune
     # Update in-memory hot cache immediately (under lock)
     with _memory_cache_lock:
         _MEMORY_CACHE[_mem_key(key, user_id)] = events.copy()
@@ -259,4 +273,7 @@ async def _save_cache(key: str, events: list[dict], user_id: str | None = None) 
                 old_tmp.unlink(missing_ok=True)
             except OSError:
                 pass
-        _prune_disk_cache()
+        _saves_since_prune += 1
+        if _saves_since_prune >= _PRUNE_EVERY_SAVES:
+            _saves_since_prune = 0
+            await asyncio.to_thread(_prune_disk_cache)

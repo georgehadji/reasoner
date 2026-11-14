@@ -14,7 +14,7 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
-os.environ.setdefault("ENABLE_LEGACY_API_KEY", "true")
+os.environ.setdefault("ALLOW_ANONYMOUS_RUNS", "true")
 os.environ.setdefault("ENVIRONMENT", "testing")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-do-not-use-in-production")
 
@@ -97,13 +97,13 @@ def test_run_with_exhausted_quota_returns_429(client, auth_token, monkeypatch):
 def test_run_without_auth_bypasses_quota_check(client, monkeypatch):
     # Anonymous requests should not trigger quota checks.
     #
-    # The module-level os.environ.setdefault("ENABLE_LEGACY_API_KEY", "true")
+    # The module-level os.environ.setdefault("ALLOW_ANONYMOUS_RUNS", "true")
     # above can't actually reach this: Settings reads os.getenv() once at
     # class-body-execution time when reasoner.core.settings is first
     # imported, and conftest.py's own imports already trigger that before
     # this test module is even collected. monkeypatch.setattr on the
     # settings singleton is what actually reaches a fresh read.
-    monkeypatch.setattr(settings, "ENABLE_LEGACY_API_KEY", True)
+    monkeypatch.setattr(settings, "ALLOW_ANONYMOUS_RUNS", True)
     response = client.post(
         "/api/run",
         json={"problem": "test", "preset": "multi-perspective-budget"},

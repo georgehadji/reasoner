@@ -59,7 +59,6 @@ security = HTTPBearer(auto_error=False)
 
 # Import rate limiter and auth
 from reasoner.api.middleware import BodySizeLimitMiddleware, SecurityHeadersMiddleware
-from reasoner.auth import AuthenticationError, get_auth_manager
 from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
 
 # Module-level singleton for health-check Postgres pool (Critical Enhancement 5.6)
@@ -142,10 +141,6 @@ async def lifespan(app: FastAPI):
             if settings.ENVIRONMENT == "production":
                 raise RuntimeError(message % uvicorn_workers)
             logger.warning(message, uvicorn_workers)
-        if settings.ENVIRONMENT == "production" and not settings.AUTH_PERSISTENCE_ENABLED:
-            raise RuntimeError(
-                "AUTH_PERSISTENCE_ENABLED must be true for multi-worker production deployments."
-            )
 
     # Neuro's endpoints are mounted on the public app and self-called over
     # loopback. Without the shared key they are open: /audit is an unmetered
@@ -364,9 +359,6 @@ rate_limiter = get_rate_limiter(RateLimitConfig(
     burst_size=settings.RATE_LIMIT_BURST,
 ))
 
-# Initialize auth manager
-auth_manager = get_auth_manager()
-
 # Neuro Integration
 from reasoner.neuro.server import create_neuro_router
 
@@ -425,7 +417,7 @@ def get_architecture_components():
 # Per-run cancellation tracking.
 # Encapsulated in RunStateManager for testability and safe async locking.
 # Redis-backed with in-memory fallback (Critical Enhancement 9.1–9.3, 9.7).
-from reasoner.api.auth_deps import optional_auth, require_csrf
+from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import (
     check_quota_if_authenticated,
     check_rate_limit,
@@ -613,7 +605,7 @@ async def _run_followup_stream_with_metrics(
 # Moved to reasoner.api.routes.agent: bearer-key auth (account keys or JWT,
 # via get_current_user), idempotency-guarded, and metered identically to a
 # web run. See that module's docstring for why this replaced the previous
-# require_api_key-authenticated, unmetered handlers.
+# legacy-key-authenticated, unmetered handlers.
 
 from reasoner.api.routes.agent import router as agent_router
 
@@ -628,7 +620,6 @@ async def run_pipeline(
     request: Request,
     req: RunRequest,
     user: User | None = Depends(get_optional_user),
-    authenticated = Depends(optional_auth),
     rate_limit_checked = Depends(check_rate_limit),
     quota: QuotaResult | None = Depends(check_quota_if_authenticated),
     credits_checked = Depends(require_credits_if_authenticated),
@@ -662,7 +653,6 @@ async def run_followup_pipeline(
     request: Request,
     req: FollowupRequest,
     user: User | None = Depends(get_optional_user),
-    authenticated = Depends(optional_auth),
     rate_limit_checked = Depends(check_rate_limit),
     quota: QuotaResult | None = Depends(check_quota_if_authenticated),
     credits_checked = Depends(require_credits_if_authenticated),

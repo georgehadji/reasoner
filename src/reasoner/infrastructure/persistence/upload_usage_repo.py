@@ -18,11 +18,12 @@ usage lives on the same volume as the files it counts.
 from __future__ import annotations
 
 import asyncio
-import os
 import sqlite3
 from pathlib import Path
 
 import asyncpg
+
+from reasoner.infrastructure.persistence.pg_pool import get_shared_pool
 
 _RESERVE_SQL = """
     INSERT INTO upload_usage (user_id, bytes) VALUES ({p1}, {p2})
@@ -86,26 +87,11 @@ class SqliteUploadUsageRepository:
 
 
 class PostgresUploadUsageRepository:
-    _pool: asyncpg.Pool | None = None
-    _pool_lock: asyncio.Lock | None = None
-
-    def __init__(self, dsn: str, pool_size: int | None = None) -> None:
+    def __init__(self, dsn: str) -> None:
         self._dsn = dsn
-        self._pool_size = (
-            pool_size if pool_size is not None else int(os.environ.get("DB_POOL_SIZE", "10"))
-        )
 
     async def _get_pool(self) -> asyncpg.Pool:
-        cls = PostgresUploadUsageRepository
-        if cls._pool_lock is None:
-            cls._pool_lock = asyncio.Lock()
-        if cls._pool is None:
-            async with cls._pool_lock:
-                if cls._pool is None:
-                    cls._pool = await asyncpg.create_pool(
-                        self._dsn, min_size=1, max_size=self._pool_size
-                    )
-        return cls._pool
+        return await get_shared_pool(self._dsn)
 
     async def reserve(self, user_id: str, n: int, cap: int) -> bool:
         if n > cap:
@@ -146,9 +132,7 @@ def get_upload_usage_repo() -> UploadUsageRepository:
         from reasoner.infrastructure.uploader import UPLOAD_DIR
 
         if settings.DATABASE_URL and "postgres" in settings.DATABASE_URL:
-            _repo = PostgresUploadUsageRepository(
-                settings.DATABASE_URL.replace("+asyncpg", ""), pool_size=settings.DB_POOL_SIZE
-            )
+            _repo = PostgresUploadUsageRepository(settings.DATABASE_URL.replace("+asyncpg", ""))
         else:
             _repo = SqliteUploadUsageRepository(UPLOAD_DIR / ".upload_usage.db")
     return _repo

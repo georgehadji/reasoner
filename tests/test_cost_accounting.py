@@ -128,3 +128,30 @@ async def test_normal_call_without_reported_cost_is_estimated_and_billed():
     raw, _ = await ex.execute("perspective", "sys", "usr", state)
     assert raw == "fine answer"
     assert state.total_cost_usd > 0
+
+
+@pytest.mark.asyncio
+async def test_cancelled_call_counts_its_prompt_cost_and_reraises():
+    import asyncio
+
+    started = asyncio.Event()
+
+    class _Blocking:
+        model = "anthropic/claude-sonnet-5"
+
+        def resolve(self, role):
+            return self
+
+        async def call(self, **kwargs):
+            started.set()
+            await asyncio.sleep(60)
+
+    ex = LLMExecutor(router=_Blocking(), phase_configs={}, token_cache=None, caching_enabled=False)
+    state = PipelineState(problem="p")
+    task = asyncio.create_task(ex.execute("perspective", "s" * 4000, "u" * 4000, state))
+    await started.wait()
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert state.total_cost_usd > 0
