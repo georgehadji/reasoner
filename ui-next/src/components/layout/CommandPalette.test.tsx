@@ -15,7 +15,6 @@ const renderPalette = (isOpen: boolean) =>
       onClose={noop}
       onNew={noop}
       onClearComposer={noop}
-      onToggleTheme={noop}
       onToggleSidebar={noop}
       onToggleNeuro={noop}
       onToggleTier={noop}

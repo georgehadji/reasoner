@@ -2,7 +2,6 @@
 
 import { useState, useRef, useCallback, useReducer, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTheme } from 'next-themes';
 import { useAppStore } from '@/stores/app-store';
 
 import { usePipelineStream } from '@/hooks/usePipelineStream';
@@ -171,6 +170,7 @@ function cleanDisplayPrompt(prompt: string): string {
 }
 
 const CONTINUATION_RE = /\b(continue|cont\.?|keep going|more|expand|elaborate|extend|add more|next (step|section|part)|again|revise|rewrite|improve|same topic|build on|follow up)\b/i;
+const isContinuation = (text: string) => CONTINUATION_RE.test(text);
 
 function clampImagePrompt(prompt: string) {
   const trimmed = prompt.trim();
@@ -222,7 +222,6 @@ export default function ChatPage() {
   // Owns the active run's ticket: its abort signal, run id and conversation id.
   const run = useRunController(wsSendStop);
   const serverOnline = useServerStatus();
-  const { resolvedTheme, setTheme } = useTheme();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -266,8 +265,6 @@ export default function ChatPage() {
     };
   }, []);
 
-  const isContinuation = (text: string) => CONTINUATION_RE.test(text);
-
   const findLastAssistant = (msgs: ChatFeedMessage[]) => {
     for (let i = msgs.length - 1; i >= 0; i--) {
       if (msgs[i].role === 'assistant' && !msgs[i].isStreaming) return msgs[i];
@@ -276,7 +273,6 @@ export default function ChatPage() {
   };
 
   const {
-    scrollToBottom,
     showNewContentIndicator,
     dismissIndicator,
   } = useScrollAnchor(scrollContainerRef);
@@ -981,7 +977,7 @@ export default function ChatPage() {
       }
       clearAttachments();
     }
-  }, [run, attachments, isImageMode, isLocal, user, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setCompletedPhases, setErrorPhases, setCurrentPhase, setPhaseDurations, setAutoSelectedMethod, setPhaseOpenMode, isContinuation, getAutoPreset, autoMethodAlways]);
+  }, [run, attachments, isImageMode, isLocal, user, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setCompletedPhases, setErrorPhases, setCurrentPhase, setPhaseDurations, setAutoSelectedMethod, setPhaseOpenMode, getAutoPreset, autoMethodAlways]);
 
   const handleSubmit = useCallback(async (
     providedText?: string,
@@ -1320,6 +1316,11 @@ export default function ChatPage() {
             </>
           ) : (
             <>
+              <Composer running={running} onSubmit={() => handleSubmit()} onStop={handleStop} centered />
+              {/* Below the composer, as in the follow-up branch: the scroll
+                  anchor pins this container to the bottom whenever content
+                  mounts, so a prompt above the composer was scrolled out of
+                  view and Enter looked like it did nothing. */}
               {gateChecking && <MethodChoiceLoading />}
               {pendingChoice && (
                 <MethodChoicePrompt
@@ -1330,7 +1331,6 @@ export default function ChatPage() {
                   onCancel={handleMethodChoiceCancel}
                 />
               )}
-              <Composer running={running} onSubmit={() => handleSubmit()} onStop={handleStop} centered />
             </>
           )}
         </div>
@@ -1369,10 +1369,6 @@ export default function ChatPage() {
         onClose={() => setCommandPaletteOpen(false)}
         onNew={handleNew}
         onClearComposer={() => setComposerText('')}
-        // Toggling the class directly added `.dark` while next-themes' own
-        // `.light` stayed put, so nothing changed and the stored preference
-        // desynchronised. Go through next-themes.
-        onToggleTheme={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
         onToggleSidebar={toggleSidebar}
         onToggleNeuro={toggleNeuroPanel}
         onToggleTier={toggleTier}

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import {
   Sparkles,
   Trash2,
-  Sun,
   PanelLeft,
   Brain,
   Copy,
@@ -31,7 +30,6 @@ interface CommandPaletteProps {
   onClose: () => void;
   onNew: () => void;
   onClearComposer: () => void;
-  onToggleTheme: () => void;
   onToggleSidebar: () => void;
   onToggleNeuro: () => void;
   onToggleTier: () => void;
@@ -49,7 +47,6 @@ export function CommandPalette({
   onClose,
   onNew,
   onClearComposer,
-  onToggleTheme,
   onToggleSidebar,
   onToggleNeuro,
   onToggleTier,
@@ -68,7 +65,6 @@ export function CommandPalette({
     () => [
       { id: 'new', label: 'New problem', icon: <Sparkles className="h-4 w-4" />, action: onNew },
       { id: 'clear', label: 'Clear composer', icon: <Trash2 className="h-4 w-4" />, shortcut: 'Ctrl+L', action: onClearComposer },
-      { id: 'theme', label: 'Toggle theme', icon: <Sun className="h-4 w-4" />, action: onToggleTheme },
       { id: 'sidebar', label: 'Toggle sidebar', icon: <PanelLeft className="h-4 w-4" />, shortcut: 'B', action: onToggleSidebar },
       { id: 'neuro', label: 'Open Neuro panel', icon: <Brain className="h-4 w-4" />, action: onToggleNeuro },
       { id: 'tier', label: tier === 'premium' ? 'Switch to Budget' : 'Switch to Premium', icon: <ArrowUpCircle className="h-4 w-4" />, action: onToggleTier },
@@ -80,7 +76,7 @@ export function CommandPalette({
         ? [{ id: 'clear-cache', label: 'Clear server cache', icon: <DatabaseZap className="h-4 w-4" />, action: onClearCache }]
         : []),
     ],
-    [onNew, onClearComposer, onToggleTheme, onToggleSidebar, onToggleNeuro, onToggleTier, tier, onCopyLastResponse, onClearCache, router, onClose]
+    [onNew, onClearComposer, onToggleSidebar, onToggleNeuro, onToggleTier, tier, onCopyLastResponse, onClearCache, router, onClose]
   );
 
   const filtered = useMemo(() => {
