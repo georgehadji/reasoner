@@ -370,13 +370,13 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
 
   /* ── Input box ────────────────────────────────────────── */
   /* State ladder, weakest to strongest: rest → hover (border only) →
-     focus-within (accent border + 3px accent ring + lifted shadow). Focus
+     focus-within (accent border + 3px accent ring). Focus
      must never be quieter than hover, or keyboard users lose the caret. */
   const inputBox = (minH: number, placeholder: string) => (
     <div
       aria-busy={running}
       className={cn(
-        'relative rounded-[var(--radius-xl)] border bg-[var(--surface)] shadow-[var(--shadow)] transition-[border-color,box-shadow,background-color] duration-[var(--dur-state)] ease-[var(--ease-standard)]',
+        'relative rounded-[var(--radius-xl)] border bg-[var(--surface)] transition-[border-color,box-shadow,background-color] duration-[var(--dur-state)] ease-[var(--ease-standard)]',
         isDragging
           ? 'border-[var(--accent)]'
           : running
@@ -390,7 +390,7 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
         // a run produced zero visual change (WCAG 2.4.7) — the textarea also
         // sets focus:outline-none, so nothing else drew a ring.
         !isDragging &&
-          'focus-within:border-[var(--accent)] focus-within:shadow-[0_0_0_3px_var(--accent-dim),var(--shadow-lg)]',
+          'focus-within:border-[var(--accent)] focus-within:shadow-[0_0_0_3px_var(--accent-dim)]',
       )}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}

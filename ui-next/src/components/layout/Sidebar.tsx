@@ -166,24 +166,31 @@ function SidebarComponent({
      restore was a no-op on the one path it existed for. Here the toggle has
      been re-mounted by the time this runs, so there is something to focus. */
   const wasOpen = useRef(!collapsed);
+  const autoClosed = useRef(false);
   useEffect(() => {
     // Its own ref, not `wasCollapsed`: the trap effect above already writes
     // that one and runs first, so reading it here would always compare equal.
     const justClosed = wasOpen.current && collapsed;
     wasOpen.current = !collapsed;
     if (!justClosed) return;
+    if (autoClosed.current) {
+      autoClosed.current = false;
+      return;
+    }
     if (!window.matchMedia('(max-width: 639px)').matches) return;
     floatingRef.current?.focus();
   }, [collapsed]);
 
   /* A phone opens on the conversation, never on the drawer: the persisted
      "open" state is a desktop panel, and below `sm` it would cover the page
-     on every load. Mount only. `wasOpen` is cleared first so the restore
-     above does not pull focus onto the toggle during page load. */
+     on every load. Mount only. `autoClosed` tells the restore above this close
+     was not the user's, so it does not pull focus onto the toggle on load.
+     A flag, not a reset of `wasOpen`: StrictMode re-runs that effect and
+     would set it back. */
   useEffect(() => {
     if (!window.matchMedia('(max-width: 639px)').matches) return;
     if (useAppStore.getState().sidebarCollapsed) return;
-    wasOpen.current = false;
+    autoClosed.current = true;
     toggleSidebar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -491,9 +498,10 @@ function SidebarComponent({
           aria-controls="app-sidebar"
           title="Open sidebar"
           /* Was `hidden sm:flex`, which left phone users with no way to
-             reopen the drawer once closed. Mid-edge on mobile so it clears
-             the chat header and the composer; back to top-left at sm+. */
-          className="fixed left-3 top-1/2 z-50 flex h-11 w-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] shadow-[var(--shadow)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] sm:top-3 sm:translate-y-0"
+             reopen the drawer once closed. Top-left at every width: the chat
+             header makes room for it (`ml-14`). Mid-edge sat on top of the
+             centred composer on a phone. */
+          className="fixed left-3 top-[var(--space-2)] z-50 flex h-11 w-11 cursor-pointer items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
         >
           <PanelLeft className="h-4 w-4" aria-hidden="true" />
         </button>

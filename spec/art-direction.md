@@ -241,6 +241,22 @@ control, the pinned pilot fragment changing state. All of it collapses under
   Inspector `--app` on sample data: settings 0 FAIL, 0 WARN. API keys has 0 FAIL and one WARN,
   `hero-void`: a two-key list above the footer, an honest short list. axe clean at 320 and 1440,
   signed in.
+- `/chat` joined the site palette (2026-11-14), re-skinned rather than rebuilt: `.site` on its
+  root, so the product is charcoal in both schemes and its theme toggle and "Secure" badge are
+  gone. `.site` now also remaps the sidebar onto the site's lightness steps (it was a cooler
+  near-black) and `--accent-2`, the composer's busy border, from the overprint pink to the bone
+  neutral, so the page keeps one accent hue. The composer lost its drop shadow and the lifted
+  shadow in its focus ring.
+  Fixed on the way:
+  - A phone landed on the open sidebar drawer, because its open state is persisted from desktop.
+    Below `sm` it now closes on mount, without pulling focus.
+  - The phone's "Open sidebar" button sat mid-edge, over the centred composer. It is top-left at
+    every width, and the header makes room for it.
+  - Sidebar accent text on its hover ground failed contrast (axe, 5 nodes); clean on the new ground.
+  Inspector `--app`: 0 FAIL, 2 WARN at 1440, 768 and 390. `font-count` is the two text faces
+  plus the mono CLAUDE.md allows; `app-title-size` is the 49px empty-state greeting, kept as
+  the one large thing on an empty screen. axe clean at 320 and 1440. Not checked: a run in
+  progress and the phase cards, which need a billed run.
 - Site chrome simplified (2026-11-14, Maeda's laws of simplicity): the header lost its theme
   toggle (a `.site` page is charcoal in both schemes),
   its "Secure" badge (/security makes that case), and its glass and shadow when scrolled (now a
