@@ -10,6 +10,15 @@ describe('RunProgress', () => {
     expect(screen.queryByRole('progressbar')).toBeNull();
   });
 
+  it('says it is answering once a direct answer starts without a method', () => {
+    render(
+      <RunProgress phases={[]} currentPhase={0} currentPhaseName="Direct Response" />,
+    );
+    expect(screen.getByText('Answering…')).toBeTruthy();
+    expect(screen.queryByText('Choosing a method…')).toBeNull();
+    expect(screen.getByText('Direct Response…')).toBeTruthy();
+  });
+
   it('shows the step, the running phase and what comes next', () => {
     render(
       <RunProgress
