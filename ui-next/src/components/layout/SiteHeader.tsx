@@ -8,7 +8,6 @@ import { Menu, X } from 'lucide-react';
 import { UserMenu } from './UserMenu';
 import { Logo } from '@/components/brand/Logo';
 import { Reveal } from '@/components/site/Reveal';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { cn } from '@/lib/utils';
 
 const NAV_LINKS = [
@@ -28,12 +27,8 @@ function isActivePath(pathname: string, href: string): boolean {
 const PRIMARY =
   'whitespace-nowrap flex h-10 items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] font-semibold text-[var(--accent-text)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--accent-hover)] active:scale-[0.97]';
 
-/**
- * `themeToggle`: only for pages outside the site world; since /settings moved
- * into `.site` (2026-11-14) no page passes it. A `.site` page is charcoal in
- * both colour schemes, so a toggle there changes nothing.
- */
-export function SiteHeader({ themeToggle = false }: { themeToggle?: boolean } = {}) {
+/** No theme toggle: every page that renders this is `.site`, charcoal in both colour schemes. */
+export function SiteHeader() {
   const user = useAppStore((s) => s.user);
   const pathname = usePathname() ?? '/';
   const [scrolled, setScrolled] = useState(false);
@@ -132,7 +127,6 @@ export function SiteHeader({ themeToggle = false }: { themeToggle?: boolean } = 
 
         {/* Actions */}
         <div className="flex items-center gap-[var(--space-2)] sm:gap-[var(--space-3)]">
-          {themeToggle && <ThemeToggle />}
           {user ? (
             <>
               <Link href="/chat" className={cn(PRIMARY, 'hidden sm:inline-flex')}>
@@ -219,12 +213,6 @@ export function SiteHeader({ themeToggle = false }: { themeToggle?: boolean } = 
           </nav>
 
           <div className="flex shrink-0 flex-col gap-[var(--space-2)] border-t border-[var(--border)] p-[var(--space-3)]">
-            {themeToggle && (
-              <div className="flex items-center justify-between gap-[var(--space-2)]">
-                <span className="text-[length:var(--text-sm)] text-[var(--text-muted)]">Theme</span>
-                <ThemeToggle />
-              </div>
-            )}
             {user ? (
               <Link
                 href="/chat"

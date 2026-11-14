@@ -86,10 +86,8 @@ ui-next/src/
 │   │   ├── ShortcutModal.tsx     # Keyboard shortcuts help (?)
 │   │   ├── UserMenu.tsx          # User profile menu (dropdown)
 │   │   ├── UpgradeModal.tsx      # Subscription upgrade prompt
-│   │   ├── SecurityModal.tsx     # Security info modal
 │   │   ├── NeuroPanel.tsx        # Memory/Neuro management panel
 │   │   ├── UsageBadge.tsx        # Quota/usage indicator
-│   │   ├── SecurityBadge.tsx     # Security status indicator
 │   │   ├── BlobBackground.tsx    # Animated blob visual
 │   │   ├── NebulaBackground.tsx  # Nebula/starfield background
 │   │   ├── ThreeBackground.tsx   # 3D Three.js background
@@ -111,7 +109,6 @@ ui-next/src/
 │   │   ├── Button.tsx            # Styled button (primary, secondary, ghost, etc.)
 │   │   ├── Badge.tsx             # Status/method badges
 │   │   ├── Spinner.tsx           # Loading spinner
-│   │   ├── ThemeToggle.tsx       # Light/dark mode toggle
 │   │   ├── Tooltip.tsx           # Tooltip primitive (Radix UI)
 │   │   └── index.ts              # Export barrel
 │   │
@@ -192,7 +189,6 @@ ui-next/src/
   │  │  ├─ Settings link
   │  │  ├─ Logout button
   │  │  └─ [admin section]
-  │  └─ <ThemeToggle />
   │
   ├─ {page content}
   │
@@ -223,7 +219,6 @@ ui-next/src/
   │  └─ <Modals>
   │     ├─ <ShortcutModal> (? to open)
   │     ├─ <CommandPalette> (Cmd+K)
-  │     ├─ <SecurityModal>
   │     ├─ <UpgradeModal>
   │     └─ <NeuroPanel>
   │

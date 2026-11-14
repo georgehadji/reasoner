@@ -369,7 +369,6 @@ ui-next/src/
 │   │   ├── Button.tsx
 │   │   ├── Badge.tsx
 │   │   ├── Spinner.tsx
-│   │   ├── ThemeToggle.tsx
 │   │   ├── Input.tsx
 │   │   ├── Select.tsx
 │   │   └── [other primitives]
