@@ -80,6 +80,54 @@ def scope_prompt_block(domain: StakesDomain, scope: dict) -> str:
     )
 
 
+MAX_MISSING_FACTS = 3
+_AGE = re.compile(
+    r"\b(\d{1,3}\s?(years?|yrs?|y/?o|ετων|ετη|χρονων)"
+    r"|age|aged|ηλικια|infant|baby|child|toddler|παιδι\w*|μωρο)\b"
+)
+_WEIGHT = re.compile(r"\b\d+(\.\d+)?\s?(kg|kilos?|lbs?|pounds?|κιλα|κιλ[οό]\w*)\b|\bweigh\w*|βαρος")
+_DOSE = re.compile(r"\b(dose|doses|dosage|mg\b|δοση|δοσολογια)")
+_YEAR = re.compile(r"\b20\d{2}\b")
+_TAX = re.compile(r"\b(tax|taxes|φορος|φορολογ\w*)")
+
+
+def missing_facts(problem: str, domain: StakesDomain, country: str | None) -> tuple[str, ...]:
+    """Decisive facts the question lacks, in a fixed order, at most MAX_MISSING_FACTS.
+
+    Deterministic and conservative: a fact is "missing" only when the question
+    gives no sign of it. Each entry is a short question for the user.
+    """
+    if domain is StakesDomain.NONE:
+        return ()
+    text = fold_text(problem or "")
+    out: list[str] = []
+    if country is None:
+        out.append("Which country does this apply to?")
+    if domain is StakesDomain.HEALTH:
+        if not _AGE.search(text):
+            out.append("What is the person's age?")
+        if _DOSE.search(text) and not _WEIGHT.search(text):
+            out.append("What is the person's weight?")
+    elif domain is StakesDomain.FINANCIAL and _TAX.search(text) and not _YEAR.search(text):
+        out.append("Which tax year?")
+    return tuple(out[:MAX_MISSING_FACTS])
+
+
+def stakes_summary(problem: str, explicit_country: str | None = None) -> dict | None:
+    """The gate preview's stakes block for a client; None if not high-stakes."""
+    profile = detect_stakes(problem)
+    if not profile.is_high:
+        return None
+    country = resolve_jurisdiction(problem, explicit_country)
+    facts = missing_facts(problem, profile.domain, country)
+    return {
+        "domain": profile.domain.value,
+        "jurisdiction": country,
+        "jurisdiction_needed": country is None,
+        "missing_facts": list(facts),
+    }
+
+
 def keep_out_of_memory(problem: str) -> bool:
     """Health questions are special-category data (GDPR Art. 9): never persisted to Neuro.
 

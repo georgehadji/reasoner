@@ -314,6 +314,12 @@ async def decide_route(problem: str, preset: str) -> dict[str, Any]:
         for alt in (decision.alternatives or [])
     ]
 
+    from reasoner.application.services.stakes_service import stakes_mode, stakes_summary
+
+    stakes = stakes_summary(problem) if stakes_mode() != "off" else None
+    # Only in active mode does a missing fact hold the run for a question.
+    asks_facts = bool(stakes and stakes["missing_facts"] and stakes_mode() == "active")
+
     return {
         "action": decision.action,
         "method": decision.method,
@@ -322,10 +328,12 @@ async def decide_route(problem: str, preset: str) -> dict[str, Any]:
         "reasoning": decision.reasoning,
         "complexity": decision.complexity,
         "alternatives": alternatives,
+        "stakes": stakes,
         "needs_confirmation": (
             decision.action == "pipeline"
             and decision.confidence < HYPERGATE_METHOD_THRESHOLD
-        ),
+        )
+        or asks_facts,
     }
 
 

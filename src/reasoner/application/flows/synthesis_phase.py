@@ -299,6 +299,14 @@ def finalize_solution(raw: str, state: PipelineState, services: WorkflowServices
         coerce_list(json_data.get("critical_insights"))
     )
     open_questions, questions_changed = _scrub_strings(coerce_list(json_data.get("open_questions")))
+    if scope and "Facts I am stating" not in (state.problem or ""):
+        # A non-interactive caller never saw the gate's questions: surface them here.
+        from reasoner.application.services.stakes_service import detect_stakes, missing_facts
+
+        domain = detect_stakes(state.problem).domain
+        for question in missing_facts(state.problem, domain, scope["jurisdiction"]):
+            if question not in open_questions:
+                open_questions.append(question)
     clean_bp, blueprint_changed = _scrub_blueprint_steps(clean_bp)
 
     all_sources = _coerce_sources(coerce_list(json_data.get("sources")))

@@ -1334,6 +1334,7 @@
       "tests/unit/test_spend_cap_enforcement.py",
       "tests/unit/test_spend_limits.py",
       "tests/unit/test_sse_phase_error_fatal.py",
+      "tests/unit/test_stakes_facts.py",
       "tests/unit/test_stakes_patterns.py",
       "tests/unit/test_stakes_policy.py",
       "tests/unit/test_stakes_scope.py",

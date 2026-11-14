@@ -136,6 +136,29 @@ class AttachmentRef(BaseModel):
         return v
 
 
+MAX_FACTS = 3
+MAX_FACT_CHARS = 200
+
+
+def _facts_suffix(facts: dict[str, str]) -> str:
+    """User-stated facts as a block appended to the problem. Fresh user input: sanitized."""
+    from reasoner.core.sanitization import sanitize_for_prompt
+
+    if len(facts) > MAX_FACTS:
+        raise ValueError(f"At most {MAX_FACTS} facts")
+    lines = []
+    for question, answer in facts.items():
+        if len(question) > MAX_FACT_CHARS or len(answer) > MAX_FACT_CHARS:
+            raise ValueError(f"A fact is too long (max {MAX_FACT_CHARS} characters)")
+        try:
+            q, _ = sanitize_for_prompt(question)
+            a, _ = sanitize_for_prompt(answer)
+        except Exception as exc:
+            raise ValueError("A fact contains disallowed content") from exc
+        lines.append(f"- {q.strip()} {a.strip()}")
+    return "\n\nFacts I am stating (take them as my word):\n" + "\n".join(lines)
+
+
 class RunRequest(BaseModel):
     problem: str
     preset: str = DEFAULT_PRESET
@@ -159,6 +182,9 @@ class RunRequest(BaseModel):
     client_run_id: str | None = Field(default=None, pattern=CLIENT_RUN_ID_PATTERN)
     # Run on the preset's Western-only twin (US/EU models only).
     western_only: bool = False
+    # The user's answers to the gate's missing-fact questions (high-stakes runs).
+    # Folded into `problem` as user-stated facts, so the premise machinery labels them.
+    facts: dict[str, str] | None = None
 
     model_config = {"extra": "forbid"}
 
@@ -167,6 +193,13 @@ class RunRequest(BaseModel):
         self.preset = _western_preset(
             self.preset, self.western_only, list((self.routing or {}).values())
         )
+        return self
+
+    @model_validator(mode="after")
+    def _fold_facts(self) -> RunRequest:
+        if self.facts:
+            self.problem += _facts_suffix(self.facts)
+            self.facts = None  # consumed once, so a re-validation cannot append twice
         return self
 
     @field_validator("problem")
