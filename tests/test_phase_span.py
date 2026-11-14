@@ -206,7 +206,9 @@ async def test_span_names_the_primary_model_from_a_real_describe(fake_langfuse):
             return {"[primary]": "qwen3:8b", "critic": "qwen3:8b -> gpt-4o-mini"}
 
     state = SimpleNamespace(degradations=[])
-    async with PhaseSpan("run-3", phase_name="Critique", phase_number=3, router=_Router(), state=state):
+    async with PhaseSpan(
+        "run-3", phase_name="Critique", phase_number=3, router=_Router(), state=state
+    ):
         pass
 
     assert state.degradations == []

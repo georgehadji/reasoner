@@ -138,7 +138,8 @@ FORMAT RULES:
 CITATION REQUIREMENTS:
 - After each claim from a source, link it as [the source's real title](its url).
 - You MUST only cite sources listed in the WEB SOURCES section above. Do not invent or reuse URLs from memory.
-- If the prompt has no WEB SOURCES section, cite nothing: no links, no bracketed references and no placeholder names.
+- If the prompt has no WEB SOURCES section, cite nothing: no links, no bracketed
+  references and no placeholder names.
 - Include all sources used in a "sources" array in the JSON output.
 
 LAYOUT HINTS (JSON Field):
