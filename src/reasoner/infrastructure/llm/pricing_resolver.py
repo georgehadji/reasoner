@@ -36,6 +36,19 @@ from reasoner.infrastructure.llm.registry import _REGISTRY
 
 logger = logging.getLogger(__name__)
 
+# Local models (Ollama) run on the user's own machine and have no per-token
+# price. Keyed by alias and by served id, because call metadata carries the
+# served id ("qwen2"), which is neither a catalogue key nor a registry alias
+# and so used to fall through to the paid default.
+_LOCAL_MODEL_IDS = frozenset(
+    mid
+    for alias, entry in _REGISTRY.items()
+    if entry.get("is_local")
+    for mid in (alias, entry.get("model"))
+    if mid
+)
+_FREE = ModelPricing(0.0, 0.0)
+
 
 def get_pricing(model_id: str) -> ModelPricing:
     """Pricing for *model_id*, resolving registry aliases.
@@ -48,6 +61,8 @@ def get_pricing(model_id: str) -> ModelPricing:
     pricing = _domain_get_pricing(model_id)
     if pricing is not PRICING_DB["_default"]:
         return pricing
+    if model_id in _LOCAL_MODEL_IDS:
+        return _FREE
 
     entry = _REGISTRY.get(model_id)
     served = entry.get("model") if entry else None
