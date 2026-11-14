@@ -126,7 +126,7 @@ jobs:
           # 2145: Western-only tier wrapped a long preset_service line (net -1).
           # 2122: audit-6 fixes deleted dead subagent packages and helpers (net -23).
           # 2109: one widget stack deleted widgets_legacy.py and its shim (net -13).
-          python scripts/ruff_ratchet.py --max 2109
+          python scripts/ruff_ratchet.py --max 2059
 
       - name: Security scan (bandit)
         run: |
