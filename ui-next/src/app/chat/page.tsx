@@ -16,12 +16,10 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Composer } from '@/components/layout/Composer';
 import { ShortcutModal } from '@/components/layout/ShortcutModal';
 import { CommandPalette } from '@/components/layout/CommandPalette';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { PhaseTimeline } from '@/components/layout/PhaseTimeline';
 import { UserMenu } from '@/components/layout/UserMenu';
 import { UpgradeModal } from '@/components/layout/UpgradeModal';
-import { SecurityBadge } from '@/components/layout/SecurityBadge';
 import { PipelineError } from '@/hooks/usePipelineStream';
 import { describeHttpError } from '@/lib/http-error';
 import { EmailVerifyBanner } from '@/components/layout/EmailVerifyBanner';
@@ -1181,7 +1179,9 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-[100dvh] w-full bg-[var(--bg)] text-[var(--text)] overflow-hidden">
+    // `.site`: the app takes the site palette (charcoal in both schemes); its
+    // role remap re-skins the sidebar, composer and phase cards without touching them.
+    <div className="site flex h-[100dvh] w-full bg-[var(--bg)] text-[var(--text)] overflow-hidden">
       <Sidebar
         conversations={history}
         onLoad={handleLoad}
@@ -1260,9 +1260,9 @@ export default function ChatPage() {
                 )}
               </>
             )}
-            <SecurityBadge className="hidden sm:flex" />
+            {/* No Secure badge (the site header dropped it; /security makes that case)
+                and no theme toggle: the product is charcoal in both schemes. */}
             <UserMenu />
-            <ThemeToggle />
           </div>
         </header>
 

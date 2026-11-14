@@ -176,6 +176,18 @@ function SidebarComponent({
     floatingRef.current?.focus();
   }, [collapsed]);
 
+  /* A phone opens on the conversation, never on the drawer: the persisted
+     "open" state is a desktop panel, and below `sm` it would cover the page
+     on every load. Mount only. `wasOpen` is cleared first so the restore
+     above does not pull focus onto the toggle during page load. */
+  useEffect(() => {
+    if (!window.matchMedia('(max-width: 639px)').matches) return;
+    if (useAppStore.getState().sidebarCollapsed) return;
+    wasOpen.current = false;
+    toggleSidebar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const methodTags = useMemo(
     () => Array.from(new Set(conversations.map((c) => c.method).filter(Boolean))),
     [conversations],
