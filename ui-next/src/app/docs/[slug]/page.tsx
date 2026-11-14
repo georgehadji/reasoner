@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
-import { DocMarkdown } from '@/components/docs/DocMarkdown';
+import { DocMarkdown, docAnchor } from '@/components/docs/DocMarkdown';
 import { DocsSidebar } from '@/components/docs/DocsSidebar';
 import { JsonLd } from '@/components/seo/JsonLd';
+import { CAP, FIGURE, ROW } from '@/components/site/ArgumentSection';
 import { DOCS, docNeighbours, getDoc } from '@/lib/docs';
 import { breadcrumbSchema, techArticleSchema } from '@/lib/schema';
 import { SITE, absoluteUrl } from '@/lib/site';
@@ -13,7 +13,6 @@ interface DocParams {
   params: Promise<{ slug: string }>;
 }
 
-/** Pre-renders every doc at build time — no client fetch, no empty shell. */
 export function generateStaticParams() {
   return DOCS.map((doc) => ({ slug: doc.slug }));
 }
@@ -43,12 +42,43 @@ export async function generateMetadata({ params }: DocParams): Promise<Metadata>
   };
 }
 
+/** The guide's sections as anchor links: beside the text on wide screens, above it otherwise. */
+function OnThisPage({ sections, id }: { sections: string[]; id: string }) {
+  if (sections.length < 2) return null;
+  return (
+    <nav aria-labelledby={id} data-ui data-reveal className={FIGURE}>
+      <p id={id} className={CAP}>
+        On this page
+      </p>
+      <ol className="list-none">
+        {sections.map((s, i) => (
+          <li key={s} className={`flex items-baseline justify-between gap-[var(--space-3)] ${ROW}`}>
+            <a href={`#${docAnchor(s)}`} className="site-link text-current">
+              {s}
+            </a>
+            <span aria-hidden="true" className="nums-tabular text-[var(--site-muted)]">
+              {i + 1}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
+/**
+ * One guide in the site world "The product performs": a reading page, with
+ * the guide list beside it on wide screens and the neighbouring guides at
+ * its foot on every screen.
+ */
 export default async function DocPage({ params }: DocParams) {
   const { slug } = await params;
   const doc = getDoc(slug);
   if (!doc) notFound();
 
   const { prev, next } = docNeighbours(doc.slug);
+  // The guide's own h2s; DocMarkdown gives each the matching docAnchor id.
+  const sections = (doc.body.match(/^## .+$/gm) ?? []).map((h) => h.slice(3));
 
   return (
     <>
@@ -62,76 +92,76 @@ export default async function DocPage({ params }: DocParams) {
           ]),
         ]}
       />
-      <div className="mx-auto grid max-w-[var(--width-wide)] gap-[var(--space-12)] px-[var(--gutter)] py-[var(--space-16)] lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="hidden lg:block">
-          <div className="sticky top-24">
+      <div className="mx-auto grid w-full max-w-[var(--site-max)] gap-[var(--space-12)] px-[var(--site-margin)] pb-[var(--space-24)] pt-[var(--space-32)] lg:grid-cols-12">
+        <aside className="hidden lg:col-span-3 lg:block">
+          <div className="sticky top-[var(--site-sticky-top)]">
             <DocsSidebar activeSlug={doc.slug} />
           </div>
         </aside>
 
-        <main id="main-content" className="min-w-0 max-w-3xl">
-          <nav aria-label="Breadcrumb" className="mb-6 text-[length:var(--text-sm)] text-[var(--text-muted)]">
-            <Link href="/docs" className="transition-colors hover:text-[var(--text)]">
+        <main id="main-content" className="min-w-0 lg:col-span-9 xl:col-span-6">
+          <nav aria-label="Breadcrumb" className="text-[length:var(--site-small)] text-[var(--site-muted)]">
+            <Link href="/docs" className="site-link text-current">
               Docs
             </Link>
-            <span className="mx-2" aria-hidden="true">
+            <span className="mx-[var(--space-2)]" aria-hidden="true">
               /
             </span>
-            <span className="text-[var(--text-2)]">{doc.section}</span>
+            <span>{doc.section}</span>
           </nav>
 
           <article>
-            <header className="mb-10 border-b border-[var(--border)] pb-8">
-              <h1 className="font-display text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">{doc.title}</h1>
-              <p className="prose-measure mt-[var(--space-3)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
-                {doc.description}
-              </p>
-              <p className="mt-[var(--space-4)] font-sans text-[length:var(--text-xs)] uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
-                {doc.minutes} min read
-              </p>
+            <header className="mt-[var(--space-6)] pb-[var(--space-6)]">
+              <h1 className="font-display text-[length:var(--site-head)] leading-[var(--site-lh-head)]">
+                <span className="site-line">
+                  <span>{doc.title}</span>
+                </span>
+              </h1>
+              <div className="site-after-headline">
+                <p className="mt-[var(--space-6)] max-w-[52ch] text-[length:var(--site-lead)] leading-[var(--site-lh-body)]">
+                  {doc.description}
+                </p>
+                <p className="mt-[var(--space-4)] text-[length:var(--site-small)] text-[var(--site-muted)]">
+                  {doc.minutes} min read
+                </p>
+              </div>
             </header>
+
+            <div className="my-[var(--space-8)] xl:hidden">
+              <OnThisPage sections={sections} id="on-this-page-inline" />
+            </div>
 
             <DocMarkdown>{doc.body}</DocMarkdown>
           </article>
 
           {(prev || next) && (
             <nav
-              aria-label="Documentation pagination"
-              className="mt-16 grid gap-4 border-t border-[var(--border)] pt-8 sm:grid-cols-2"
+              aria-label="Neighbouring guides"
+              className="mt-[var(--space-16)] grid gap-[var(--space-6)] sm:grid-cols-2"
             >
               {prev ? (
-                <Link
-                  href={`/docs/${prev.slug}`}
-                  className="group flex flex-col rounded-xl border border-[var(--border)] p-4 transition-colors hover:border-[var(--accent)]"
-                >
-                  <span className="flex items-center gap-1.5 text-[length:var(--text-xs)] text-[var(--text-muted)]">
-                    <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-                    Previous
-                  </span>
-                  <span className="mt-1 font-medium text-[var(--text)] group-hover:text-[var(--accent)]">
-                    {prev.title}
-                  </span>
+                <Link href={`/docs/${prev.slug}`} className="group block">
+                  <span className="block text-[length:var(--site-small)] text-[var(--site-muted)]">Previous</span>
+                  <span className="site-link mt-[var(--space-1)] inline-block font-semibold text-current">{prev.title}</span>
                 </Link>
               ) : (
                 <span />
               )}
               {next && (
-                <Link
-                  href={`/docs/${next.slug}`}
-                  className="group flex flex-col rounded-xl border border-[var(--border)] p-4 text-right transition-colors hover:border-[var(--accent)] sm:col-start-2"
-                >
-                  <span className="flex items-center justify-end gap-1.5 text-[length:var(--text-xs)] text-[var(--text-muted)]">
-                    Next
-                    <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                  </span>
-                  <span className="mt-1 font-medium text-[var(--text)] group-hover:text-[var(--accent)]">
-                    {next.title}
-                  </span>
+                <Link href={`/docs/${next.slug}`} className="group block sm:text-right">
+                  <span className="block text-[length:var(--site-small)] text-[var(--site-muted)]">Next</span>
+                  <span className="site-link mt-[var(--space-1)] inline-block font-semibold text-current">{next.title}</span>
                 </Link>
               )}
             </nav>
           )}
         </main>
+
+        <aside className="hidden xl:col-span-3 xl:block">
+          <div className="sticky top-[var(--site-sticky-top)]">
+            <OnThisPage sections={sections} id="on-this-page" />
+          </div>
+        </aside>
       </div>
     </>
   );
