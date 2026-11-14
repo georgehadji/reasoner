@@ -150,6 +150,14 @@ control, the pinned pilot fragment changing state. All of it collapses under
   (now an `[INPUT REQUIRED]` effective date); sign-in was described as a cookie, but supabase-js
   keeps the session in localStorage; theme and sidebar were "cookies", both are localStorage.
   Inspector: 0 FAIL.
+- /terms rebuilt (2026-11-14): "Terms of service." beside a numbered summary that says it is
+  one, then the six sections with fragments for the source licence (from LICENSE), the
+  epistemic labels and the prohibited uses. The legal wording is kept; nothing new was
+  drafted. Corrected: "Last updated" printed today's date; "99.9% uptime" had no measurement
+  (/status publishes no history); a reverse-engineering ban contradicted the published BSL
+  source and is replaced by the licence's one restriction (no hosted resale); the metadata
+  promised billing and liability sections that do not exist. Jurisdiction and effective date
+  are `[INPUT REQUIRED]`. Inspector: 0 FAIL.
 - Rolled out (2026-11-13, tokens and chrome only): `.site` on every marketing page root,
   `SiteFooter` is now the quiet line, inverted bands flip to the concrete field, uppercase
   micro-labels and prose mono removed, `Reveal` mounted in `SiteHeader`. Their layouts are
