@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
-import { CHANGELOG } from '@/lib/changelog';
+import { ArgumentSection as Section, BODY, CAP, FIGURE, HEAD, ROW } from '@/components/site/ArgumentSection';
+import { CHANGELOG, type ChangelogEntry } from '@/lib/changelog';
 import { SITE, absoluteUrl } from '@/lib/site';
 
 export const metadata: Metadata = {
   title: 'Changelog',
-  description: 'What shipped and when — a dated record of Reasoner releases.',
+  description: 'What shipped and when. Every entry names the commit on main it shipped in.',
   alternates: { canonical: absoluteUrl('/changelog') },
   openGraph: {
     title: `Changelog — ${SITE.name}`,
@@ -16,54 +18,148 @@ export const metadata: Metadata = {
   },
 };
 
-function formatDate(iso: string): string {
-  return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', {
-    month: 'long',
+/**
+ * /changelog in the site world "The product performs": one section per
+ * month, generated from CHANGELOG, so a new entry needs no new markup.
+ */
+
+function utc(iso: string): Date {
+  return new Date(`${iso}T00:00:00Z`);
+}
+
+function formatDate(iso: string, long = false): string {
+  return utc(iso).toLocaleDateString('en-US', {
+    month: long ? 'long' : 'short',
     day: 'numeric',
-    year: 'numeric',
+    ...(long ? { year: 'numeric' } : {}),
     timeZone: 'UTC',
   });
 }
 
+/** Entries grouped by month, newest first, keeping CHANGELOG's order. */
+function byMonth(entries: readonly ChangelogEntry[]) {
+  const months = new Map<string, ChangelogEntry[]>();
+  for (const e of entries) {
+    const key = e.date.slice(0, 7);
+    months.set(key, [...(months.get(key) ?? []), e]);
+  }
+  return [...months].map(([key, items]) => ({
+    key,
+    label: utc(`${key}-01`).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
+    items,
+  }));
+}
+
+/** At most five entries per fragment, so none runs past a phone screen and a half. */
+function chunks(items: ChangelogEntry[], size = 5): ChangelogEntry[][] {
+  return Array.from({ length: Math.ceil(items.length / size) }, (_, i) => items.slice(i * size, i * size + size));
+}
+
+function range(part: ChangelogEntry[]): string {
+  const first = formatDate(part[0].date);
+  const last = formatDate(part[part.length - 1].date);
+  return first === last ? first : `${first} to ${last}`;
+}
+
+function Entry({ entry }: { entry: ChangelogEntry }) {
+  return (
+    <li className={ROW}>
+      <p className="flex flex-wrap items-baseline justify-between gap-x-[var(--space-3)] text-[var(--site-muted)]">
+        <time dateTime={entry.date}>{formatDate(entry.date)}</time>
+        <code className="font-mono">{entry.commit}</code>
+      </p>
+      <h3 className="mt-[var(--space-1)] font-semibold">{entry.title}</h3>
+      <p className="mt-[var(--space-1)] max-w-[60ch]">{entry.description}</p>
+    </li>
+  );
+}
+
 export default function ChangelogPage() {
+  const [latest] = CHANGELOG;
+  const months = byMonth(CHANGELOG);
+
   return (
     <div className="site flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
       <SiteHeader />
+      <main id="main-content" className="flex-1">
+        {/* ── Hero: the claim (left), the latest entry (right) ── */}
+        <header className="grid min-h-[var(--site-hero-h)] lg:grid-cols-2">
+          <div className="flex flex-col justify-end px-[var(--site-margin)] pb-[var(--space-12)] pt-[var(--space-32)] lg:pb-[var(--space-16)]">
+            <h1 className="font-display text-[length:var(--site-display)] leading-[var(--site-lh-display)]">
+              <span className="site-line">
+                <span>What shipped,</span>
+              </span>
+              <span className="site-line">
+                <span>and when.</span>
+              </span>
+            </h1>
+            <div className="site-after-headline">
+              <p className="mt-[var(--space-8)] max-w-[40ch] text-[length:var(--site-lead)] leading-[var(--site-lh-body)]">
+                Each entry names the commit it shipped in. Only work merged to main is listed; nothing planned
+                or in progress.
+              </p>
+              <div className="mt-[var(--space-8)] flex flex-wrap items-center gap-x-[var(--space-8)] gap-y-[var(--space-4)]">
+                <a href={`#m-${months[0].key}`} className="site-button">
+                  Read the latest changes
+                </a>
+                <Link href="/status" className={`site-link ${BODY}`}>
+                  See what is running now
+                </Link>
+              </div>
+            </div>
+          </div>
 
-      <main className="mx-auto w-full max-w-[var(--width-content)] flex-1 px-[var(--gutter)] py-[var(--space-24)]">
-        <header className="mb-[var(--space-16)]">
-          <h1 className="font-display text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)] md:text-[length:var(--text-5xl)]">
-            Changelog
-          </h1>
-          <p className="prose-measure mt-[var(--space-4)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-            What shipped and when.
-          </p>
+          <div className="flex min-w-0 items-center justify-center bg-[var(--site-surface)] px-[var(--site-margin)] py-[var(--space-16)] lg:pt-[var(--space-24)]">
+            <figure
+              data-ui
+              className="w-full rounded-[var(--radius-lg)] border border-[var(--site-line)] bg-[var(--site-bg)] lg:max-w-[var(--site-fragment)]"
+            >
+              <figcaption className={CAP}>Latest, {formatDate(latest.date, true)}</figcaption>
+              <ul className="list-none">
+                <Entry entry={latest} />
+              </ul>
+            </figure>
+          </div>
         </header>
 
-        <ol role="list" className="space-y-[var(--space-12)] border-l border-[var(--border)] pl-[var(--space-8)]">
-          {CHANGELOG.map((entry) => (
-            <li key={`${entry.date}-${entry.title}`} className="relative">
-              <span
-                aria-hidden="true"
-                className="absolute -left-[calc(var(--space-8)_+_4px)] top-[var(--space-1)] h-[var(--space-2)] w-[var(--space-2)] rounded-[var(--radius-pill)] bg-[var(--accent)]"
-              />
-              <time
-                dateTime={entry.date}
-                className="font-sans text-[length:var(--text-sm)] text-[var(--text-subtle)]"
-              >
-                {formatDate(entry.date)}
-              </time>
-              <h2 className="mt-[var(--space-2)] font-display text-[length:var(--text-xl)] font-semibold leading-[var(--lh-subhead)] text-[var(--text)]">
-                {entry.title}
-              </h2>
-              <p className="prose-measure mt-[var(--space-2)] text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-muted)]">
-                {entry.description}
-              </p>
-            </li>
-          ))}
-        </ol>
-      </main>
+        {months.map(({ key, label, items }, i) => (
+          <Section
+            key={key}
+            id={`m-${key}`}
+            lines={[label, `${items.length} ${items.length === 1 ? 'change' : 'changes'}.`]}
+            field={i % 2 === 1}
+          >
+            <div className="flex flex-col gap-[var(--space-6)]">
+              {chunks(items).map((part) => (
+                <figure key={part[0].commit} data-ui className={FIGURE}>
+                  <figcaption className={CAP}>{range(part)}</figcaption>
+                  <ul className="list-none">
+                    {part.map((entry) => (
+                      <Entry key={entry.commit} entry={entry} />
+                    ))}
+                  </ul>
+                </figure>
+              ))}
+            </div>
+          </Section>
+        ))}
 
+        {/* ── Close ── */}
+        <section aria-labelledby="close-h" className="mx-auto w-full max-w-[var(--site-max)] px-[var(--site-margin)] py-[var(--space-24)]">
+          <h2 id="close-h" className={HEAD}>
+            <span className="block">Something changed</span>
+            <span className="block">that is not here?</span>
+          </h2>
+          <p className={`mt-[var(--space-6)] max-w-[52ch] ${BODY}`}>
+            Tell us what you noticed. If it shipped without an entry, the list is wrong and we will add it.
+          </p>
+          <div className="mt-[var(--space-8)] flex flex-wrap items-center gap-x-[var(--space-8)] gap-y-[var(--space-4)]">
+            <Link href="/contact" className="site-button">
+              Get in touch
+            </Link>
+          </div>
+        </section>
+      </main>
       <SiteFooter />
     </div>
   );

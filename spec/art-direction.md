@@ -167,6 +167,11 @@ control, the pinned pilot fragment changing state. All of it collapses under
   `scripts/update_mindmap_meta.py`. Three pages said every provider was listed "with its
   privacy policy"; only the direct fallbacks have one linked, so that phrase is gone. Host
   pinning and hosting region are `[INPUT REQUIRED]`. Inspector: 0 FAIL.
+- /changelog rebuilt (2026-11-14): "What shipped, and when." beside the latest entry, then one
+  section per month generated from `CHANGELOG`, in fragments of at most five entries so none
+  runs past a phone screen and a half. Every entry now names its commit on main. Corrected: the
+  list had stopped at 2026-08-16 while nine user-facing changes landed after it; those are
+  added, each traced to a commit. Work on unmerged branches is left out. Inspector: 0 FAIL.
 - /status rebuilt (2026-11-14): "Checked as you load it." beside the live `GET /api/health`
   panel, which lists the six checks in every state (checking, answered, no answer) so it keeps
   its height. Sections say what each check really tests (`lib/status-checks.ts`, mirrored from
