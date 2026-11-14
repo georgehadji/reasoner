@@ -122,6 +122,12 @@ control, the pinned pilot fragment changing state. All of it collapses under
   `.site-link` pins dark-ground ink, so links on the light field add `text-current`.
   Inspector: 0 FAIL at 1440 and 768; 1 FAIL at 390, blank-gap past the 11-screen walk
   (page is 14.4 screens; unscrolled `Reveal` sections stay armed), the same artifact as home.
+- /developers rebuilt (2026-11-14): "An answer your code can act on." beside the sync call and
+  its response, then the seven sections with fragments for the MCP config and six tools, the
+  CLI, the discovery endpoints and the statuses. The section chrome moved out of
+  /capabilities into `site/ArgumentSection.tsx`, shared by both; `landing/prose.tsx` had no
+  importers left and was deleted. A hero cell holding `<pre>` needs `min-w-0`, or the code's
+  longest line widens the page at 390. Inspector: 0 FAIL.
 - Rolled out (2026-11-13, tokens and chrome only): `.site` on every marketing page root,
   `SiteFooter` is now the quiet line, inverted bands flip to the concrete field, uppercase
   micro-labels and prose mono removed, `Reveal` mounted in `SiteHeader`. Their layouts are
