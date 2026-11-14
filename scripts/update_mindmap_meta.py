@@ -384,7 +384,9 @@ def _stage(path: Path) -> None:
 
 # ── Per-document updaters ────────────────────────────────────────────────────
 
-def _update_architecture_mindmap(today: str, py: int, models: int, presets: int, methods: int) -> bool:
+def _update_architecture_mindmap(
+    today: str, py: int, models: int, presets: int, methods: int
+) -> bool:
     if not ARCHITECTURE_MINDMAP.exists():
         return False
     text = orig = ARCHITECTURE_MINDMAP.read_text(encoding="utf-8")
@@ -403,7 +405,9 @@ def _update_architecture_mindmap(today: str, py: int, models: int, presets: int,
         text = re.sub(r"\b\d+\+? declarative presets\b", f"{presets}+ declarative presets", text)
         text = re.sub(r"(\| \*\*Presets\*\* \| )\d+\+?", rf"\g<1>{presets}+", text)
     if methods:
-        text = _patch(text, r"\| \*\*Reasoning Methods\*\* \| \d+", f"| **Reasoning Methods** | {methods}", f)
+        text = _patch(
+            text, r"\| \*\*Reasoning Methods\*\* \| \d+", f"| **Reasoning Methods** | {methods}", f
+        )
 
     if text == orig:
         return False
@@ -416,7 +420,6 @@ def _update_codebase_mindmap(today: str, py: int, models: int, presets: int, met
     if not CODEBASE_MINDMAP.exists():
         return False
     text = orig = CODEBASE_MINDMAP.read_text(encoding="utf-8")
-    f = CODEBASE_MINDMAP.name
 
     # Both plain and bold "Last updated" forms
     text = re.sub(r"(\*\*Last updated:\*\*|Last updated:) \S+", rf"\1 {today}", text)
