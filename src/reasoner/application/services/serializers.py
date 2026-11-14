@@ -946,7 +946,14 @@ def _ser_5(state: PipelineState) -> dict:
         return {
             "coding_state": {
                 "final_files": [
-                    {"path": f.get("path", ""), "changed": f.get("changed", False)}
+                    # The content is the run's answer: Final Assembly is the
+                    # coding flow's last phase, so without it the UI has no code.
+                    {
+                        "path": f.get("path", ""),
+                        "content": f.get("content", ""),
+                        "language": f.get("language") or coding.get("language", ""),
+                        "changed": f.get("changed", False),
+                    }
                     for f in coding["final_files"]
                 ],
                 "readme": coding.get("readme", ""),
