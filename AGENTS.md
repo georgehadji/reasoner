@@ -55,7 +55,6 @@ It is not a chatbot. It is a **reasoning orchestrator** that treats reasoning as
 | Markdown | react-markdown, react-syntax-highlighter, remark-gfm, rehype-highlight |
 | Icons | lucide-react |
 | Animation | framer-motion |
-| Charts | recharts |
 | 3D Graphics | three.js, @react-three/fiber, @react-three/drei, @react-three/postprocessing |
 | Auth | `@supabase/supabase-js`, `@supabase/ssr` |
 | Error Tracking | `@sentry/nextjs` |
