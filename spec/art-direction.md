@@ -178,6 +178,20 @@ control, the pinned pilot fragment changing state. All of it collapses under
   about a guide, so it cannot drift from the docs. Corrected: the old cards said "retention
   controls" (retention is not configurable); the security doc's description now says how long
   runs are kept. Inspector: 0 FAIL.
+- /docs rebuilt (2026-11-14): "Every guide, in full." beside the quickstart's own steps, then
+  one section per `DocSection` generated from `DOCS`. A guide is a reading page in three
+  columns: the guide list, the text, and "On this page" built from the guide's own headings
+  (inline above the text below 1280px). Code blocks and tables are its fragments. Corrected
+  in `docs.ts`, each against the backend: runs reserve their estimate up front and return 402
+  before running (the docs said they were charged after, never from an estimate); both image
+  tiers default to four images; `/api/presets` and `/api/models` return what they return, not
+  method, tier, vendor or pricing; `reasoner_gate` needs a key; rate-limit headers are on run
+  responses and 429s, not every response; key minting, export and deletion need a session;
+  `DELETE /api/user/data` is documented; the model line counts adapters, not labs.
+  Inspector: 0 FAIL on /docs, quickstart and troubleshooting with `few-pictures` allowed (a
+  guide's only pictures are its own code and tables). api-reference keeps one `off-centre` at
+  1440: the columns are symmetric, but on a 9-minute page the article's right edge outweighs
+  the short sticky aside in the 98th-percentile measure.
 - /status rebuilt (2026-11-14): "Checked as you load it." beside the live `GET /api/health`
   panel, which lists the six checks in every state (checking, answered, no answer) so it keeps
   its height. Sections say what each check really tests (`lib/status-checks.ts`, mirrored from

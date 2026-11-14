@@ -217,7 +217,7 @@ Leaving the preset on **Auto** lets HyperGate pick both the method and the tier 
 
 ## Models
 
-Reasoner routes across ${CAPABILITIES.directModels} directly registered reasoning models and ${CAPABILITIES.routableModels}+ more through OpenRouter, spanning ${CAPABILITIES.providerAdapters} model labs including Anthropic, OpenAI, Google, DeepSeek, Mistral, xAI, and Perplexity.
+Reasoner routes across ${CAPABILITIES.directModels} directly registered reasoning models and ${CAPABILITIES.routableModels}+ more through OpenRouter, with ${CAPABILITIES.providerAdapters} direct provider adapters (Anthropic, OpenAI, Google, Mistral, DeepSeek, xAI, Perplexity, and Qwen).
 
 Routing is by **role**, not by preference. Each phase requests a role — generator, scorer, synthesiser, searcher — and the router resolves it against the preset's routing table.
 
@@ -267,7 +267,7 @@ Labs rather than model ids: the tiers are re-ranked whenever measured prices mov
 
 The primaries fire concurrently. If fewer images come back than you asked for, fallbacks are tried one at a time until the count is met or the list runs out. A model that fails does not fail the request — you get what the survivors produced.
 
-The app asks for four images on Budget and two on Premium.
+Both tiers ask for four images by default, one per primary.
 
 ## Policy rewrites
 
@@ -301,7 +301,7 @@ curl -X POST https://reasoner.app/api/generate-image \\
     "prompt": "a lighthouse in a winter storm",
     "preset": "image-gen-budget",
     "aspect_ratio": "16:9",
-    "num_images": 2
+    "num_images": 4
   }'
 \`\`\`
 
@@ -314,7 +314,7 @@ curl -X POST https://reasoner.app/api/generate-image \\
 | \`enhance\` | \`true\` | Set false to send the prompt verbatim |
 | \`preview_only\` | \`false\` | Returns the enhanced prompt without generating |
 | \`reference_images\` | \`[]\` | Up to 4 image data URLs |
-| \`num_images\` | \`2\` | How many images must succeed. 1–8; SVG prompts return fewer, never raster |
+| \`num_images\` | \`4\` | How many images must succeed. 1–8; SVG prompts return fewer, never raster |
 
 \`preview_only\` is what the app uses to show you the enhanced prompt while the images are still rendering — it is a cheap text call, not a generation.
 
@@ -508,7 +508,7 @@ The grant is idempotent per period — checking your balance tops it up if the p
 
 ## When you are charged
 
-**After the run completes, from actual model spend.** Not on submission, and not from an estimate.
+**Reserved before the run, settled after it.** A run holds its estimated cost when it starts, and returns **402 Payment Required** if your balance cannot cover that. When it ends, the charge is trued up to actual model spend and the rest of the hold is released. Image generation is charged at its estimate.
 
 This matters more than it sounds:
 
@@ -516,7 +516,7 @@ This matters more than it sounds:
 - A cache hit costs **nothing**.
 - You pay the real cost of the models that actually ran, not a padded estimate.
 
-Because settlement happens after the work, a single run can take your balance to zero or slightly below. The next run is then blocked with **402 Payment Required** until you top up. Every charge carries an idempotency key, so a dropped connection or a retried request cannot double-charge you.
+Every charge carries an idempotency key, so a dropped connection or a retried request cannot double-charge you.
 
 ## Reading your ledger
 
@@ -589,6 +589,8 @@ A key can only be granted scopes its owner already has, and administrative scope
 | \`history:delete\` | Delete history entries |
 
 New keys default to \`read\`, \`preset:read\`, \`history:read\` and \`run\`. Untick \`run\` for a key that should only read. Grant more only when something actually needs it.
+
+Minting and revoking keys, exporting your data, and deleting the account are not scopes a key can hold. They need a signed-in browser session, so a leaked key cannot mint more keys or close the account.
 
 ## Expiry, limits, and rotation
 
@@ -682,8 +684,8 @@ Returns HyperGate's decision — route, method, and confidence — without execu
 
 | Endpoint | Returns |
 | --- | --- |
-| \`GET /api/presets\` | All 48 presets with method, tier, and cost band |
-| \`GET /api/models\` | Registered models with vendor and pricing |
+| \`GET /api/presets\` | All ${CAPABILITIES.presets} presets with name, description, primary model, and tags |
+| \`GET /api/models\` | Registered model ids, grouped by provider |
 | \`GET /api/credits/pricing\` | Credit conversion rate and tier allowances |
 | \`GET /api/health\` | Liveness and dependency status |
 
@@ -724,7 +726,7 @@ Bearer-only variants of the run endpoints, built for programmatic callers. See [
 | 429 | Rate limited | Back off for \`Retry-After\` seconds |
 | 503 | Dependency unavailable | Retry with backoff |
 
-Rate limit headroom is returned on every response as \`X-RateLimit-Limit\` and \`X-RateLimit-Remaining\`.
+Run responses carry rate limit headroom as \`X-RateLimit-Limit\` and \`X-RateLimit-Remaining\`; a 429 carries \`X-RateLimit-Remaining: 0\` and \`Retry-After\`.
 `,
   },
   {
@@ -1015,7 +1017,7 @@ This is what Claude Desktop and Claude Code use. Add the server to your host's M
 
 Point \`args\` at \`mcp_server.py\` in your checkout — use an absolute path unless you are certain the host's working directory is the repo root. The host launches it as a subprocess and talks to it over stdin and stdout; nothing is exposed on the network.
 
-\`REASONER_API_KEY\` is a normal account key from [Settings → API keys](/settings/api-keys). The two metered tools need it. The four read-only tools work without one, exactly as their unauthenticated HTTP counterparts do.
+\`REASONER_API_KEY\` is a normal account key from [Settings → API keys](/settings/api-keys). The two metered tools and \`reasoner_gate\` need it. \`reasoner_estimate\`, \`reasoner_presets\`, and \`reasoner_health\` work without one, as their unauthenticated HTTP counterparts do.
 
 ## Or over streamable HTTP
 
@@ -1033,9 +1035,9 @@ That mounts the MCP server at \`/mcp\` on the same FastAPI app that serves the R
 | --- | --- | --- |
 | \`reasoner_run\` | Paid | Runs a reasoning pipeline. Blocks, and reports progress per phase. |
 | \`reasoner_followup\` | Paid | Continues a conversation with a prior synthesis as context. |
-| \`reasoner_gate\` | Free, 200 calls a day | Previews routing — direct, web search, or pipeline, and which method — without running it. |
+| \`reasoner_gate\` | Free with a key, 200 calls a day | Previews routing — direct, web search, or pipeline, and which method — without running it. |
 | \`reasoner_estimate\` | Free | Estimates tokens, cost, and duration without running it. |
-| \`reasoner_presets\` | Free | Lists presets with method, description, and primary model. |
+| \`reasoner_presets\` | Free | Lists presets with name, description, and primary model. |
 | \`reasoner_health\` | Free | Liveness and dependency status, public detail only. |
 
 \`reasoner_run\` takes \`problem\` plus optional \`preset\`, \`top_k\`, \`web_search\`, \`source_type\`, and \`client_run_id\`. Leaving \`preset\` unset means \`auto-budget\`: the router picks the method and the cheaper tier, which is the right default for an agent.
@@ -1107,8 +1109,9 @@ Uploaded documents are treated as untrusted data, never as instructions. Text in
 
 ## GDPR
 
-- **Export (Article 20)** — \`GET /api/account/export\` returns your profile, subscription, quota, and recent query metadata as JSON.
+- **Export (Article 20)** — \`GET /api/account/export\` returns JSON with one key per store that holds your data: the account, its runs, uploads, history, memory, and billing rows.
 - **Deletion (Article 17)** — \`POST /api/account/delete\` cancels billing, deletes the database records transactionally, then clears uploads, history, vectors, and cache. API keys are revoked with the account.
+- **Erase data, keep the account** — \`DELETE /api/user/data\` (scope \`history:delete\`) erases the same stores except the account itself. If a store fails, the call returns 502 and names it, so you can retry.
 
 Deletion is irreversible. Export first if you want a copy.
 
@@ -1128,7 +1131,7 @@ Email the security contact listed on [our security page](/security). Please incl
     body: `
 ## "Insufficient credits" (402)
 
-Your balance is exhausted. Because runs settle after they complete, the run that emptied the balance still finished and was charged.
+Your balance cannot cover the run's estimated cost. A run reserves that estimate before it starts, so it was refused before any model ran and nothing was charged.
 
 Options: wait for the next monthly grant, upgrade the plan, or top up. Check [your ledger](/dashboard) to see what consumed the balance — a handful of Premium runs will do it faster than expected.
 
@@ -1164,7 +1167,7 @@ Either the key expired or it was revoked. Expiry is shown in [Settings → API k
 
 ## 429 rate limited
 
-Back off for the number of seconds in the \`Retry-After\` header. Every response also carries \`X-RateLimit-Remaining\`, so a well-behaved client can throttle itself before hitting the wall.
+Back off for the number of seconds in the \`Retry-After\` header. Run responses also carry \`X-RateLimit-Remaining\`, so a well-behaved client can throttle itself before hitting the wall.
 `,
   },
 ];
