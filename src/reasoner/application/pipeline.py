@@ -38,7 +38,6 @@ from reasoner.core import DEFAULT_PERSPECTIVES, PhaseConfig
 from reasoner.core.constants import (
     TRUNCATION,
 )
-from reasoner.core.degrade import degraded
 from reasoner.core.parsing import (
     coerce_list,
     extract_json,
@@ -545,6 +544,8 @@ class ReasonerPipeline:
         fs = state.final_solution
         if fs is None or not fs.scope:  # scope is set only for an active high-stakes run
             return
+        from reasoner.core.degrade import degraded
+
         try:
             from reasoner.application.services.answerability import assess_answerability
 

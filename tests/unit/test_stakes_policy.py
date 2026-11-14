@@ -38,14 +38,19 @@ def test_input_not_mutated():
 
 
 def test_domain_module_is_stdlib_only():
-    import ast, pathlib
+    import ast
+    import pathlib
+
     import reasoner.domain.stakes as m
-    mods = {n.module for n in ast.walk(ast.parse(pathlib.Path(m.__file__).read_text()))
-            if isinstance(n, ast.ImportFrom) and n.module}
+
+    tree = ast.parse(pathlib.Path(m.__file__).read_text(encoding="utf-8"))
+    mods = {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module}
     assert mods <= {"__future__", "dataclasses", "datetime", "enum"}
 
 
-@pytest.mark.parametrize("mode,action", [("off", "direct"), ("shadow", "direct"), ("active", "pipeline")])
+@pytest.mark.parametrize(
+    "mode,action", [("off", "direct"), ("shadow", "direct"), ("active", "pipeline")]
+)
 def test_agent_choke_point_modes(monkeypatch, mode, action):
     from reasoner.core.settings import settings
     from reasoner.hypergate.hyperagent import HyperGateAgent
@@ -62,4 +67,5 @@ def test_named_method_is_left_alone(monkeypatch):
 
     monkeypatch.setattr(settings, "STAKES_POLICY_MODE", "active")
     d = _d("pipeline", "debate")
-    assert HyperGateAgent._apply_stakes("use the debate method: is it legal to sue my landlord", d) is d
+    problem = "use the debate method: is it legal to sue my landlord"
+    assert HyperGateAgent._apply_stakes(problem, d) is d
