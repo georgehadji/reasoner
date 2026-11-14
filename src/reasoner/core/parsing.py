@@ -387,7 +387,6 @@ def _extract_balanced_structure(text: str, start: int, open_char: str, close_cha
     return None
 
 
-
 def _extract_json_dict_fallback(text: str) -> dict[str, Any] | None:
     """
     Tolerant fallback that extracts key-value pairs from malformed JSON
@@ -550,46 +549,6 @@ def _is_structural_quote(text: str, i: int) -> bool:
     if k < len(text) and text[k] in "}],:":
         return True
     return False
-
-
-def _repair_json_quotes(text: str) -> str | None:
-    """
-    Repair unescaped double quotes inside JSON string values.
-
-    Identifies every unescaped quote that is NOT a JSON structural delimiter
-    and escapes them all in one pass, then tries to parse again.
-    """
-    try:
-        json.loads(text)
-        return text
-    except json.JSONDecodeError:
-        pass
-
-    # Build a new string where every non-structural unescaped quote is escaped.
-    result = []
-    i = 0
-    while i < len(text):
-        if text[i] == '"':
-            # Count preceding backslashes
-            backslashes = 0
-            j = i - 1
-            while j >= 0 and text[j] == '\\':
-                backslashes += 1
-                j -= 1
-            if backslashes % 2 == 0 and not _is_structural_quote(text, i):
-                result.append('\\"')
-            else:
-                result.append('"')
-        else:
-            result.append(text[i])
-        i += 1
-
-    repaired = "".join(result)
-    try:
-        json.loads(repaired)
-        return repaired
-    except json.JSONDecodeError:
-        return None
 
 
 def _repair_truncated_json(text: str) -> str | None:

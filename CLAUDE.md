@@ -101,7 +101,7 @@ src/reasoner/
 │   ├── settings.py         # Settings (pydantic-settings), dotenv load, CSRF/auth config
 │   ├── ports/              # Hexagonal ports: LLMPort, SearchServicePort, FileSearchPort
 │   ├── events/             # DomainEvent hierarchy + make_event() factory
-│   └── aggregates/         # PipelineAggregate (event-sourced), WidgetAggregate
+│   └── aggregates/         # PipelineAggregate (event-sourced)
 ├── domain/                 # Business entities and declarative routing configs
 │   ├── pipeline_state.py   # PipelineState (~60 fields) — canonical state model
 │   ├── preset_core.py      # PipelinePreset, build_auto_preset(), _KNOWN_ROUTING_ROLES
@@ -131,7 +131,7 @@ ui-next/src/
 ├── lib/                    # api-client, db (IndexedDB), types, utils, security, markdown
 └── stores/                 # app-store.ts (Zustand global state with persistence)
 
-tests/                      # pytest suite (<!-- gen:test_files -->466<!-- /gen --> test_*.py files, recursive)
+tests/                      # pytest suite (<!-- gen:test_files -->465<!-- /gen --> test_*.py files, recursive)
 scripts/
 └── update_mindmap_meta.py  # Patches live counts into ARCHITECTURE_MINDMAP.md (run manually — see §10)
 ```

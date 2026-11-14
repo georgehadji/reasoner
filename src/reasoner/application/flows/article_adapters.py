@@ -460,36 +460,6 @@ async def adapter_style_copy_edit(
     return result
 
 
-def _revert_spans(new_text: str, old_text: str, locked_spans: tuple[tuple[int, int], ...]) -> str:
-    """Revert changes to specific locked spans while preserving edits elsewhere.
-
-    For each locked span, tries exact match first, then word-level fuzzy
-    match within a search window around the expected position.
-    """
-    result = new_text
-    # Process right-to-left so earlier fixes don't shift later positions
-    for start, end in reversed(sorted(locked_spans)):
-        original = old_text[start:end]
-        pos = result.find(original)
-        if pos >= 0:
-            # Exact match found — no violation
-            continue
-        # Locked span was altered — try word-level recovery within the region
-        words = [w for w in original.split() if len(w) > 3]
-        if words:
-            # Try to find the anchored word in the expected region
-            search_start = max(0, start - 20)
-            search_end = min(len(result), end + 20)
-            region = result[search_start:search_end]
-            # Check if any key words survive
-            surviving = [w for w in words if w in region]
-            if len(surviving) >= len(words) * 0.5:
-                continue  # enough words survive — skip revert
-        # Revert the entire locked span
-        result = result[:start] + original + result[min(end, len(result)):]
-    return result
-
-
 async def adapter_final_audit(
     ctx: Context, deps: AdapterDeps
 ) -> Result[Context, PhaseError]:

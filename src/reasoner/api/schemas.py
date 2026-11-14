@@ -477,18 +477,6 @@ class SuggestionRequestModel(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-class WeatherRequest(BaseModel):
-    location: str
-
-    model_config = {"extra": "forbid"}
-
-
-class StockRequest(BaseModel):
-    symbol: str
-
-    model_config = {"extra": "forbid"}
-
-
 class CalculationRequest(BaseModel):
     expression: str
 
@@ -520,8 +508,3 @@ class RunResult(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-class DiscoverRequest(BaseModel):
-    topic: str = "tech"
-    mode: str = "normal"
-
-    model_config = {"extra": "forbid"}

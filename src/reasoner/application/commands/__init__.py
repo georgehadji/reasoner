@@ -8,7 +8,7 @@ by command handlers which produce domain events.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from reasoner.core.constants import DEFAULT_PRESET, DEFAULT_SOURCE_TYPE, DEFAULT_TOP_K
 
@@ -65,13 +65,6 @@ class StopPipelineCommand(Command):
     reason: str = "user_requested"
 
 
-@dataclass(frozen=True)
-class ClearPipelineCacheCommand(Command):
-    """Command to clear pipeline cache."""
-    all: bool = True  # Clear all or just expired
-    older_than_hours: int = 24
-
-
 # ─────────────────────────────────────────────────────────────────────
 # WIDGET COMMANDS
 # ─────────────────────────────────────────────────────────────────────
@@ -87,46 +80,3 @@ class ExecuteWidgetCommand(Command):
     params: dict[str, Any] = field(default_factory=dict)
     auto_detect: bool = True  # Auto-detect from query
     query: str = ""  # For auto-detection
-
-
-@dataclass(frozen=True)
-class RefreshWidgetCommand(Command):
-    """Command to refresh widget data."""
-    widget_id: str
-
-
-# ─────────────────────────────────────────────────────────────────────
-# MEMORY COMMANDS
-# ─────────────────────────────────────────────────────────────────────
-
-@dataclass(frozen=True)
-class StoreMemoryCommand(Command):
-    """Command to store conversation in memory."""
-    prompt: str
-    response: str
-    agent_id: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
-    compress: bool = True
-
-
-@dataclass(frozen=True)
-class ClearMemoryCommand(Command):
-    """Command to clear memory."""
-    agent_id: str | None = None
-    older_than_days: int = 30
-
-
-# ─────────────────────────────────────────────────────────────────────
-# HISTORY COMMANDS
-# ─────────────────────────────────────────────────────────────────────
-
-@dataclass(frozen=True)
-class DeleteHistoryCommand(Command):
-    """Command to delete history entry."""
-    entry_id: str
-
-
-@dataclass(frozen=True)
-class ClearHistoryCommand(Command):
-    """Command to clear all history."""
-    older_than_days: int = 0  # 0 = all

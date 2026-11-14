@@ -61,10 +61,6 @@ def _get_rate_limiter_instance() -> RateLimiter:
         )
     return _rate_limiter_instance
 
-def _reset_rate_limiter_instance() -> None:
-    """Reset rate limiter singleton (useful for tests)."""
-    global _rate_limiter_instance
-    _rate_limiter_instance = None
 
 security = HTTPBearer(auto_error=False)
 
@@ -691,13 +687,6 @@ def _get_api_key_service() -> ApiKeyService:
             repo = InMemoryApiKeyRepository()
         _api_key_service = ApiKeyService(repo)
     return _api_key_service
-
-
-def _reset_credit_services() -> None:
-    """Reset credit/API-key singletons (useful for tests)."""
-    global _credit_service, _api_key_service
-    _credit_service = None
-    _api_key_service = None
 
 
 # (user, period, tier) already topped up by this process. A tier change makes

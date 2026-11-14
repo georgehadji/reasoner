@@ -25,7 +25,6 @@ from fastapi import WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
 from reasoner.core.constants import (
-    DEFAULT_HEARTBEAT_INTERVAL,
     WS_MAX_REPLAY_BUFFERS,
     WS_REPLAY_TTL_SECONDS,
 )
@@ -132,7 +131,6 @@ class WebSocketManager:
         self.dropped_after_complete: int = 0
 
         # Background task for heartbeats
-        self._heartbeat_task: asyncio.Task | None = None
 
         # Global lock for state mutations
         self._lock: asyncio.Lock = asyncio.Lock()
@@ -429,50 +427,6 @@ class WebSocketManager:
         )
         await self.broadcast_to_pipeline(pipeline_id, message)
 
-    async def broadcast_progress(
-        self,
-        phase: str,
-        status: str,
-        pipeline_id: str,
-        progress: dict[str, Any] | None = None,
-    ) -> None:
-        """Broadcast pipeline progress update."""
-        message = WebSocketMessage(
-            type='progress',
-            data={
-                'phase': phase,
-                'status': status,
-                'progress': progress or {},
-            },
-            pipeline_id=pipeline_id,
-        )
-        await self.broadcast_to_pipeline(pipeline_id, message)
-
-    async def broadcast_complete(
-        self,
-        result: dict[str, Any],
-        pipeline_id: str,
-    ) -> None:
-        """Broadcast pipeline completion."""
-        message = WebSocketMessage(
-            type='complete',
-            data={'result': result},
-            pipeline_id=pipeline_id,
-        )
-        await self.broadcast_to_pipeline(pipeline_id, message)
-
-    async def broadcast_error(
-        self,
-        error: str,
-        pipeline_id: str,
-    ) -> None:
-        """Broadcast error to pipeline subscribers."""
-        message = WebSocketMessage(
-            type='error',
-            data={'error': error},
-            pipeline_id=pipeline_id,
-        )
-        await self.broadcast_to_pipeline(pipeline_id, message)
 
     def get_connection_count(self) -> int:
         """Get number of active connections."""
@@ -481,41 +435,6 @@ class WebSocketManager:
     def get_subscriber_count(self, pipeline_id: str) -> int:
         """Get number of subscribers for a pipeline."""
         return len(self.subscriptions.get(pipeline_id, set()))
-
-    async def start_heartbeat(self, interval: float = DEFAULT_HEARTBEAT_INTERVAL) -> None:
-        """Start heartbeat task to detect dead connections."""
-        async def heartbeat_loop():
-            while True:
-                await asyncio.sleep(interval)
-
-                # Snapshot connections under lock, then ping outside the lock.
-                async with self._lock:
-                    connection_ids = list(self.active_connections.keys())
-
-                for connection_id in connection_ids:
-                    try:
-                        async with self._lock:
-                            if connection_id not in self.active_connections:
-                                continue
-                            websocket = self.active_connections[connection_id]
-                        conn_lock = self._connection_locks.setdefault(connection_id, asyncio.Lock())
-                        async with conn_lock:
-                            await asyncio.wait_for(
-                                websocket.send_json({'type': 'ping'}), WS_SEND_TIMEOUT_S
-                            )
-                    except Exception:
-                        self.disconnect(connection_id)
-
-        self._heartbeat_task = asyncio.create_task(heartbeat_loop())
-
-    async def stop_heartbeat(self) -> None:
-        """Stop heartbeat task."""
-        if self._heartbeat_task:
-            self._heartbeat_task.cancel()
-            try:
-                await self._heartbeat_task
-            except asyncio.CancelledError:
-                pass
 
 
 # ─────────────────────────────────────────────────────────────────────

@@ -13,7 +13,6 @@ import re
 # These are set by api/__init__.py during bootstrap, inverting the
 # dependency: core defines the port, infrastructure provides the impl.
 # Thread-safe via single assignment (not atomic, but set once at startup).
-from datetime import UTC, datetime
 from typing import Any, Literal
 from urllib.parse import urlparse
 
@@ -191,25 +190,6 @@ def _bm25_score(query: str, result: dict, k1: float = 1.5, b: float = 0.75) -> f
 # ─────────────────────────────────────────────
 #  Freshness Scoring
 # ─────────────────────────────────────────────
-
-def _parse_freshness(result: dict) -> float:
-    """
-    Derive a freshness score in [0, 1] from a result's publishedDate field.
-
-    Returns 0.5 (neutral) when no date is available so non-dated results
-    are not unfairly penalised against fresh content.
-
-    Score curve: 1.0 for today → ~0.5 at 1 year → asymptotes toward 0.
-    """
-    raw = result.get("publishedDate") or result.get("published_date") or ""
-    if not raw:
-        return 0.5
-    try:
-        pub = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-        days_old = max(0, (datetime.now(UTC) - pub).days)
-        return 1.0 / (1.0 + days_old / 365.0)
-    except Exception:
-        return 0.5
 
 
 # ─────────────────────────────────────────────
