@@ -125,7 +125,6 @@ export const METHOD_PHASES: Record<string, MethodPhase[]> = {
   ],
   "research": [
     { id: 2, name: "Deep Research" },
-    { id: 3, name: "Critique & Pruning" },
     { id: 5, name: "Synthesis" },
   ],
   "scientific": [
