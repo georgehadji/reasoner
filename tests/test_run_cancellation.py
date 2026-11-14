@@ -122,3 +122,26 @@ async def test_absolute_timeout_cancels_the_run(monkeypatch):
 
     assert slow.cancelled.is_set()
     assert any("PIPELINE_TIMEOUT" in f for f in frames)
+
+
+@pytest.mark.asyncio
+async def test_direct_answer_stops_when_the_cancel_event_fires_mid_call():
+    from reasoner.api.execution import direct
+
+    async def hang(*a, **k):
+        await asyncio.Event().wait()
+
+    ev = asyncio.Event()
+    direct._call_with_model_fallback, orig = hang, direct._call_with_model_fallback
+    try:
+        gen = direct._stream_direct_answer(SimpleNamespace(), "hi", "r1", ev)
+        asyncio.get_running_loop().call_later(0.05, ev.set)
+        frames = await asyncio.wait_for(_collect(gen), timeout=2)
+    finally:
+        direct._call_with_model_fallback = orig
+    assert any("cancelled" in f for f in frames)
+    assert not any('"done"' in f for f in frames)
+
+
+async def _collect(gen):
+    return [f async for f in gen]

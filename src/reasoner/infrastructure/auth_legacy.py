@@ -103,10 +103,6 @@ class AuthManager:
             from reasoner.infrastructure.persistence.auth_store import AuthStore
             self._store = AuthStore(Path(settings.AUTH_DB_PATH))
 
-        # Local LRU cache for hot-path reads (avoids DB round-trips)
-        self._cache: dict[str, APIKey] = {}
-        self._CACHE_MAX_SIZE = 1000
-
     def _hash_key(self, key: str) -> str:
         """Hash API key using SHA-256."""
         return hashlib.sha256(key.encode()).hexdigest()
@@ -168,7 +164,6 @@ class AuthManager:
 
         async with self._lock:
             self._set_key(key_hash, api_key)
-            self._cache.pop(key_hash, None)  # Invalidate cache
 
         # Write-through to persistent store if enabled
         if self._store:
@@ -203,25 +198,14 @@ class AuthManager:
 
         key_hash = self._hash_key(api_key)
 
-        # Fast-path: check local cache
-        cached = self._cache.get(key_hash)
-        if cached and cached.is_active:
-            if cached.expires_at is None or datetime.now(UTC) <= cached.expires_at:
-                cached.last_used_at = datetime.now(UTC)
-                cached.usage_count += 1
-                return cached
-            else:
-                self._cache.pop(key_hash, None)
-
         async with self._lock:
-            stored_key = self._keys.get(key_hash)
-
-            # Fallback to persistent store if enabled and not in memory
-            if stored_key is None and self._store:
+            # The store is authoritative when enabled: a revocation made by another
+            # worker must be seen here, so no in-process copy is trusted.
+            if self._store:
                 db_row = await self._store.get_by_hash(key_hash)
-                if db_row:
-                    stored_key = APIKey(**db_row)
-                    self._set_key(key_hash, stored_key)
+                stored_key = APIKey(**db_row) if db_row else None
+            else:
+                stored_key = self._keys.get(key_hash)
 
             # Check if key exists
             if not stored_key:
@@ -251,11 +235,9 @@ class AuthManager:
             stored_key.last_used_at = datetime.now(UTC)
             stored_key.usage_count += 1
 
-            # Update persistent store and cache
+            # Update persistent store
             if self._store:
                 await self._store.update_usage(key_hash)
-            self._cache[key_hash] = stored_key
-            self._maybe_evict_cache()
 
             return stored_key
 
@@ -307,18 +289,9 @@ class AuthManager:
         async with self._lock:
             if key_hash in self._keys:
                 self._keys[key_hash].is_active = False
-                self._cache.pop(key_hash, None)
             if self._store:
                 return await self._store.revoke(key_hash)
             return key_hash in self._keys
-
-    def _maybe_evict_cache(self) -> None:
-        """Evict oldest entries if cache exceeds max size."""
-        if len(self._cache) > self._CACHE_MAX_SIZE:
-            # Simple eviction: remove 10% oldest entries
-            keys_to_remove = list(self._cache.keys())[: self._CACHE_MAX_SIZE // 10]
-            for k in keys_to_remove:
-                self._cache.pop(k, None)
 
     async def list_keys(self, requester_scopes: set[str] | None = None) -> list[dict[str, Any]]:
         """

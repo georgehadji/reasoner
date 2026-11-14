@@ -218,9 +218,10 @@ class FeedbackStore:
         conn = self._get_connection()
         cursor = conn.execute(
             """
-            INSERT OR REPLACE INTO feedback_entries
+            INSERT INTO feedback_entries
                 (timestamp, conversation_id, message_id, rating, reason, comment, context_json)
             VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(conversation_id, message_id) DO NOTHING
             """,
             (
                 entry.timestamp or datetime.now(UTC).isoformat(),
@@ -233,7 +234,10 @@ class FeedbackStore:
             ),
         )
         conn.commit()
-        return cursor.lastrowid
+        # First rating wins: the endpoint is anonymous, so a repeat can't be tied
+        # to the original submitter and must not overwrite it. lastrowid is stale
+        # (0 or the previous insert) on a skipped row.
+        return cursor.lastrowid if cursor.rowcount else 0
 
     def _get_stats_sync(self, days: int) -> FeedbackStats:
         """Synchronous stats aggregation. Must be called inside lock."""

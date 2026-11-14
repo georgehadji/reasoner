@@ -158,7 +158,7 @@ def _dup_repo(existing):
 @pytest.mark.asyncio
 async def test_second_live_checkout_is_cancelled_at_the_provider():
     uid = uuid4()
-    port = SimpleNamespace(cancel_subscription=AsyncMock())
+    port = SimpleNamespace(cancel_subscription=AsyncMock(), refund_latest_charge=AsyncMock())
     repo = _dup_repo(_stripe_sub(uid, "sub_old"))
     await BillingService(port)._apply_webhook(
         "checkout.session.completed", _stripe_sub(uid, "sub_new"), repo, None
@@ -170,7 +170,7 @@ async def test_second_live_checkout_is_cancelled_at_the_provider():
 @pytest.mark.asyncio
 async def test_redelivery_of_the_same_checkout_still_upserts():
     uid = uuid4()
-    port = SimpleNamespace(cancel_subscription=AsyncMock())
+    port = SimpleNamespace(cancel_subscription=AsyncMock(), refund_latest_charge=AsyncMock())
     repo = _dup_repo(_stripe_sub(uid, "sub_1"))
     await BillingService(port)._apply_webhook(
         "checkout.session.completed", _stripe_sub(uid, "sub_1"), repo, None

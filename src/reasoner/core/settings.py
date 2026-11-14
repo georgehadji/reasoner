@@ -396,7 +396,11 @@ class Settings:
     # ── Event Store Compaction ──
     COMPACTION_ENABLED: bool = os.getenv("COMPACTION_ENABLED", "true").lower() in ("1", "true", "yes")
     EVENT_RETENTION_DAYS: int = int(os.getenv("EVENT_RETENTION_DAYS", "365"))
-    DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "50"))
+    # Per pool, and each Postgres repository keeps its own: about six pools per
+    # worker, so 8 workers x 6 x 50 vastly exceeded Postgres' default
+    # max_connections of 100. shortcut: still not a shared pool; raise this only
+    # with max_connections (or PgBouncer) to match.
+    DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "5"))
 
     # ── Persistent Data Paths ──
     # feedback.db (feedback_store.py), events.db (event_store.py /
@@ -410,6 +414,7 @@ class Settings:
     # docker-compose.yml sets them to paths under its mounted volumes.
     FEEDBACK_DB_PATH: str = os.getenv("FEEDBACK_DB_PATH", "")
     EVENT_STORE_DB_PATH: str = os.getenv("EVENT_STORE_DB_PATH", "")
+    ERROR_DB_PATH: str = os.getenv("ERROR_DB_PATH", "")
     UPLOAD_STORAGE_DIR: str = os.getenv("UPLOAD_STORAGE_DIR", "")
     HISTORY_STORAGE_DIR: str = os.getenv("HISTORY_STORAGE_DIR", "")
     RUN_CACHE_DIR: str = os.getenv("RUN_CACHE_DIR", "")
@@ -677,6 +682,13 @@ if settings.ENVIRONMENT == "production":
             )
     if settings.JWT_SECRET_KEY and len(settings.JWT_SECRET_KEY) < 32:
         raise RuntimeError("JWT_SECRET_KEY must be at least 32 characters in production.")
+    # A configured provider with no webhook secret 503s every paid event.
+    for provider_key, webhook_var in (
+        ("STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"),
+        ("PAYPAL_CLIENT_ID", "PAYPAL_WEBHOOK_ID"),
+    ):
+        if os.getenv(provider_key) and not os.getenv(webhook_var):
+            raise RuntimeError(f"{webhook_var} must be set in production when {provider_key} is.")
     # Without trusted proxies every caller behind the load balancer shares its
     # IP, so per-IP rate limits and the anonymous trial cap act on one bucket.
     if not settings.TRUSTED_PROXIES and os.getenv("ALLOW_NO_TRUSTED_PROXIES", "").lower() not in (

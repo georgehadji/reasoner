@@ -176,7 +176,6 @@ def test_webhook_unsigned_payload_is_ignored_when_secret_missing(client, monkeyp
 
     response = client.post("/api/billing/webhook", json=event, headers={"stripe-signature": "test"})
 
-    assert response.status_code == 200
-    assert response.json()["status"] == "misconfigured"
+    assert response.status_code == 503  # retryable: a 200 would lose the paid event
     # BillingService must NOT have been invoked
     assert len(handle_called) == 0

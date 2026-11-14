@@ -12,7 +12,7 @@ class TestDBPoolSize:
     def test_default_pool_size(self) -> None:
         # Bumped 10 -> 50 in 2d5d2a2 for higher concurrency.
         settings = Settings()
-        assert settings.DB_POOL_SIZE == 50
+        assert settings.DB_POOL_SIZE == 5
 
     def test_pool_size_is_int(self) -> None:
         settings = Settings()

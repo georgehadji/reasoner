@@ -46,7 +46,7 @@ async def resolve_caller(ctx, *, scope: str | None = None) -> User:
     FastAPI dependency -- so FastMCP surfaces a clean tool-call error instead
     of a stack trace.
     """
-    from reasoner.api.dependencies import _ensure_user_in_db, _resolve_auth_token
+    from reasoner.api.dependencies import _ensure_user_in_db, _looks_like_jwt, _resolve_auth_token
     from reasoner.domain.api_keys import key_allows, looks_like_api_key
 
     token = _bearer_token_from_context(ctx)
@@ -68,7 +68,8 @@ async def resolve_caller(ctx, *, scope: str | None = None) -> User:
         except HTTPException as exc:
             raise McpAuthError(str(exc.detail)) from exc
     granted = getattr(user, "scopes", set())
-    if scope and looks_like_api_key(token) and not key_allows(granted, scope):
+    # Every non-JWT credential is a key (rsn_ or legacy), so scopes bind all of them.
+    if scope and not _looks_like_jwt(token) and not key_allows(granted, scope):
         raise McpAuthError(f"API key lacks the '{scope}' scope")
     return user
 

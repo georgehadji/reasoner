@@ -114,6 +114,7 @@ services:
       # as in .env.example, falls back to the default).
       - EVENT_STORE_DB_PATH=${EVENT_STORE_DB_PATH:-/app/history/events.db}
       - FEEDBACK_DB_PATH=${FEEDBACK_DB_PATH:-/app/history/feedback.db}
+      - ERROR_DB_PATH=${ERROR_DB_PATH:-/app/history/errors.db}
       - UPLOAD_STORAGE_DIR=${UPLOAD_STORAGE_DIR:-/app/uploads}
       # A subdirectory: /app/history also holds the *.db files.
       - HISTORY_STORAGE_DIR=${HISTORY_STORAGE_DIR:-/app/history/runs}

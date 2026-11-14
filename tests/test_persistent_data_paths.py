@@ -191,3 +191,17 @@ def test_auth_store_creates_missing_parent_dir(tmp_path):
     asyncio.run(_open())
 
     assert target.exists()
+
+
+def test_error_store_honors_path_and_uses_wal(tmp_path, monkeypatch):
+    from reasoner.infrastructure.persistence.error_store import ErrorStore
+
+    target = tmp_path / "sub" / "errors.db"
+    monkeypatch.setattr(settings, "ERROR_DB_PATH", str(target))
+
+    store = ErrorStore()
+    conn = store._get_connection()
+
+    assert store.db_path == target and target.exists()
+    assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+    assert conn.execute("PRAGMA busy_timeout").fetchone()[0] == 5000

@@ -296,6 +296,13 @@ class PostgresSubscriptionRepository:
         )
         return str(user_id) if user_id else None
 
+    async def get_user_by_paypal_sub_id(self, paypal_sub_id: str) -> str | None:
+        pool = await self._get_pool()
+        user_id = await pool.fetchval(
+            "SELECT user_id FROM subscriptions WHERE paypal_sub_id = $1", paypal_sub_id
+        )
+        return str(user_id) if user_id else None
+
     async def sync_quota_for_subscription(self, sub: Subscription) -> None:
         """Sync quota limits for a subscription without resetting used_queries on update.
 

@@ -10,6 +10,7 @@ See docs/plans/audit-remediation-2026-10-20.md, OPS-3.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import time
 import uuid
 from collections import OrderedDict
@@ -38,11 +39,17 @@ def _adapter(delay: float = 0.0) -> SupabaseAuthAdapter:
     adapter = SupabaseAuthAdapter.__new__(SupabaseAuthAdapter)
     adapter._client = SimpleNamespace(auth=_BlockingAuth(delay))
     adapter._cache = OrderedDict()
+    adapter._rejected = OrderedDict()
     return adapter
 
 
-def _token(exp_in: float) -> str:
-    return jwt.encode({"sub": "x", "exp": int(time.time() + exp_in)}, "k" * 32, algorithm="HS256")
+_ISS = "https://p.supabase.co/auth/v1"
+
+
+def _token(exp_in: float, iss: str = _ISS) -> str:
+    return jwt.encode(
+        {"sub": "x", "iss": iss, "exp": int(time.time() + exp_in)}, "k" * 32, algorithm="HS256"
+    )
 
 
 @pytest.mark.asyncio
@@ -73,10 +80,48 @@ async def test_a_verified_token_is_cached_but_never_past_its_exp():
     await adapter.authenticate(token)
     assert auth.calls == 1
 
-    expired = _token(-5)
-    await adapter.authenticate(expired)
-    await adapter.authenticate(expired)
-    assert auth.calls == 3, "a token past its exp must be re-verified, not served from cache"
+    # Near expiry: cached only until exp, then re-verified.
+    short = _token(1)
+    await adapter.authenticate(short)
+    adapter._cache[hashlib.sha256(short.encode()).hexdigest()] = (time.time() - 1, None)
+    await adapter.authenticate(short)
+    assert auth.calls == 3, "a lapsed cache entry must be re-verified"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "token",
+    ["a.b.c", _token(-5), jwt.encode({"iss": _ISS}, "k" * 32)],
+    ids=["garbage", "expired", "no-exp"],
+)
+async def test_bad_tokens_never_reach_supabase(token):
+    from reasoner.auth import AuthenticationError
+
+    adapter = _adapter()
+    with pytest.raises(AuthenticationError):
+        await adapter.authenticate(token)
+    assert adapter._client.auth.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_a_token_supabase_rejected_is_not_asked_again():
+    from reasoner.auth import AuthenticationError
+
+    adapter = _adapter()
+    adapter._client.auth.get_user = lambda t: SimpleNamespace(user=None)
+    calls = []
+    orig = adapter._verify
+
+    async def counted(t):
+        calls.append(t)
+        return await orig(t)
+
+    adapter._verify = counted
+    token = _token(3600)
+    for _ in range(3):
+        with pytest.raises(AuthenticationError):
+            await adapter.authenticate(token)
+    assert len(calls) == 1
 
 
 @pytest.mark.asyncio

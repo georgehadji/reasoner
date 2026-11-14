@@ -7,6 +7,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from reasoner.api.admin_auth import require_admin_key
 from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import (
     _get_credit_service,
@@ -97,7 +98,11 @@ async def get_credit_pricing():
     }
 
 
-@router.post("/grant", dependencies=[Depends(check_rate_limit), Depends(require_csrf)])
+# Same second factor as /api/admin/*: scope alone must not mint credits.
+@router.post(
+    "/grant",
+    dependencies=[Depends(check_rate_limit), Depends(require_csrf), Depends(require_admin_key)],
+)
 async def grant_credits(
     body: GrantRequest,
     user: User = Depends(get_current_user),

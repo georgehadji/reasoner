@@ -424,12 +424,25 @@ class LLMExecutor:
             # providers that honour explicit breakpoints can cache it across
             # turns of the same conversation.
             with user_cache_prefix(getattr(state, "_followup_cache", "") or ""):
-                raw, metadata = await self.router.call(
-                    role=role,
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    **kwargs,
-                )
+                try:
+                    raw, metadata = await self.router.call(
+                        role=role,
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                        **kwargs,
+                    )
+                except asyncio.CancelledError:
+                    # Timeout/Stop cancels a call the provider may already bill:
+                    # count the prompt side so spend caps and credit true-up do not
+                    # under-count. Output is unknown, so it is not estimated.
+                    try:
+                        await self._account_call_cost(state, role, {
+                            "model": getattr(self.router.resolve(role), "model", "unknown"),
+                            "input_tokens": (len(system_prompt) + len(user_prompt)) // 4,
+                        })
+                    except Exception as exc:  # the cancellation must still propagate
+                        logger.warning("Cancelled-call cost not booked for %s: %s", role, exc)
+                    raise
             llm_call_end_time = time.monotonic() # Capture end time for LLM call
             duration_seconds = llm_call_end_time - llm_call_start_time
 

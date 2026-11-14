@@ -68,7 +68,7 @@ user's problem, to TypeSafe.
 | Variable | Default | Description |
 |---|---|---|
 | `DATABASE_URL` | — | PostgreSQL connection string |
-| `DB_POOL_SIZE` | `10` | `asyncpg` connection pool max size |
+| `DB_POOL_SIZE` | `5` | Max size of EACH `asyncpg` pool. Every Postgres repository (credits, quota, api keys, subscriptions, upload usage) keeps its own pool per worker, so connections ≈ workers × pools × this value; keep that under Postgres `max_connections` (default 100) |
 | `EVENT_STORE_DB_PATH` | — (in-package default) | SQLite events.db path — event store + pipeline ownership records. Point this at a mounted volume in production; the installed package dir is replaced on every redeploy |
 | `FEEDBACK_DB_PATH` | — (in-package default) | SQLite feedback.db path. Same rationale as `EVENT_STORE_DB_PATH` |
 
