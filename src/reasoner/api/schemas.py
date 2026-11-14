@@ -27,6 +27,7 @@ from reasoner.core.constants_limits import MAX_DATA_URL_CHARS
 from reasoner.core.model_policy import WESTERN_BLOCS
 from reasoner.core.settings import settings
 from reasoner.domain.preset_core import is_western_preset, western_variant
+from reasoner.domain.stakes import KNOWN_COUNTRIES
 from reasoner.presets import is_valid_preset_name, resolve_preset_name
 
 _AUTO_PRESET = re.compile(r"^auto-(western-)?(budget|premium)$")
@@ -185,6 +186,8 @@ class RunRequest(BaseModel):
     # The user's answers to the gate's missing-fact questions (high-stakes runs).
     # Folded into `problem` as user-stated facts, so the premise machinery labels them.
     facts: dict[str, str] | None = None
+    # Country the question applies to (ISO code or "EU"); beats a country named in the text.
+    jurisdiction: str | None = None
 
     model_config = {"extra": "forbid"}
 
@@ -200,6 +203,12 @@ class RunRequest(BaseModel):
         if self.facts:
             self.problem += _facts_suffix(self.facts)
             self.facts = None  # consumed once, so a re-validation cannot append twice
+        if self.jurisdiction:
+            code = self.jurisdiction.strip().upper()
+            if code not in KNOWN_COUNTRIES:
+                raise ValueError(f"Unknown jurisdiction (use one of {sorted(KNOWN_COUNTRIES)})")
+            self.problem += f"\n\nJurisdiction: {code}"
+            self.jurisdiction = None  # consumed, like facts
         return self
 
     @field_validator("problem")

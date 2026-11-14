@@ -69,3 +69,15 @@ def test_named_method_is_left_alone(monkeypatch):
     d = _d("pipeline", "debate")
     problem = "use the debate method: is it legal to sue my landlord"
     assert HyperGateAgent._apply_stakes(problem, d) is d
+
+
+def test_choke_point_counts_detection_and_reroute(monkeypatch):
+    from reasoner.core.ports import metrics_port
+    from reasoner.core.settings import settings
+    from reasoner.hypergate.hyperagent import HyperGateAgent
+
+    seen = []
+    monkeypatch.setattr(metrics_port, "_STAKES_COUNTER", lambda k, a, b: seen.append((k, a, b)))
+    monkeypatch.setattr(settings, "STAKES_POLICY_MODE", "active")
+    HyperGateAgent._apply_stakes("What is the max dosage of ibuprofen?", _d("direct"))
+    assert seen == [("detected", "health", "regex"), ("rerouted", "direct", "")]

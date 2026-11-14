@@ -97,8 +97,30 @@ def _stakes_block(state: PipelineState) -> str:
     return scope_prompt_block(profile.domain, scope_for(state.problem))
 
 
+def _rank_sources_by_authority(state: PipelineState) -> None:
+    """Active high-stakes run: put primary sources first, so the synthesis context keeps them."""
+    from reasoner.application.services.stakes_service import (
+        detect_stakes,
+        resolve_jurisdiction,
+        stakes_mode,
+    )
+    from reasoner.domain.authority_sources import rank_by_authority
+
+    profile = detect_stakes(state.problem)
+    if not profile.is_high or stakes_mode() != "active":
+        return
+    country = resolve_jurisdiction(state.problem)
+    if state.vetted_context:
+        state.vetted_context = rank_by_authority(state.vetted_context, profile.domain, country)
+    if state.web_discovery_results:
+        state.web_discovery_results = rank_by_authority(
+            state.web_discovery_results, profile.domain, country
+        )
+
+
 async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("SYNTHESIS", "Synthesizing final solution...", state)
+    _rank_sources_by_authority(state)
 
     # Simplified synthesis logic extracted from pipeline.py
     from reasoner.pipeline import TOKEN_OPTIMIZATION, USE_PHASE_SUBAGENTS

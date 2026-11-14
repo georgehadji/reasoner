@@ -48,9 +48,18 @@ def _explicit(_problem: str, explicit: str | None) -> str | None:
     return code if code in KNOWN_COUNTRIES else None
 
 
-# Chain of Responsibility: first non-None wins. An explicit request value beats
+_MARKER = re.compile(r"(?m)^Jurisdiction: ([A-Z]{2})$")
+
+
+def _marker(problem: str, _explicit: str | None) -> str | None:
+    """The `Jurisdiction: XX` line RunRequest.jurisdiction appends to the problem."""
+    found = _MARKER.findall(problem)
+    return found[-1] if found and found[-1] in KNOWN_COUNTRIES else None
+
+
+# Chain of Responsibility: first non-None wins. A value the caller gave beats
 # the question's own text; no account default exists (decided 2026-11-14).
-_RESOLVERS = (_explicit, _from_text)
+_RESOLVERS = (_explicit, _marker, _from_text)
 
 
 def resolve_jurisdiction(problem: str, explicit: str | None = None) -> str | None:

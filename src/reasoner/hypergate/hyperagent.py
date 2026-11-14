@@ -377,6 +377,11 @@ class HyperGateAgent:
             return decision
         profile = StakesProfile(domain=domain, confidence=1.0, source="regex")
         rerouted = apply_stakes_policy(decision, profile)
+        from reasoner.core.ports.metrics_port import count_stakes
+
+        count_stakes("detected", domain.value, profile.source)
+        if rerouted.action != decision.action and mode == "active":
+            count_stakes("rerouted", decision.action)
         logger.info(
             "HyperGate stakes mode=%s domain=%s action=%s->%s method=%s->%s",
             mode, domain.value, decision.action, rerouted.action,
