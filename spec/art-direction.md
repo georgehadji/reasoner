@@ -172,6 +172,12 @@ control, the pinned pilot fragment changing state. All of it collapses under
   runs past a phone screen and a half. Every entry now names its commit on main. Corrected: the
   list had stopped at 2026-08-16 while nine user-facing changes landed after it; those are
   added, each traced to a commit. Work on unmerged branches is left out. Inspector: 0 FAIL.
+- /help rebuilt (2026-11-14): "What went wrong?" beside the troubleshooting guide's own
+  headings, then every guide from `DOCS` grouped by what the reader is doing, then one FAQ
+  question per topic with the first sentence of its answer. Nothing on the page is hand-written
+  about a guide, so it cannot drift from the docs. Corrected: the old cards said "retention
+  controls" (retention is not configurable); the security doc's description now says how long
+  runs are kept. Inspector: 0 FAIL.
 - /status rebuilt (2026-11-14): "Checked as you load it." beside the live `GET /api/health`
   panel, which lists the six checks in every state (checking, answered, no answer) so it keeps
   its height. Sections say what each check really tests (`lib/status-checks.ts`, mirrored from

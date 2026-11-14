@@ -1079,7 +1079,7 @@ Runs settle after they complete, from the run's actual cost. A failed run costs 
     slug: 'security-and-privacy',
     title: 'Security and privacy',
     description:
-      'How Reasoner handles your data: prompt-injection defence, retention controls, encryption, and GDPR export and deletion.',
+      'How Reasoner handles your data: prompt-injection defence, encryption, how long runs are kept, and GDPR export and deletion.',
     section: 'Operations',
     minutes: 5,
     keywords: ['security', 'privacy', 'gdpr', 'encryption', 'prompt injection', 'retention'],
