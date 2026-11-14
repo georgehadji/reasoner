@@ -19,6 +19,54 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date: '2026-11-14',
+    title: 'The contact form sends',
+    description:
+      'It used to show "Message sent" and send nothing. Messages now go by email, and the form says so when delivery fails.',
+    commit: 'fe802db3',
+  },
+  {
+    date: '2026-11-14',
+    title: '/status reads the live health check',
+    description:
+      'The page always read as a disruption because its proxy called the wrong endpoint. It now shows each check the API runs, refreshed every 30 seconds.',
+    commit: 'a4121730',
+  },
+  {
+    date: '2026-11-14',
+    title: 'Health check keeps its errors private',
+    description:
+      'A failed check used to show its raw error to anyone. The public response now gives only the status; admins still see the reason.',
+    commit: '10b490ef',
+  },
+  {
+    date: '2026-11-14',
+    title: '/subprocessors lists every service a run reaches',
+    description:
+      'It named only the eight direct fallbacks. It now lists OpenRouter, every model maker in the registry, and the search, sign-in, payment, email and error-report services.',
+    commit: '2bcf6066',
+  },
+  {
+    date: '2026-11-14',
+    title: 'Security claims the code does not back, removed',
+    description:
+      'Settings, the docs and the FAQ claimed end-to-end encryption, AES-256-GCM at rest, an internal PKI and configurable retention. None held, so the claims are gone.',
+    commit: 'e04a046d',
+  },
+  {
+    date: '2026-11-14',
+    title: 'The public site, rebuilt',
+    description: 'Every marketing page was rebuilt, with pages for regulated sectors and one for each policy.',
+    commit: '0cf5d188',
+  },
+  {
+    date: '2026-11-14',
+    title: 'Escape no longer stops a run',
+    description:
+      'Closing the shortcuts panel, the image lightbox or the command palette with Escape also stopped the run. Escape now closes only the open dialog.',
+    commit: 'ca22d266',
+  },
+  {
     date: '2026-11-13',
     title: 'Western-only presets',
     description:
