@@ -1,5 +1,6 @@
 'use client';
 
+import { AuthShell } from '@/components/auth/AuthShell';
 import { useEffect, useRef, useState, Suspense } from 'react';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -162,10 +163,7 @@ export default function LoginPage() {
     );
 
   return (
-    <main id="main-content" className="flex min-h-dvh items-center justify-center px-[var(--gutter)] py-[var(--space-12)]">
-      <div className="flex w-full max-w-[var(--width-form)] flex-col gap-[var(--space-5)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-[var(--space-8)] shadow-[var(--shadow)]">
-        <h1 className="font-display text-[length:var(--text-2xl)] font-bold text-[var(--text)]">Sign In</h1>
-
+    <AuthShell lines={['Sign in', 'to Reasoner.']} lead="Your runs, history and credits are tied to your account.">
         <Suspense fallback={null}>
           <LoginMessage />
           <ForwardWhenSignedIn />
@@ -239,11 +237,7 @@ export default function LoginPage() {
               )}
             </div>
 
-            <div className="flex items-center gap-[var(--space-4)]">
-              <span aria-hidden="true" className="h-px flex-1 bg-[var(--border)]" />
-              <span className="smallcaps text-[length:var(--text-xs)] text-[var(--text-muted)]">Or</span>
-              <span aria-hidden="true" className="h-px flex-1 bg-[var(--border)]" />
-            </div>
+            <p className="text-center text-[length:var(--text-sm)] text-[var(--text-muted)]">or with your email</p>
           </>
         )}
 
@@ -310,7 +304,6 @@ export default function LoginPage() {
             </a>
           </span>
         </div>
-      </div>
-    </main>
+    </AuthShell>
   );
 }
