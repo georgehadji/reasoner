@@ -154,6 +154,12 @@ def calculate_expression(expression: str) -> dict[str, Any]:
         # Validate result is numeric
         if not isinstance(result, (int, float, complex)):
             return {"error": "Result must be numeric", "valid": False}
+        # Both reach the client as JSON, which has no complex type, and int->str
+        # refuses past 4300 digits (~14_280 bits): either one was a 500.
+        if isinstance(result, complex):
+            return {"error": "Result is not a real number", "valid": False}
+        if isinstance(result, int) and result.bit_length() > 14_000:
+            return {"error": "Result too large", "valid": False}
 
         return {"result": result, "valid": True, "expression": expression}
 
@@ -257,7 +263,5 @@ class CalculatorWidget(BaseWidget):
             if result == int(result):
                 return str(int(result))
             return f"{result:.6g}"
-        elif isinstance(result, complex):
-            return f"{result.real:.6g} + {result.imag:.6g}i"
         else:
             return str(result)
