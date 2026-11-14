@@ -594,6 +594,9 @@ class Settings:
     JEV_MODE: str = os.getenv("JEV_MODE", "active").strip().lower()
     # Pinned, not jev-latest: a shadow comparison is only meaningful against a
     # fixed model. The served id is a dated snapshot and is logged per call.
+    # High-stakes (health/law/finance) policy. off: nothing; shadow: detect and
+    # log only, decision unchanged; active: reroute to a grounded pipeline.
+    STAKES_POLICY_MODE: str = os.getenv("STAKES_POLICY_MODE", "off").strip().lower()
     JEV_MODEL: str = os.getenv("JEV_MODEL", "typesafe/jev-1.13")
 
     # ── Trusted Proxies ──

@@ -9,9 +9,13 @@ asserted. This operationalizes "a label is a claim about evidence, not confidenc
 
 from __future__ import annotations
 
+from typing import Protocol
+
 from reasoner.core.constants_limits import EVIDENCE_SENSOR_SOURCES
+from reasoner.domain.authority_sources import AuthorityTier, authority_tier
 from reasoner.domain.core_types import EvidenceBundle
 from reasoner.domain.models import ClaimLabel
+from reasoner.domain.stakes import StakesProfile
 
 _SENSOR_SOURCES = set(EVIDENCE_SENSOR_SOURCES)
 
@@ -23,9 +27,42 @@ def _norm(url: str) -> str:
     return url.strip().rstrip(".,;:!?").rstrip("/")
 
 
+class EpistemicPolicy(Protocol):
+    def promote(
+        self, bundle: EvidenceBundle, allowed_refs: set[str] | None
+    ) -> EvidenceBundle: ...
+
+
+class StandardPolicy:
+    """Every run: model-sourced VERIFIED is capped; search needs a retrieved URL."""
+
+    def promote(self, bundle: EvidenceBundle, allowed_refs: set[str] | None) -> EvidenceBundle:
+        return _apply_promotion(bundle, allowed_refs)
+
+
+class HighStakesPolicy:
+    """Standard, plus VERIFIED needs a PRIMARY authority source for the run's domain and country."""
+
+    def __init__(self, profile: StakesProfile) -> None:
+        self._profile = profile
+
+    def promote(self, bundle: EvidenceBundle, allowed_refs: set[str] | None) -> EvidenceBundle:
+        out = _apply_promotion(bundle, allowed_refs)
+        if out.label.upper() != "VERIFIED":
+            return out
+        p = self._profile
+        if any(
+            authority_tier(r, p.domain, p.jurisdiction.country) >= AuthorityTier.PRIMARY
+            for r in out.evidence_refs
+        ):
+            return out
+        return _downgraded(out)
+
+
 def apply_promotion_rules(
     bundles: dict[str, EvidenceBundle],
     allowed_refs: set[str] | None = None,
+    policy: EpistemicPolicy | None = None,
 ) -> dict[str, EvidenceBundle]:
     """Apply evidence-tier promotion rules to a set of evidence bundles.
 
@@ -46,7 +83,7 @@ def apply_promotion_rules(
     """
     corrected: dict[str, EvidenceBundle] = {}
     for claim, bundle in bundles.items():
-        updated = _apply_promotion(bundle, allowed_refs)
+        updated = (policy or StandardPolicy()).promote(bundle, allowed_refs)
         corrected[claim] = updated
     return corrected
 
@@ -64,17 +101,21 @@ def _apply_promotion(
     )
     if label == "VERIFIED" and (bundle.source not in _SENSOR_SOURCES or ungrounded):
         # Model self-attestation is not sufficient — downgrade to HYPOTHESIS
-        return EvidenceBundle(
-            label="HYPOTHESIS",
-            checks_run=bundle.checks_run,
-            evidence_refs=bundle.evidence_refs,
-            untested=bundle.untested,
-            residual_risk=bundle.residual_risk,
-            source=bundle.source,
-        )
+        return _downgraded(bundle)
 
     # Pass through unchanged
     return bundle
+
+
+def _downgraded(bundle: EvidenceBundle) -> EvidenceBundle:
+    return EvidenceBundle(
+        label="HYPOTHESIS",
+        checks_run=bundle.checks_run,
+        evidence_refs=bundle.evidence_refs,
+        untested=bundle.untested,
+        residual_risk=bundle.residual_risk,
+        source=bundle.source,
+    )
 
 
 def reconcile_labels(

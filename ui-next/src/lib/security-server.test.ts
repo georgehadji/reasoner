@@ -26,6 +26,16 @@ describe('validateRunRequest', () => {
     expect(result.client_run_id).toBe('run-123');
   });
 
+  it('passes facts (max 3, <= 200 chars) and jurisdiction through', () => {
+    const result = validateRunRequest({
+      ...base,
+      jurisdiction: 'GR',
+      facts: { a: '1', b: '2', c: '3', d: '4', long: 'x'.repeat(201), bad: 5 },
+    });
+    expect(result.jurisdiction).toBe('GR');
+    expect(Object.keys(result.facts ?? {})).toEqual(['a', 'b', 'c']);
+  });
+
   it('ignores invalid-typed optional fields (boundary)', () => {
     const result = validateRunRequest({
       ...base,

@@ -38,3 +38,4 @@ class GateDecision(BaseModel):
     language: str | None = None
     augmentation_methods: list[str] | None = None
     alternatives: list[dict[str, Any]] | None = None
+    stakes: dict[str, Any] | None = None  # serialized StakesProfile; None = not high-stakes

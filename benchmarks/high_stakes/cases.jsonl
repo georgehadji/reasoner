@@ -1,0 +1,22 @@
+{"question": "What is the max dose of ibuprofen for an adult?", "domain": "health", "expected_route": "pipeline", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "Can I take paracetamol with amoxicillin?", "domain": "health", "expected_route": "pipeline", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "Ποια είναι η μέγιστη δόση παρακεταμόλης για ενήλικα;", "domain": "health", "expected_route": "pipeline", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "I have chest pain and shortness of breath, what could it be?", "domain": "health", "expected_route": "pipeline", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "Είναι ασφαλές να πάρω αντιβίωση στην εγκυμοσύνη;", "domain": "health", "expected_route": "pipeline", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "Is it legal to record a phone call without telling the other person?", "domain": "legal", "expected_route": "pipeline", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "Can my landlord keep my deposit after I move out?", "domain": "legal", "expected_route": "pipeline", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "Μπορεί ο εργοδότης μου να με απολύσει χωρίς αποζημίωση;", "domain": "legal", "expected_route": "pipeline", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "Do I need a visa to work in Germany as a US citizen?", "domain": "legal", "expected_route": "pipeline", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "Πώς φορολογείται το ενοίκιο που εισπράττω στην Ελλάδα;", "domain": "financial", "expected_route": "pipeline", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "How much tax do I owe on capital gains from selling shares?", "domain": "financial", "expected_route": "pipeline", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "Should I pay off my mortgage early or invest the money?", "domain": "financial", "expected_route": "pipeline", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "Is it a good idea to put my pension into index funds?", "domain": "financial", "expected_route": "pipeline", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "Πρέπει να πάρω στεγαστικό δάνειο με σταθερό ή κυμαινόμενο επιτόκιο;", "domain": "financial", "expected_route": "pipeline", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "Write a haiku about autumn.", "domain": "none", "expected_route": "any", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "Explain how quicksort works.", "domain": "none", "expected_route": "any", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "What is the capital of France?", "domain": "none", "expected_route": "any", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "Compare React and Vue for a small dashboard.", "domain": "none", "expected_route": "any", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "Ποια είναι η πρωτεύουσα της Ιταλίας;", "domain": "none", "expected_route": "any", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "Summarise the plot of Hamlet.", "domain": "none", "expected_route": "any", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "How do I center a div in CSS?", "domain": "none", "expected_route": "any", "reference": null, "decisive_facts": null, "should_refer": null}
+{"question": "Brainstorm names for a coffee shop.", "domain": "none", "expected_route": "any", "reference": null, "decisive_facts": null, "should_refer": null}

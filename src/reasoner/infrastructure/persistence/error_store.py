@@ -106,9 +106,14 @@ class ErrorStore:
                 check_same_thread=False,
             )
             self._connection.row_factory = sqlite3.Row
-            # Several workers write this file; WAL + busy_timeout stop "database is locked".
-            self._connection.execute("PRAGMA journal_mode=WAL")
+            # Several workers write this file. busy_timeout goes first so the WAL
+            # switch below waits for a competing worker instead of failing.
             self._connection.execute("PRAGMA busy_timeout=5000")
+            try:
+                self._connection.execute("PRAGMA journal_mode=WAL")
+            except sqlite3.OperationalError:
+                # Another worker is mid-switch; WAL is persistent, so one of us wins.
+                logger.warning("error store: WAL switch lost a race, continuing", exc_info=True)
         return self._connection
 
     async def _run_in_executor(self, func: Callable, *args) -> Any:

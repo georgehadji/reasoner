@@ -1112,6 +1112,8 @@ def _ser_synthesis(state: PipelineState) -> dict:
             "action_blueprint": clean_bp,
             "open_questions": _get_v(fs, "open_questions", []),
             "claim_labels": clean_labels,
+            "scope": _get_v(fs, "scope", {}) or {},
+            "reliability": _get_v(fs, "reliability", {}) or {},
             "premises": premises,
             # EvidenceBundle dataclasses from synthesis_phase; a resumed state
             # may already hold plain dicts. The SSE encoder takes neither raw.
