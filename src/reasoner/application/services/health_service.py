@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 def _failed(check: str, status: str, exc: Exception, is_admin: bool) -> dict[str, Any]:
     """A failed probe. The exception text goes to the log and to admins only:
-    `GET /api/health` is public, and driver errors can name hosts, ports or DSNs."""
-    logger.warning("health check %s failed: %s", check, exc)
+    `GET /api/health` is public, and driver errors can name hosts, ports or DSNs.
+    Callers log the failure themselves, so each handler carries its own signal."""
     return {"status": status, "reason": str(exc)} if is_admin else {"status": status}
 
 _health_postgres_pool = None
@@ -54,6 +54,7 @@ async def _probe_postgres(database_url: str | None, is_admin: bool) -> dict[str,
         return {"status": "ok"}
     except Exception as e:
         _health_postgres_pool = None
+        logger.warning("health check postgres failed: %s", e)
         return _failed("postgres", "error", e, is_admin)
 
 
@@ -72,6 +73,7 @@ async def _probe_valkey(is_admin: bool) -> dict[str, Any]:
         REASONER_VALKEY_POOL_SIZE.set(pool_info or 0)
         return {"status": "ok"}
     except Exception as e:
+        logger.warning("health check valkey failed: %s", e)
         return _failed("valkey", "error", e, is_admin)
 
 
@@ -148,6 +150,7 @@ async def check_health(
         else:
             health["checks"]["stripe"] = {"status": "ok", "reason": "not configured"}
     except Exception as e:
+        logger.warning("health check stripe failed: %s", e)
         health["checks"]["stripe"] = _failed("stripe", "warning", e, is_admin)
 
     # Determine overall status
