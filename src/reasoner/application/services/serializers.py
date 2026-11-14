@@ -1106,7 +1106,12 @@ def _ser_synthesis(state: PipelineState) -> dict:
             "open_questions": _get_v(fs, "open_questions", []),
             "claim_labels": clean_labels,
             "premises": premises,
-            "evidence": _get_v(fs, "evidence", {}),
+            # EvidenceBundle dataclasses from synthesis_phase; a resumed state
+            # may already hold plain dicts. The SSE encoder takes neither raw.
+            "evidence": {
+                claim: bundle.to_dict() if hasattr(bundle, "to_dict") else bundle
+                for claim, bundle in (_get_v(fs, "evidence", {}) or {}).items()
+            },
             # Already filtered by synthesis_phase to URLs the run retrieved.
             "sources": _get_v(fs, "sources", []),
             "meta_audit": meta_audit,

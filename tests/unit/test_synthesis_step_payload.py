@@ -78,6 +78,29 @@ def test_synthesis_payload_keeps_research_citations() -> None:
     assert _ser_synthesis(state)["citations"] == [citation]
 
 
+def test_synthesis_payload_evidence_is_json_safe() -> None:
+    """synthesis_phase stores EvidenceBundle objects; the SSE frame must encode them.
+
+    A run whose synthesis returned evidence failed at the last step with
+    "Object of type EvidenceBundle is not JSON serializable".
+    """
+    import json
+
+    from reasoner.api.sse_utils import _event
+    from reasoner.domain.core_types import EvidenceBundle
+
+    state = _finished_state()
+    state.final_solution.evidence = {
+        "Cards raise sales": EvidenceBundle(label="HYPOTHESIS", untested="no local data"),
+        "Resumed claim": {"label": "VERIFIED"},
+    }
+    payload = _ser_synthesis(state)
+    assert payload["evidence"]["Cards raise sales"]["label"] == "HYPOTHESIS"
+    assert payload["evidence"]["Resumed claim"] == {"label": "VERIFIED"}
+    frame = _event({"type": "phase_complete", "data": payload})
+    assert json.loads(frame.removeprefix("data: "))["data"]["evidence"]
+
+
 def test_method_state_without_prism_is_not_a_crash() -> None:
     """Every Synthesis step now reads citations; most methods never write "prism"."""
     state = _finished_state()
