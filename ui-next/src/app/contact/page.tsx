@@ -7,7 +7,7 @@ import { AlertCircle } from 'lucide-react';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { submitContact } from '@/lib/api-client';
-import { FAQS } from '@/lib/faq';
+import { FAQS, faqAnchor } from '@/lib/faq';
 import { securityTxtLines } from '@/lib/security-txt';
 
 /**
@@ -379,11 +379,11 @@ export default function ContactPage() {
             data-reveal
             className="min-h-[var(--site-fragment-min-h)] w-full min-w-0 rounded-[var(--radius-lg)] border border-[var(--site-line)] bg-[var(--site-surface)] lg:col-span-6 lg:col-start-7"
           >
-            <figcaption className={CAP}>Questions people ask</figcaption>
+            <figcaption className={CAP}>From the FAQ</figcaption>
             <ul className="list-none">
               {FAQS.slice(2, 9).map(({ q }) => (
                 <li key={q} className="border-b border-[var(--site-line)] last:border-b-0">
-                  <Link href="/faq" className="flex justify-between gap-[var(--space-3)] px-[var(--space-4)] py-[var(--space-3)] hover:bg-[var(--site-surface-2)]">
+                  <Link href={`/faq#${faqAnchor(q)}`} className="flex justify-between gap-[var(--space-3)] px-[var(--space-4)] py-[var(--space-3)] hover:bg-[var(--site-surface-2)]">
                     <span>{q}</span>
                     <span aria-hidden="true" className="text-[var(--site-muted)]">
                       &rarr;

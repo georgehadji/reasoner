@@ -12,8 +12,8 @@ import {
   More,
   ROW,
 } from '@/components/site/ArgumentSection';
-import { CREDITS_PER_USD, RUN_COSTS, TIER_CREDITS, runsPerMonth } from '@/lib/credits';
-import { FAQS, type FaqEntry, type FaqTopic } from '@/lib/faq';
+import { CREDITS_PER_USD, FREE_CREDITS, RUN_COSTS, runsPerMonth } from '@/lib/credits';
+import { FAQS, faqAnchor, type FaqEntry, type FaqTopic } from '@/lib/faq';
 import { breadcrumbSchema, faqSchema } from '@/lib/schema';
 import { SITE, absoluteUrl } from '@/lib/site';
 
@@ -48,15 +48,8 @@ const TOPICS: Array<{ topic: FaqTopic; label: string }> = [
   { topic: 'data', label: 'Your data' },
 ];
 
-const slug = (q: string) =>
-  q
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-
 const byTopic = (topic: FaqTopic) => FAQS.filter((f) => f.topic === topic);
 
-const FREE_CREDITS = TIER_CREDITS.find((t) => t.tier === 'free')?.credits ?? 0;
 
 const REQUEST = `curl -N ${absoluteUrl('/api/agent/run')} \\
   -H "Authorization: Bearer $REASONER_KEY" \\
@@ -80,7 +73,7 @@ function Answers({ entries }: { entries: readonly FaqEntry[] }) {
   return (
     <>
       {entries.map(({ q, a }) => (
-        <div key={q} id={slug(q)} className="mt-[var(--space-8)] scroll-mt-[var(--space-20)]">
+        <div key={q} id={faqAnchor(q)} className="mt-[var(--space-8)] scroll-mt-[var(--space-20)]">
           <h3 className={`font-semibold ${BODY}`}>{q}</h3>
           <p className={`mt-[var(--space-2)] max-w-[60ch] ${BODY}`}>{a}</p>
         </div>
@@ -116,8 +109,8 @@ export default function FAQPage() {
             </h1>
             <div className="site-after-headline">
               <p className="mt-[var(--space-8)] max-w-[40ch] text-[length:var(--site-lead)] leading-[var(--site-lh-body)]">
-                The {FAQS.length} questions people ask before their first run, each answered in full on
-                this page.
+                {FAQS.length} questions about what it is, what it costs, how to call it and what
+                happens to your data, each answered in full on this page.
               </p>
               <div className="mt-[var(--space-8)] flex flex-wrap items-center gap-x-[var(--space-8)] gap-y-[var(--space-4)]">
                 <Link href="/chat" className="site-button">
@@ -143,7 +136,7 @@ export default function FAQPage() {
                     {byTopic(topic).map(({ q }) => (
                       <li key={q} className="py-[var(--space-1)]">
                         <a
-                          href={`#${slug(q)}`}
+                          href={`#${faqAnchor(q)}`}
                           className="text-[var(--site-muted)] underline-offset-4 hover:text-[var(--site-ink)] hover:underline"
                         >
                           {q}

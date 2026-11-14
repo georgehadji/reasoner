@@ -13,8 +13,8 @@ import {
   ROW,
 } from '@/components/site/ArgumentSection';
 import { CAPABILITIES, SYCOPHANCY_CONTROLS } from '@/lib/capabilities.generated';
-import { TIER_CREDITS } from '@/lib/credits';
-import { EPISTEMIC_TAG, epistemicClassName } from '@/lib/remark-epistemic';
+import { FREE_CREDITS } from '@/lib/credits';
+import { EPISTEMIC_TAG, epistemicClassName, type EpistemicLabelName } from '@/lib/remark-epistemic';
 import { SITE } from '@/lib/site';
 
 /**
@@ -57,14 +57,15 @@ const BUILT = CONTROLS.filter((c) => c.built).length;
 const UNBUILT = CONTROLS.length - BUILT;
 
 /** The page's own claims, labelled the way the pipeline labels an answer. */
-const PAGE_CLAIMS = [
+const PAGE_CLAIMS: Array<{ claim: string; label: EpistemicLabelName }> = [
   { claim: 'A claim only its own model backs is downgraded, in code', label: 'VERIFIED' },
   { claim: 'Scoring and synthesis never share a bloc; a breach fails the build', label: 'VERIFIED' },
   { claim: 'The parallel generators never read each other', label: 'VERIFIED' },
   { claim: 'Every capability count here regenerates from the live registry', label: 'VERIFIED' },
   { claim: `${BUILT} of ${CONTROLS.length} sycophancy controls are in the code`, label: 'VERIFIED' },
-  { claim: `The other ${UNBUILT} will help as much as the research says`, label: 'HYPOTHESIS' },
-] as const;
+  // Drops out once every control ships, rather than claiming "the other 0".
+  ...(UNBUILT ? [{ claim: `The other ${UNBUILT} will help as much as the research says`, label: 'HYPOTHESIS' as const }] : []),
+];
 
 /** The three rules the mechanism section stands on. Each is checkable in the repository. */
 const RULES = [
@@ -118,7 +119,6 @@ const FIGURES = [
   { value: CAPABILITIES.testFiles, label: 'Test files' },
 ];
 
-const FREE_CREDITS = TIER_CREDITS.find((t) => t.tier === 'free')?.credits ?? 0;
 
 /* ── Page ─────────────────────────────────────────────────────────── */
 
@@ -305,8 +305,10 @@ export default function AboutPage() {
                 {CONTROLS.map(({ key, name, built }) => (
                   <li key={key} className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-[var(--space-3)] ${ROW}`}>
                     <span className={built ? '' : 'text-[var(--site-muted)]'}>{name}</span>
-                    <span className={epistemicClassName(EPISTEMIC_TAG[built ? 'VERIFIED' : 'HYPOTHESIS'])}>
-                      {built ? 'IN CODE' : 'NOT BUILT'}
+                    {/* A build status, not an epistemic claim: plain ink and muted
+                        rather than the VERIFIED / HYPOTHESIS label colours. */}
+                    <span className={`font-semibold ${built ? 'text-[var(--site-ink)]' : 'text-[var(--site-muted)]'}`}>
+                      {built ? 'In code' : 'Not built'}
                     </span>
                   </li>
                 ))}
@@ -320,8 +322,10 @@ export default function AboutPage() {
           </Body>
           <Body>
             {BUILT} of the {CONTROLS.length} mitigations researched here are in the code, each found by a
-            detector at every commit rather than ticked off by hand. The other {UNBUILT} are designed and
-            not built. When they land, this list changes by itself, and you can check it.
+            detector at every commit rather than ticked off by hand.{' '}
+            {UNBUILT
+              ? `The other ${UNBUILT} are designed and not built. When they land, this list changes by itself, and you can check it.`
+              : 'Every one of them has landed, and the list beside this says so by itself.'}
           </Body>
           <More href="/capabilities#sycophancy">How the shipped controls work</More>
         </Section>

@@ -17,6 +17,11 @@ export const TIER_CREDITS = [
 
 export type Tier = (typeof TIER_CREDITS)[number]['tier'];
 
+/** The free plan's monthly allowance. The annotation fails the type check if
+ *  the first tier stops being 'free', instead of a lookup quietly yielding 0. */
+const FREE_TIER: { tier: 'free'; credits: number } = TIER_CREDITS[0];
+export const FREE_CREDITS = FREE_TIER.credits;
+
 /** Typical cost of one run, in credits: [low, high]. */
 export const RUN_COSTS = [
   { kind: 'Direct answer', cost: [0, 2] },

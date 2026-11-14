@@ -16,6 +16,15 @@ export interface FaqEntry {
   a: string;
 }
 
+/** The id of an answer on /faq, so other pages can link straight to it.
+ *  `faq.test.ts` fails if two questions collapse to the same anchor. */
+export function faqAnchor(q: string): string {
+  return q
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 export const FAQS: readonly FaqEntry[] = [
   {
     topic: 'product',
