@@ -132,11 +132,15 @@ def finalize_solution(raw: str, state: PipelineState, services: WorkflowServices
         insights = data.get("critical_insights", [])
         if insights:
             parts.append("Critical Insights:\n" + "\n".join(f"- {i}" for i in insights))
-        bp = data.get("action_blueprint", [])
-        if bp:
-            parts.append("Action Blueprint:\n" + "\n".join(
-                f"- {b.get('step', '')}: {b.get('action', '')}" for b in bp if isinstance(b, dict)
-            ))
+        # A step may be a plain string; a dict-only filter printed the heading
+        # with nothing under it.
+        steps = [
+            f"- {b.get('step', '')}: {b.get('action', '')}" if isinstance(b, dict) else f"- {b}"
+            for b in coerce_list(data.get("action_blueprint"))
+            if b and (not isinstance(b, dict) or b.get("step") or b.get("action"))
+        ]
+        if steps:
+            parts.append("Action Blueprint:\n" + "\n".join(steps))
         oq = data.get("open_questions", [])
         if oq:
             parts.append("Open Questions:\n" + "\n".join(f"- {q}" for q in oq))
