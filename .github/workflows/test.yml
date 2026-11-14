@@ -334,7 +334,7 @@ jobs:
           # 95: one widget stack. widgets_legacy.py was deleted with its
           # handlers, and DiscoverWidget._search_web's bare `return []` now goes
           # through degraded(), as the legacy search_web did.
-          python scripts/silent_failure_ratchet.py --max 95
+          python scripts/silent_failure_ratchet.py --max 92
 
       - name: Dead-code ratchet (vulture, ADVISORY)
         # P-5 (docs/plans/phaseoutput-retirement-2026-09-12.md): advisory for
