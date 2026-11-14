@@ -134,7 +134,7 @@ export function MechanismDiagram() {
             {/* The failure is the headline. Naming the disease before the
                 cure is the whole point of the section — a reader who does
                 not recognise the problem has no use for the mechanism. */}
-            <h3 className="mt-[var(--space-3)] font-serif text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-subhead)] tracking-[var(--tracking-snug)] text-[var(--text)]">
+            <h3 className="mt-[var(--space-3)] font-display text-[length:var(--text-2xl)] font-semibold leading-[var(--lh-subhead)] tracking-[var(--tracking-snug)] text-[var(--text)]">
               {failure}
             </h3>
 

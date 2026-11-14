@@ -507,6 +507,9 @@ const RATE_LIMITS: Record<string, { limit: number; windowMs: number }> = {
   gate: { limit: 30, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
   'error-report': { limit: 10, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
   'account-delete': { limit: 3, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
+  // Each accepted submission sends an email through Resend; a person writes
+  // a handful at most.
+  contact: { limit: 5, windowMs: SECURITY_CONSTANTS.rateLimitWindowMs },
   // A ticket is single-use and 30s-lived (backend WS_TICKET_TTL_SECONDS) --
   // a legitimate client fetches one per connect/reconnect, so this stays
   // tight without blocking normal reconnect-with-backoff behavior.

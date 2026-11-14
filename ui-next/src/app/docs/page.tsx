@@ -55,7 +55,7 @@ export default function DocsIndexPage() {
         </aside>
 
         <main id="main-content">
-          <h1 className="font-serif text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">Documentation</h1>
+          <h1 className="font-display text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">Documentation</h1>
           <p className="prose-measure mt-[var(--space-3)] max-w-2xl text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">
             Everything needed to run Reasoner well — from a first query to metered
             production usage over the API.

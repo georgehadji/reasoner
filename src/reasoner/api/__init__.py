@@ -922,11 +922,13 @@ from reasoner.api.routes.credits import router as credits_router
 app.include_router(credits_router)
 app.include_router(account_keys_router)
 
+from reasoner.api.routes.contact import router as contact_router
 from reasoner.api.routes.estimate import router as estimate_router
 from reasoner.api.routes.feedback import router as feedback_router
 from reasoner.api.routes.gate import router as gate_router
 
 app.include_router(feedback_router)
+app.include_router(contact_router)
 app.include_router(estimate_router)
 app.include_router(gate_router)
 

@@ -86,7 +86,9 @@ class Settings:
 
     # ── Phase Subagent Feature Flags ──
     USE_SUBAGENT_ENHANCEMENT: bool = os.getenv("USE_SUBAGENT_ENHANCEMENT", "false").lower() == "true"
-    USE_SUBAGENT_DECOMPOSITION: bool = os.getenv("USE_SUBAGENT_DECOMPOSITION", "false").lower() == "true"
+    USE_SUBAGENT_DECOMPOSITION: bool = (
+        os.getenv("USE_SUBAGENT_DECOMPOSITION", "false").lower() == "true"
+    )
     USE_SUBAGENT_CRITIQUE: bool = os.getenv("USE_SUBAGENT_CRITIQUE", "false").lower() == "true"
     USE_SUBAGENT_SYNTHESIS: bool = os.getenv("USE_SUBAGENT_SYNTHESIS", "false").lower() == "true"
     USE_SUBAGENT_SEARCH: bool = os.getenv("USE_SUBAGENT_SEARCH", "false").lower() == "true"
@@ -334,6 +336,10 @@ class Settings:
 
     NOTIFICATION_EMAIL: str | None = os.getenv("NOTIFICATION_EMAIL")
     """Email address to receive admin notifications (webhook failures, spend cap, etc.)."""
+
+    CONTACT_EMAIL: str | None = os.getenv("CONTACT_EMAIL") or None
+    """Inbox for /contact form submissions. Falls back to NOTIFICATION_EMAIL;
+    with neither, the form returns 503."""
 
     # ── Scraping ──
     SCRAPE_USER_AGENT: str = os.getenv(

@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { DOCS } from '@/lib/docs';
+import { SECTORS } from '@/lib/sectors';
 import { absoluteUrl } from '@/lib/site';
 
 /**
@@ -25,6 +26,7 @@ const MARKETING_PAGES: Entry[] = [
   { path: '/about', changeFrequency: 'monthly', priority: 0.7 },
   { path: '/faq', changeFrequency: 'monthly', priority: 0.7 },
   { path: '/help', changeFrequency: 'monthly', priority: 0.7 },
+  ...SECTORS.map(({ slug }): Entry => ({ path: `/for/${slug}`, changeFrequency: 'monthly', priority: 0.8 })),
   { path: '/contact', changeFrequency: 'yearly', priority: 0.4 },
   { path: '/security', changeFrequency: 'monthly', priority: 0.5 },
   { path: '/subprocessors', changeFrequency: 'monthly', priority: 0.4 },

@@ -8,9 +8,19 @@ argument instead.
 
 from __future__ import annotations
 
+import logging
 import sys
 from datetime import UTC, datetime
 from typing import Any
+
+logger = logging.getLogger(__name__)
+
+
+def _failed(check: str, status: str, exc: Exception, is_admin: bool) -> dict[str, Any]:
+    """A failed probe. The exception text goes to the log and to admins only:
+    `GET /api/health` is public, and driver errors can name hosts, ports or DSNs."""
+    logger.warning("health check %s failed: %s", check, exc)
+    return {"status": status, "reason": str(exc)} if is_admin else {"status": status}
 
 _health_postgres_pool = None
 
@@ -95,7 +105,7 @@ async def check_health(
             # each), so a gauge fed from here read ~1 permanently and drove
             # PostgresPoolLow/PostgresPoolExhaustion on a number unrelated to load.
         except Exception as e:
-            health["checks"]["postgres"] = {"status": "error", "reason": str(e)}
+            health["checks"]["postgres"] = _failed("postgres", "error", e, is_admin)
             _health_postgres_pool = None
 
     # Valkey check (canonical; falls back to REDIS_URL for backward compat)
@@ -115,7 +125,7 @@ async def check_health(
             pool_info = valkey_client.connection_pool.max_connections
             REASONER_VALKEY_POOL_SIZE.set(pool_info or 0)
         except Exception as e:
-            health["checks"]["valkey"] = {"status": "error", "reason": str(e)}
+            health["checks"]["valkey"] = _failed("valkey", "error", e, is_admin)
 
     # Stripe check
     try:
@@ -124,7 +134,7 @@ async def check_health(
         else:
             health["checks"]["stripe"] = {"status": "ok", "reason": "not configured"}
     except Exception as e:
-        health["checks"]["stripe"] = {"status": "warning", "reason": str(e)}
+        health["checks"]["stripe"] = _failed("stripe", "warning", e, is_admin)
 
     # Determine overall status
     if any(c.get("status") == "error" for c in health["checks"].values()):

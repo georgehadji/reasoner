@@ -132,6 +132,9 @@ export function CommandPalette({
     // of the Tab order and the accessibility tree, as `pointer-events-none` does not.
     <div
       inert={!isOpen}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Command palette"
       className={cn(
         'fixed inset-0 z-[400] flex items-start justify-center p-4 pt-[20vh] transition-all duration-[var(--dur-component)]',
         isOpen
@@ -159,7 +162,7 @@ export function CommandPalette({
               setSelectedIndex(0);
             }}
             placeholder="Type a command..."
-            className="flex-1 bg-transparent text-[length:var(--text-sm)] text-[var(--text)] outline-none placeholder:text-[var(--text-muted)]"
+            className="-my-[var(--space-1)] flex-1 rounded-[var(--radius-sm)] bg-transparent px-[var(--space-2)] py-[var(--space-1)] text-[length:var(--text-sm)] text-[var(--text)] placeholder:text-[var(--text-muted)]"
           />
           <kbd className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[length:var(--text-2xs)] text-[var(--text-muted)]">ESC</kbd>
         </div>

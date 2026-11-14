@@ -2,13 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/stores/app-store';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Lock, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { UserMenu } from './UserMenu';
 import { Logo } from '@/components/brand/Logo';
-import { SecurityModal } from './SecurityModal';
-import { Button } from '@/components/ui/Button';
+import { Reveal } from '@/components/site/Reveal';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { cn } from '@/lib/utils';
 
@@ -26,19 +25,19 @@ function isActivePath(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function SiteHeader() {
+const PRIMARY =
+  'whitespace-nowrap flex h-10 items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] font-semibold text-[var(--accent-text)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--accent-hover)] active:scale-[0.97]';
+
+/**
+ * `themeToggle`: only for pages outside the site world (/settings). A `.site`
+ * page is charcoal in both colour schemes, so a toggle there changes nothing.
+ */
+export function SiteHeader({ themeToggle = false }: { themeToggle?: boolean } = {}) {
   const user = useAppStore((s) => s.user);
-  const router = useRouter();
   const pathname = usePathname() ?? '/';
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const drawerRef = useRef<HTMLDialogElement>(null);
-  /* One modal for both triggers, owned here rather than by two SecurityBadges.
-     The drawer trigger has to close the drawer before opening it: showModal()
-     makes everything outside the <dialog> inert, so a security modal rendered
-     while the drawer is open is visible but unfocusable, and clicks at its
-     centre hit-test through to the drawer's nav underneath. */
-  const [securityOpen, setSecurityOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);
@@ -56,11 +55,13 @@ export function SiteHeader() {
     if (!menuOpen && el.open) el.close();
   }, [menuOpen]);
 
-  /* Rotating a tablet past the md breakpoint with the drawer open would leave
-     the page inert behind a menu that is no longer reachable. */
+  /* Widening past the lg breakpoint with the drawer open would leave the page
+     inert behind a menu that is no longer reachable. lg, not md: the menu
+     button shows below lg, and an md query closed the drawer the moment it
+     opened at 768–1023px. */
   useEffect(() => {
     if (!menuOpen) return;
-    const mq = window.matchMedia('(min-width: 768px)');
+    const mq = window.matchMedia('(min-width: 1024px)');
     const sync = () => { if (mq.matches) setMenuOpen(false); };
     sync();
     mq.addEventListener('change', sync);
@@ -81,13 +82,13 @@ export function SiteHeader() {
     <header
       className={cn(
         'fixed top-0 left-0 right-0 z-50',
-        'border-b border-transparent backdrop-blur-xl saturate-[1.3]',
-        'transition-[background-color,border-color,box-shadow] duration-[var(--dur-state)] ease-[var(--ease-standard)]',
-        scrolled
-          ? 'glass border-[var(--border)] shadow-[var(--shadow-lg)]'
-          : 'bg-transparent',
+        'border-b transition-[background-color,border-color] duration-[var(--dur-state)] ease-[var(--ease-standard)]',
+        /* Flat when scrolled: the site world keeps shadows for open dialogs. */
+        scrolled ? 'border-[var(--border)] bg-[var(--bg)]' : 'border-transparent bg-transparent',
       )}
     >
+      {/* Arms section entrances on every marketing page (renders nothing). */}
+      <Reveal />
       <div className="mx-auto flex h-[var(--space-16)] max-w-[var(--width-wide)] items-center justify-between gap-[var(--space-3)] px-[var(--gutter)]">
         {/* Logo */}
         <Link
@@ -99,7 +100,7 @@ export function SiteHeader() {
         </Link>
 
         {/* Desktop nav */}
-        <nav aria-label="Main" className="hidden items-center gap-[var(--space-1)] md:flex">
+        <nav aria-label="Main" className="hidden items-center gap-[var(--space-1)] lg:flex">
           {NAV_LINKS.map(({ label, href }) => {
             const active = isActivePath(pathname, href);
             return (
@@ -130,40 +131,25 @@ export function SiteHeader() {
 
         {/* Actions */}
         <div className="flex items-center gap-[var(--space-2)] sm:gap-[var(--space-3)]">
-          <ThemeToggle />
-          <Button
-            variant="outline"
-            size="sm"
-            leftIcon={<Lock className="h-3.5 w-3.5" />}
-            onClick={() => setSecurityOpen(true)}
-            className="hidden sm:flex"
-          >
-            Secure
-          </Button>
+          {themeToggle && <ThemeToggle />}
           {user ? (
             <>
-              <button
-                onClick={() => router.push('/chat')}
-                className="whitespace-nowrap hidden h-10 items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] font-semibold text-[var(--accent-text)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--accent-hover)] active:scale-[0.97] sm:inline-flex"
-              >
-                Open App
-              </button>
+              <Link href="/chat" className={cn(PRIMARY, 'hidden sm:inline-flex')}>
+                Open the app
+              </Link>
               <UserMenu />
             </>
           ) : (
             <>
-              <button
-                onClick={() => router.push('/login')}
+              <Link
+                href="/login"
                 className="whitespace-nowrap hidden h-10 items-center rounded-[var(--radius)] px-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] font-medium text-[var(--text-muted)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:text-[var(--text)] sm:flex"
               >
                 Sign in
-              </button>
-              <button
-                onClick={() => router.push('/chat')}
-                className="whitespace-nowrap flex h-10 items-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] font-semibold text-[var(--accent-text)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--accent-hover)] active:scale-[0.97]"
-              >
-                Get started
-              </button>
+              </Link>
+              <Link href="/chat" className={PRIMARY}>
+                Open the app
+              </Link>
             </>
           )}
 
@@ -173,7 +159,7 @@ export function SiteHeader() {
             aria-label="Open navigation menu"
             aria-expanded={menuOpen}
             aria-controls="site-nav-drawer"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] text-[var(--text-muted)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] md:hidden"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius)] text-[var(--text-muted)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] lg:hidden"
           >
             <Menu className="h-5 w-5" aria-hidden="true" />
           </button>
@@ -232,45 +218,32 @@ export function SiteHeader() {
           </nav>
 
           <div className="flex shrink-0 flex-col gap-[var(--space-2)] border-t border-[var(--border)] p-[var(--space-3)]">
-            {/* Below sm the header badge is hidden and the drawer was the only
-                place left to reach it — so it was reachable nowhere. sm:hidden
-                because from sm up the header shows it and the drawer is still
-                open until md. */}
-            <div className="flex items-center justify-between gap-[var(--space-2)]">
-              <span className="text-[length:var(--text-sm)] text-[var(--text-muted)]">Theme</span>
-              <ThemeToggle />
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<Lock className="h-3.5 w-3.5" />}
-              onClick={() => { setMenuOpen(false); setSecurityOpen(true); }}
-              className="w-full justify-center sm:hidden"
-            >
-              Secure
-            </Button>
+            {themeToggle && (
+              <div className="flex items-center justify-between gap-[var(--space-2)]">
+                <span className="text-[length:var(--text-sm)] text-[var(--text-muted)]">Theme</span>
+                <ThemeToggle />
+              </div>
+            )}
             {user ? (
-              <button
-                onClick={() => { setMenuOpen(false); router.push('/chat'); }}
-                className="flex min-h-[44px] items-center justify-center rounded-[var(--radius)] bg-[var(--accent)] px-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] font-semibold text-[var(--accent-text)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--accent-hover)] active:scale-[0.97]"
+              <Link
+                href="/chat"
+                onClick={() => setMenuOpen(false)}
+                className={cn(PRIMARY, 'min-h-[44px] justify-center')}
               >
-                Open App
-              </button>
+                Open the app
+              </Link>
             ) : (
-              <button
-                onClick={() => { setMenuOpen(false); router.push('/login'); }}
+              <Link
+                href="/login"
+                onClick={() => setMenuOpen(false)}
                 className="flex min-h-[44px] items-center justify-center rounded-[var(--radius)] border border-[var(--border)] px-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] font-medium text-[var(--text-2)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:border-[var(--border-strong)] hover:text-[var(--text)]"
               >
                 Sign in
-              </button>
+              </Link>
             )}
           </div>
         </div>
       </dialog>
-
-      {/* Sibling of the drawer, never a child of it. It portals to <body>, so
-          the header's own backdrop-blur does not become its containing block. */}
-      <SecurityModal isOpen={securityOpen} onClose={() => setSecurityOpen(false)} />
     </header>
   );
 }

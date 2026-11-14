@@ -279,6 +279,27 @@ _CURATED_MARQUEE_LABS: dict[str, str] = {
 }
 
 
+#: OpenRouter slugs that name the same company as another slug. Without this
+#: the /subprocessors count reads one company twice.
+_VENDOR_SAME_COMPANY: dict[str, str] = {"meta-llama": "meta"}
+
+
+def _model_vendors() -> list[str]:
+    """Every company a registered model belongs to, by OpenRouter slug, sorted.
+
+    The /subprocessors page lists these: each is a company a request may
+    reach. Local Ollama models carry no vendor prefix and send nothing out,
+    so they fall away; ``openrouter/`` is OpenRouter's own router, listed on
+    that page in its own right.
+    """
+    slugs = (
+        model.split("/", 1)[0]
+        for model in _whitelist_model_ids()
+        if "/" in model and not model.startswith("openrouter/")
+    )
+    return sorted({_VENDOR_SAME_COMPANY.get(slug, slug) for slug in slugs})
+
+
 def _marquee_lab_names() -> list[str]:
     """PROVIDERS plus the curated labs above that still have a live model."""
     names = list(_provider_names())
@@ -363,7 +384,9 @@ def _stage(path: Path) -> None:
 
 # ── Per-document updaters ────────────────────────────────────────────────────
 
-def _update_architecture_mindmap(today: str, py: int, models: int, presets: int, methods: int) -> bool:
+def _update_architecture_mindmap(
+    today: str, py: int, models: int, presets: int, methods: int
+) -> bool:
     if not ARCHITECTURE_MINDMAP.exists():
         return False
     text = orig = ARCHITECTURE_MINDMAP.read_text(encoding="utf-8")
@@ -382,7 +405,9 @@ def _update_architecture_mindmap(today: str, py: int, models: int, presets: int,
         text = re.sub(r"\b\d+\+? declarative presets\b", f"{presets}+ declarative presets", text)
         text = re.sub(r"(\| \*\*Presets\*\* \| )\d+\+?", rf"\g<1>{presets}+", text)
     if methods:
-        text = _patch(text, r"\| \*\*Reasoning Methods\*\* \| \d+", f"| **Reasoning Methods** | {methods}", f)
+        text = _patch(
+            text, r"\| \*\*Reasoning Methods\*\* \| \d+", f"| **Reasoning Methods** | {methods}", f
+        )
 
     if text == orig:
         return False
@@ -395,7 +420,6 @@ def _update_codebase_mindmap(today: str, py: int, models: int, presets: int, met
     if not CODEBASE_MINDMAP.exists():
         return False
     text = orig = CODEBASE_MINDMAP.read_text(encoding="utf-8")
-    f = CODEBASE_MINDMAP.name
 
     # Both plain and bold "Last updated" forms
     text = re.sub(r"(\*\*Last updated:\*\*|Last updated:) \S+", rf"\1 {today}", text)
@@ -532,6 +556,7 @@ def _render_capabilities_ts(today: str, presets: int, methods: int) -> str:
     adapters = _count_provider_adapters()
     providers_literal = ", ".join(f"'{name}'" for name in _provider_names())
     marquee_literal = ", ".join(f"'{name}'" for name in _marquee_lab_names())
+    vendors_literal = ", ".join(f"'{slug}'" for slug in _model_vendors())
     tests = _count_test_files()
     controls = _detect_sycophancy_controls()
     controls_literal = ",\n".join(
@@ -567,6 +592,13 @@ export const PROVIDERS = [{providers_literal}] as const;
  * behind it.
  */
 export const MARQUEE_LABS = [{marquee_literal}] as const;
+
+/**
+ * Every OpenRouter vendor slug with a registered model, sorted: each is a
+ * company a request may reach. Local Ollama models are excluded. Drives the
+ * /subprocessors list.
+ */
+export const MODEL_VENDORS = [{vendors_literal}] as const;
 
 /**
  * Sycophancy controls that are actually present in the code, per commit.

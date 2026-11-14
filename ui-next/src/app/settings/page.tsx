@@ -79,20 +79,14 @@ export default function SettingsPage() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
-      <SiteHeader />
+      <SiteHeader themeToggle />
       <main className="flex-1 w-full">
         {/* ── Masthead ───────────────────────────────────────────
-            Same marginal-marker idiom as the other generic routes —
-            no lede here, this is an account-management page, not a
+            No label above the h1 and no lede here, this is an account-management page, not a
             pitch, so there is nothing genuine to put in one. */}
         <header className="mx-auto w-full max-w-3xl px-[var(--gutter)] pb-[var(--space-8)] pt-[var(--space-48)]">
-          <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
-            <div>
-              <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
-                Settings
-              </p>
-            </div>
-            <h1 className="min-w-0 font-serif text-[length:var(--text-3xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+          <div>
+            <h1 className="min-w-0 font-display text-[length:var(--text-3xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
               Account settings.
             </h1>
           </div>
@@ -152,9 +146,9 @@ export default function SettingsPage() {
             <div className="flex items-start gap-3 rounded-lg bg-[var(--surface-2)] p-4 border border-[var(--border)]">
               <ShieldCheck className="h-5 w-5 text-[var(--text)] shrink-0 mt-0.5" />
               <div>
-                <p className="text-[length:var(--text-sm)] font-semibold text-[var(--text)]">Encryption Active</p>
+                <p className="text-[length:var(--text-sm)] font-semibold text-[var(--text)]">Encryption</p>
                 <p className="text-[length:var(--text-xs)] text-[var(--text-muted)] leading-relaxed mt-1">
-                  All your data is currently protected with AES-256-GCM encryption at rest and TLS 1.3 in transit.
+                  Stored runs, uploads and their search index are encrypted per field at rest, and connections use HTTPS with HSTS. This is not end-to-end: the model provider decrypts a request to answer it.
                 </p>
               </div>
             </div>

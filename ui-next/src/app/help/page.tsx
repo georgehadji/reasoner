@@ -61,7 +61,7 @@ const TOPICS = [
 
 export default function HelpPage() {
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
+    <div className="site flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text)]">
       <JsonLd
         data={breadcrumbSchema([
           { name: 'Home', path: '/' },
@@ -71,17 +71,11 @@ export default function HelpPage() {
       <SiteHeader />
       <main id="main-content" className="flex-1">
         {/* ── Masthead ───────────────────────────────────────────
-            Same marginal-marker idiom as /about, /capabilities,
-            /pricing, /security and /faq. */}
+            Left-aligned, no label above the h1; the heading names the page. */}
         <header className="mx-auto w-full max-w-[var(--width-content)] px-[var(--gutter)] pb-[var(--space-12)] pt-[var(--space-48)]">
-          <div className="grid gap-[var(--space-6)] lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-[var(--space-12)]">
-            <div>
-              <p className="mt-[var(--space-1)] font-sans text-[length:var(--text-xs)] font-medium uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
-                Help
-              </p>
-            </div>
+          <div>
             <div className="min-w-0">
-              <h1 className="font-serif text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+              <h1 className="font-display text-[length:var(--text-4xl)] font-semibold leading-[var(--lh-heading)] tracking-[var(--tracking-tight)] text-[var(--text)]">
                 Help center.
               </h1>
               <p className="prose-measure mt-[var(--space-6)] text-[length:var(--text-md)] leading-[var(--lh-body)] text-[var(--text-2)]">

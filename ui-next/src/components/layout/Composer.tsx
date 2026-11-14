@@ -473,7 +473,7 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
               server value and is replaced post-mount by the effect above, so
               there is no mismatch to suppress -- and suppressing one here
               would silence genuine future mismatches in this element. */}
-          <h1 className="mb-[var(--space-8)] text-center font-serif text-[length:var(--text-4xl)] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+          <h1 className="mb-[var(--space-8)] text-center font-display text-[length:var(--text-4xl)] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
             {isImageMode ? 'What should we picture?' : greeting}
           </h1>
 

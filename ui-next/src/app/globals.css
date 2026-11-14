@@ -33,10 +33,10 @@
    paired line-heights.
    ============================================================ */
 @theme {
-  --font-sans:  var(--font-public-sans), -apple-system,
-                BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --font-serif: var(--font-piazzolla), Charter, 'Bitstream Charter',
-                Cambria, Georgia, serif;
+  --font-sans:    var(--font-figtree), -apple-system,
+                  BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-display: var(--font-spartan), 'Arial Black', Impact,
+                  system-ui, sans-serif;
   --font-mono:  var(--font-inconsolata), ui-monospace, SFMono-Regular,
                 Menlo, Consolas, monospace;
 }
@@ -47,12 +47,13 @@
      Shape, motion, and type plumbing — theme-independent
      ========================================================== */
   :root {
-    /* Radius scale. A single 12px radius looked bloated on a 24px chip
-       and timid on a full-width panel. */
-    --radius-sm:   4px;
-    --radius:      8px;
-    --radius-lg:   16px;
-    --radius-xl:   24px;   /* composer shell — the one element that is a slab */
+    /* Radius scale. Print plates, not app cards: corners are a
+       trimmed sheet, barely softened. Not zero — the banlist forbids
+       broadsheet pastiche — and pills stay round for controls. */
+    --radius-sm:   2px;
+    --radius:      3px;
+    --radius-lg:   4px;
+    --radius-xl:   6px;    /* composer shell — the one element that is a slab */
     --radius-pill: 999px;
 
     /* ========================================================
@@ -771,64 +772,65 @@
 /* ============================================================
    Inverted band
 
-   A full-bleed section that runs against the page's ground: dark on
-   the ivory theme, ivory on the dark one. It is a token swap and
-   nothing else — every element inside already paints from --text,
-   --border and --accent, so the band inverts by redefining those
-   rather than by any component knowing it is on dark.
+   A full-bleed section printed on carbon stock. It is a token swap
+   and nothing else: every element inside already paints from --text,
+   --border and --accent, so the band changes ground by redefining
+   those rather than by any component knowing it is on dark.
 
-   Defined once per theme selector, mirroring the three palettes above:
-   :root is the ivory theme (so the band takes the dark values), while
-   the dark theme — whether reached by preference or by the explicit
-   .dark class — takes the ivory ones. The (0,3,0) selectors outrank
-   the (0,2,0) one, so a reader who forces a theme still gets a band
-   that contrasts with it.
+   All three selectors carry the carbon values, so in the dark theme the
+   band matches the page and is separated by spacing alone.
 
-   --accent has to move with the rest. The light theme's #3C332E is a
-   10.5:1 ink on #F2EEEA but only 1.4:1 on the band's #1A1614, so a band
-   that swapped only the greys would quietly drop its links below AA.
+   --accent and the two drums have to move with the rest. Light
+   #1F3FBF is a 7.5:1 ink on #F1F3F0 but only 2.2:1 on #121318, so a
+   band that swapped only the greys would drop its links below AA.
    ============================================================ */
 
 :root .invert-band {
   color-scheme: dark;
 
-  /* Dark values from styles/tokens.css. This is the THIRD/FOURTH copy of
-     the dark palette — see the EDIT BOTH note there; this makes it four.
+  /* Dark values from styles/tokens.css. One of five copies of the dark
+     palette — see the EDIT BOTH note there.
      --accent is redeclared because a band that swapped only the greys
      would drop its links below AA. */
-  --bg:             #1A1614;
-  --surface:        #24201C;
-  --surface-hover:  #1F1B17;
-  --surface-2:      #2F2925;
-  --surface-3:      #39332E;
+  --bg:             #121318;
+  --surface:        #1B1D23;
+  --surface-hover:  #16181D;
+  --surface-2:      #23262D;
+  --surface-3:      #2C2F37;
 
-  --text:        #FAF1EC;
-  --text-2:      #C9BFB9;
-  --text-muted:  #A59B95;
-  --text-subtle: #98908B;   /* NOT legal on --surface-3 — use --text-muted */
+  --text:        #EEF0EA;
+  --text-2:      #BEC2CC;
+  --text-muted:  #A2A7B2;
+  --text-subtle: #9196A2;   /* NOT legal on --surface-3 — use --text-muted */
 
-  --border:        rgb(250 241 236 / 0.13);
-  --border-strong: rgb(250 241 236 / 0.38);   /* 3.10:1 — WCAG 1.4.11 */
+  --border:        rgb(238 240 234 / 0.13);
+  --border-strong: rgb(238 240 234 / 0.40);   /* 3.10:1 — WCAG 1.4.11 */
 
-  --accent:       #D4C9C3;
-  --accent-hover: #E6DDD8;
-  --accent-text:  #1A1614;
-  --accent-dim:   rgb(212 201 195 / 0.13);
+  --accent:       #93A6FF;
+  --accent-hover: #B0BEFF;
+  --accent-text:  #121318;
+  --accent-dim:   rgb(147 166 255 / 0.14);
+    --ink-blue:      #93A6FF;
+    --ink-pink:      #FF5FA5;
+    --ink-pink-text: #FF7DB5;
+    --ink-overlap:   #B79AF0;
+    --grain-blend:   screen;
+    --grain-opacity: 0.06;
+    --accent-2:      var(--ink-pink-text);
 
-  --ok:      #A2B9FA;
-  --warn:    #CE90EA;
-  --unknown: #6AA6BC;
+  --ok:      #4FC7C2;
+  --warn:    #B79AF0;
+  --unknown: #D9B24A;
 
-  --red:        #FB7D76;
-  --red-bg:     rgb(251 125 118 / 0.10);
-  --red-border: rgb(251 125 118 / 0.26);
+  --red:        #FF7A7A;
+  --red-bg:     rgb(255 122 122 / 0.10);
+  --red-border: rgb(255 122 122 / 0.26);
 
   --shadow:       0 1px 2px rgb(0 0 0 / 0.40), 0 8px 24px -12px rgb(0 0 0 / 0.70);
   --shadow-float: 0 2px 4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.80);
 
   /* DEPRECATED — see styles/tokens.css */
-  --accent-2:     #A59B95;
-  --accent-2-dim: rgb(165 155 149 / 0.12);
+  --accent-2-dim: rgb(255 95 165 / 0.16);
   --shadow-lg:    var(--shadow-float);
 }
 
@@ -836,43 +838,49 @@
   :root:not(.light) .invert-band {
     color-scheme: dark;
 
-    /* Dark values from styles/tokens.css. This is the THIRD/FOURTH copy of
-       the dark palette — see the EDIT BOTH note there; this makes it four.
+    /* Dark values from styles/tokens.css. One of five copies of the dark
+       palette — see the EDIT BOTH note there.
        --accent is redeclared because a band that swapped only the greys
        would drop its links below AA. */
-    --bg:             #1A1614;
-    --surface:        #24201C;
-    --surface-hover:  #1F1B17;
-    --surface-2:      #2F2925;
-    --surface-3:      #39332E;
+    --bg:             #121318;
+    --surface:        #1B1D23;
+    --surface-hover:  #16181D;
+    --surface-2:      #23262D;
+    --surface-3:      #2C2F37;
 
-    --text:        #FAF1EC;
-    --text-2:      #C9BFB9;
-    --text-muted:  #A59B95;
-    --text-subtle: #98908B;   /* NOT legal on --surface-3 — use --text-muted */
+    --text:        #EEF0EA;
+    --text-2:      #BEC2CC;
+    --text-muted:  #A2A7B2;
+    --text-subtle: #9196A2;   /* NOT legal on --surface-3 — use --text-muted */
 
-    --border:        rgb(250 241 236 / 0.13);
-    --border-strong: rgb(250 241 236 / 0.38);   /* 3.10:1 — WCAG 1.4.11 */
+    --border:        rgb(238 240 234 / 0.13);
+    --border-strong: rgb(238 240 234 / 0.40);   /* 3.10:1 — WCAG 1.4.11 */
 
-    --accent:       #D4C9C3;
-    --accent-hover: #E6DDD8;
-    --accent-text:  #1A1614;
-    --accent-dim:   rgb(212 201 195 / 0.13);
+    --accent:       #93A6FF;
+    --accent-hover: #B0BEFF;
+    --accent-text:  #121318;
+    --accent-dim:   rgb(147 166 255 / 0.14);
+    --ink-blue:      #93A6FF;
+    --ink-pink:      #FF5FA5;
+    --ink-pink-text: #FF7DB5;
+    --ink-overlap:   #B79AF0;
+    --grain-blend:   screen;
+    --grain-opacity: 0.06;
+    --accent-2:      var(--ink-pink-text);
 
-    --ok:      #A2B9FA;
-    --warn:    #CE90EA;
-    --unknown: #6AA6BC;
+    --ok:      #4FC7C2;
+    --warn:    #B79AF0;
+    --unknown: #D9B24A;
 
-    --red:        #FB7D76;
-    --red-bg:     rgb(251 125 118 / 0.10);
-    --red-border: rgb(251 125 118 / 0.26);
+    --red:        #FF7A7A;
+    --red-bg:     rgb(255 122 122 / 0.10);
+    --red-border: rgb(255 122 122 / 0.26);
 
     --shadow:       0 1px 2px rgb(0 0 0 / 0.40), 0 8px 24px -12px rgb(0 0 0 / 0.70);
     --shadow-float: 0 2px 4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.80);
 
     /* DEPRECATED — see styles/tokens.css */
-    --accent-2:     #A59B95;
-    --accent-2-dim: rgb(165 155 149 / 0.12);
+    --accent-2-dim: rgb(255 95 165 / 0.16);
     --shadow-lg:    var(--shadow-float);
   }
 }
@@ -880,43 +888,49 @@
 :root.dark .invert-band {
   color-scheme: dark;
 
-  /* Dark values from styles/tokens.css. This is the THIRD/FOURTH copy of
-     the dark palette — see the EDIT BOTH note there; this makes it four.
+  /* Dark values from styles/tokens.css. One of five copies of the dark
+     palette — see the EDIT BOTH note there.
      --accent is redeclared because a band that swapped only the greys
      would drop its links below AA. */
-  --bg:             #1A1614;
-  --surface:        #24201C;
-  --surface-hover:  #1F1B17;
-  --surface-2:      #2F2925;
-  --surface-3:      #39332E;
+  --bg:             #121318;
+  --surface:        #1B1D23;
+  --surface-hover:  #16181D;
+  --surface-2:      #23262D;
+  --surface-3:      #2C2F37;
 
-  --text:        #FAF1EC;
-  --text-2:      #C9BFB9;
-  --text-muted:  #A59B95;
-  --text-subtle: #98908B;   /* NOT legal on --surface-3 — use --text-muted */
+  --text:        #EEF0EA;
+  --text-2:      #BEC2CC;
+  --text-muted:  #A2A7B2;
+  --text-subtle: #9196A2;   /* NOT legal on --surface-3 — use --text-muted */
 
-  --border:        rgb(250 241 236 / 0.13);
-  --border-strong: rgb(250 241 236 / 0.38);   /* 3.10:1 — WCAG 1.4.11 */
+  --border:        rgb(238 240 234 / 0.13);
+  --border-strong: rgb(238 240 234 / 0.40);   /* 3.10:1 — WCAG 1.4.11 */
 
-  --accent:       #D4C9C3;
-  --accent-hover: #E6DDD8;
-  --accent-text:  #1A1614;
-  --accent-dim:   rgb(212 201 195 / 0.13);
+  --accent:       #93A6FF;
+  --accent-hover: #B0BEFF;
+  --accent-text:  #121318;
+  --accent-dim:   rgb(147 166 255 / 0.14);
+    --ink-blue:      #93A6FF;
+    --ink-pink:      #FF5FA5;
+    --ink-pink-text: #FF7DB5;
+    --ink-overlap:   #B79AF0;
+    --grain-blend:   screen;
+    --grain-opacity: 0.06;
+    --accent-2:      var(--ink-pink-text);
 
-  --ok:      #A2B9FA;
-  --warn:    #CE90EA;
-  --unknown: #6AA6BC;
+  --ok:      #4FC7C2;
+  --warn:    #B79AF0;
+  --unknown: #D9B24A;
 
-  --red:        #FB7D76;
-  --red-bg:     rgb(251 125 118 / 0.10);
-  --red-border: rgb(251 125 118 / 0.26);
+  --red:        #FF7A7A;
+  --red-bg:     rgb(255 122 122 / 0.10);
+  --red-border: rgb(255 122 122 / 0.26);
 
   --shadow:       0 1px 2px rgb(0 0 0 / 0.40), 0 8px 24px -12px rgb(0 0 0 / 0.70);
   --shadow-float: 0 2px 4px rgb(0 0 0 / 0.45), 0 24px 56px -20px rgb(0 0 0 / 0.80);
 
   /* DEPRECATED — see styles/tokens.css */
-  --accent-2:     #A59B95;
-  --accent-2-dim: rgb(165 155 149 / 0.12);
+  --accent-2-dim: rgb(255 95 165 / 0.16);
   --shadow-lg:    var(--shadow-float);
 }
 
@@ -975,6 +989,208 @@
   }
 }
 
+/* Site world: an inverted band on a marketing page flips to the pale
+   concrete field with dark ink (spec/art-direction.md §3), not to the
+   app's carbon. Unlayered and more specific than the three blocks above
+   so it wins in every theme. Contrast on #C8C5BA / #D4D1C7 / #BEBBAF:
+   ink 9.86+, muted 5.01+, accent 5.09+, labels 4.55+. */
+:root .site .invert-band,
+:root:not(.light) .site .invert-band,
+:root.dark .site .invert-band {
+  color-scheme: light;
+  --bg:            #C8C5BA;
+  --surface:       #D4D1C7;
+  --surface-hover: #BEBBAF;
+  --surface-2:     #BEBBAF;
+  --surface-3:     #BEBBAF;
+  --text:          #1C1C1C;
+  --text-2:        #1C1C1C;
+  --text-muted:    #454540;
+  --text-subtle:   #454540;
+  --border:        rgb(28 28 28 / 0.16);
+  --border-strong: rgb(28 28 28 / 0.45);
+  --accent:        #2F4A30;
+  --accent-hover:  #1C1C1C;
+  --accent-text:   #F1F1EF;
+  --accent-dim:    rgb(47 74 48 / 0.12);
+  --ok:            #124F4C;
+  --warn:          #6A420C;
+  --unknown:       #3A3A35;
+  --site-ink:      #1C1C1C;
+  --site-muted:    #454540;
+  --site-line:     rgb(28 28 28 / 0.16);
+  --ink-pink:      transparent;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ============================================================
+   Overprint — the print layer. See spec/art-direction.md.
+
+   Three moves, all global so every route picks them up without a
+   call-site change:
+
+   1. Grain. One fixed SVG-noise sheet over the page, multiplied on
+      newsprint and screened on carbon. Never intercepts input.
+   2. (Retired 2026-11-13: display type no longer runs expanded; the
+      display face is League Spartan, which has no width axis.)
+   3. Page headings print in two drums: ink, with the pink drum
+      offset under it. The offset is the misregistration of a real
+      riso pass, and it never closes.
+
+   The signature (.misregister) is the fourth: a pink plate printed
+   out of register behind each perspective. Each plate sits at its
+   own offset and they settle once on load, never into alignment.
+   That is the run's actual shape: positions from different labs
+   that do not converge.
+   ============================================================ */
+
+@layer base {
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 2147483000;
+    pointer-events: none;
+    opacity: var(--grain-opacity);
+    mix-blend-mode: var(--grain-blend);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 1.4 -0.2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* League Spartan has no width axis; hyphenate a long word rather
+     than let it push a narrow column sideways. */
+  .font-display {
+    hyphens: auto;
+  }
+
+  h1.font-display,
+  h2.font-display,
+  .overprint {
+    text-shadow: 0.05em 0.035em 0 var(--ink-pink);
+  }
+
+  .misregister {
+    --reg-x: 5px;
+    --reg-y: 4px;
+    box-shadow: var(--reg-x) var(--reg-y) 0 var(--ink-pink);
+    animation: misregister-settle var(--dur-scene) var(--ease-entrance) both;
+  }
+  .misregister:nth-child(4n + 2) { --reg-x: -4px; --reg-y: 5px; animation-delay: calc(var(--stagger-step) * 1); }
+  .misregister:nth-child(4n + 3) { --reg-x: 6px;  --reg-y: -3px; animation-delay: calc(var(--stagger-step) * 2); }
+  .misregister:nth-child(4n + 4) { --reg-x: -5px; --reg-y: -4px; animation-delay: calc(var(--stagger-step) * 3); }
+
+  @keyframes misregister-settle {
+    from { box-shadow: calc(var(--reg-x) * 3) calc(var(--reg-y) * 3) 0 var(--ink-pink); }
+    to   { box-shadow: var(--reg-x) var(--reg-y) 0 var(--ink-pink); }
+  }
+
+  @media print {
+    body::after { display: none; }
+  }
+}
+
+/* ============================================================
+   Site world — "The product performs" (spec/art-direction.md)
+
+   Everything under `.site`, the root of each marketing page. Tokens
+   live in tokens.css; this layer holds what tokens cannot: switching
+   off the Overprint ornaments, the masked headline, section entrances
+   and the data-ui boundary.
+
+   One loud moment per page: the headline lines rise from behind their
+   own baselines. Everything else enters quietly once, on scroll.
+   ============================================================ */
+
+@layer base {
+  body:has(.site)::after { display: none; }
+
+  .site h1.font-display,
+  .site h2.font-display,
+  .site .overprint {
+    text-shadow: none;
+  }
+
+  .site .font-display {
+    font-weight: 700;
+    letter-spacing: var(--site-track-display);
+    line-height: var(--site-lh-head);
+  }
+
+  /* Masked line reveal. Each authored line is a mask; its inner span
+     rises from below the baseline. */
+  .site-line {
+    display: block;
+    overflow: hidden;
+    padding-bottom: 0.08em;
+  }
+  .site-line > span {
+    display: block;
+    animation: site-rise 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .site-line:nth-child(2) > span { animation-delay: 110ms; }
+  .site-after-headline {
+    animation: site-fade 500ms var(--ease-entrance) 450ms both;
+  }
+
+  @keyframes site-rise {
+    from { transform: translateY(105%); }
+    to   { transform: translateY(0); }
+  }
+  @keyframes site-fade {
+    from { opacity: 0; transform: translateY(0.5rem); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* Section entrances. Visible by default: the class that hides them is
+     only added by script (Reveal.tsx), so no-JS and print show all. */
+  .site-reveal-armed {
+    opacity: 0;
+    transform: translateY(1.5rem);
+    transition: opacity var(--dur-component) var(--ease-entrance),
+                transform 600ms var(--ease-entrance);
+  }
+  .site-reveal-armed.is-in {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* data-ui: a cropped fragment of the product. Inside it the product's
+     own conventions apply: 1px control borders, small radii, uppercase
+     epistemic marks, interface text at --site-small. */
+  .site [data-ui] {
+    font-family: var(--font-sans);
+    font-size: var(--site-small);
+    line-height: var(--lh-ui);
+  }
+
+  .site-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 3rem;
+    padding: 0 var(--space-6);
+    border-radius: var(--site-radius);
+    background: var(--site-accent);
+    color: var(--site-accent-ink);
+    font-family: var(--font-sans);
+    font-size: var(--site-body);
+    font-weight: 600;
+    transition: background-color var(--dur-micro) var(--ease-standard),
+                transform var(--dur-micro) var(--ease-standard);
+  }
+  .site-button:hover { background: var(--site-accent-hover); }
+  .site-button:active { transform: scale(0.97); }
+
+  .site-link {
+    color: var(--site-ink);
+    text-decoration: underline;
+    text-decoration-color: var(--site-line);
+    text-underline-offset: 0.25em;
+    transition: text-decoration-color var(--dur-micro) var(--ease-standard);
+  }
+  .site-link:hover { text-decoration-color: var(--site-accent); }
+}
+
 /* ============================================================
    Accessibility — Reduced motion preference
    ============================================================ */
@@ -1020,8 +1236,8 @@
 
 @media (prefers-contrast: more) {
   :root {
-    --border:        rgb(27 21 17 / 0.42);
-    --border-strong: rgb(27 21 17 / 0.68);
+    --border:        rgb(18 19 24 / 0.42);
+    --border-strong: rgb(18 19 24 / 0.68);
     --text-muted:    var(--text-2);
     --text-subtle:   var(--text-2);
 
@@ -1029,37 +1245,37 @@
        the labels the LOWEST-contrast text on the page in the one mode
        where a user explicitly asked for more. Darkened and pushed in
        chroma; the solid/dashed/dotted carrier is untouched. */
-    --ok:            #22337A;
-    --warn:          #5E3171;
-    --unknown:       #1F4E5E;
-    --red:           #8E1F22;
+    --ok:            #004A4E;
+    --warn:          #4C2A7C;
+    --unknown:       #5A4200;
+    --red:           #8E0E24;
   }
 
   :root.dark {
-    --border:        rgb(250 241 236 / 0.42);
-    --border-strong: rgb(250 241 236 / 0.68);
+    --border:        rgb(238 240 234 / 0.42);
+    --border-strong: rgb(238 240 234 / 0.68);
     --text-muted:    var(--text-2);
     --text-subtle:   var(--text-2);
 
     /* See the light block above — same reason. */
-    --ok:            #C2D2FF;
-    --warn:          #E2B4F5;
-    --unknown:       #96C6D8;
-    --red:           #FFA9A3;
+    --ok:            #8FE3DF;
+    --warn:          #D2C0F7;
+    --unknown:       #EBCB75;
+    --red:           #FFA9A9;
   }
 
   @media (prefers-color-scheme: dark) {
     :root:not(.light) {
-      --border:        rgb(250 241 236 / 0.42);
-      --border-strong: rgb(250 241 236 / 0.68);
+      --border:        rgb(238 240 234 / 0.42);
+      --border-strong: rgb(238 240 234 / 0.68);
       --text-muted:    var(--text-2);
       --text-subtle:   var(--text-2);
 
       /* See the light block above — same reason. */
-      --ok:            #C2D2FF;
-      --warn:          #E2B4F5;
-      --unknown:       #96C6D8;
-      --red:           #FFA9A3;
+      --ok:            #8FE3DF;
+      --warn:          #D2C0F7;
+      --unknown:       #EBCB75;
+      --red:           #FFA9A9;
     }
   }
 

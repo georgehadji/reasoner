@@ -19,8 +19,8 @@ beforeEach(() => {
 describe('SM-U7 pricing checkout', () => {
   it('SM-U7: a second click while checkout is in flight starts no second checkout', () => {
     render(<PricingPage />);
-    fireEvent.click(screen.getByRole('button', { name: 'Upgrade' }));
-    const stripe = screen.getByRole('button', { name: /pay with card/i });
+    fireEvent.click(screen.getByRole('button', { name: 'Upgrade to Pro' }));
+    const stripe = screen.getByRole('button', { name: /pay by card/i });
     fireEvent.click(stripe);
     fireEvent.click(stripe);
     expect(mocked.apiFetch).toHaveBeenCalledTimes(1);
@@ -28,8 +28,8 @@ describe('SM-U7 pricing checkout', () => {
 
   it('SM-U7: the other provider button is also locked while one checkout is in flight', () => {
     render(<PricingPage />);
-    fireEvent.click(screen.getByRole('button', { name: 'Upgrade' }));
-    const stripe = screen.getByRole('button', { name: /pay with card/i });
+    fireEvent.click(screen.getByRole('button', { name: 'Upgrade to Pro' }));
+    const stripe = screen.getByRole('button', { name: /pay by card/i });
     const paypal = screen.getByRole('button', { name: /paypal/i });
     fireEvent.click(stripe);
     fireEvent.click(paypal);
@@ -38,13 +38,13 @@ describe('SM-U7 pricing checkout', () => {
 
   it('SM-U7: a bfcache restore clears the frozen pending spinner', () => {
     render(<PricingPage />);
-    fireEvent.click(screen.getByRole('button', { name: 'Upgrade' }));
-    const stripe = screen.getByRole('button', { name: /pay with card/i });
+    fireEvent.click(screen.getByRole('button', { name: 'Upgrade to Pro' }));
+    const stripe = screen.getByRole('button', { name: /pay by card/i });
     fireEvent.click(stripe);
     expect(stripe).toBeDisabled();
     act(() => {
       window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true }));
     });
-    expect(screen.getByRole('button', { name: /pay with card/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /pay by card/i })).toBeEnabled();
   });
 });

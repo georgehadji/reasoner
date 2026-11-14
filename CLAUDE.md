@@ -131,7 +131,7 @@ ui-next/src/
 ├── lib/                    # api-client, db (IndexedDB), types, utils, security, markdown
 └── stores/                 # app-store.ts (Zustand global state with persistence)
 
-tests/                      # pytest suite (<!-- gen:test_files -->457<!-- /gen --> test_*.py files, recursive)
+tests/                      # pytest suite (<!-- gen:test_files -->460<!-- /gen --> test_*.py files, recursive)
 scripts/
 └── update_mindmap_meta.py  # Patches live counts into ARCHITECTURE_MINDMAP.md (run manually — see §10)
 ```
@@ -384,7 +384,7 @@ Semantic landmarks. Real alt text. WCAG 2.2 AA.
 LCP <= 2.0s and CLS <= 0.05 lab; field targets LCP <= 2.5s / INP <= 200ms / CLS <= 0.1 at p75.
 Max 2 text families (display + body) plus 1 monospace for code and data, 4 weights,
 self-hosted woff2. Only the text families preload; the mono loads below the fold. This
-matches `spec/art-direction.md` §4 (Piazzolla, Public Sans, Inconsolata).
+matches `spec/art-direction.md` §4 (Archivo, Atkinson Hyperlegible Next, Inconsolata).
 
 ## Hook wiring is not in git
 
