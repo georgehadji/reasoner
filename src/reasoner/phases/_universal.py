@@ -136,8 +136,9 @@ FORMAT RULES:
 - Output valid JSON inside the fence with fields: critical_insights, action_blueprint, open_questions, claim_labels, meta_audit, sources, layout_hints, evidence.
 
 CITATION REQUIREMENTS:
-- Use format: [source_title](url) after each claim from a source.
+- After each claim from a source, link it as [the source's real title](its url).
 - You MUST only cite sources listed in the WEB SOURCES section above. Do not invent or reuse URLs from memory.
+- If the prompt has no WEB SOURCES section, cite nothing: no links, no bracketed references and no placeholder names.
 - Include all sources used in a "sources" array in the JSON output.
 
 LAYOUT HINTS (JSON Field):
