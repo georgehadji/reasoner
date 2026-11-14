@@ -114,7 +114,7 @@ class TestQuotaRepoPoolRaceCondition:
 
         monkeypatch.setattr("asyncpg.create_pool", mock_create_pool)
 
-        repo = PostgresQuotaRepository("postgresql://test", pool_size=2)
+        repo = PostgresQuotaRepository("postgresql://test")
 
         # Fire 10 concurrent _get_pool() calls
         await asyncio.gather(*[repo._get_pool() for _ in range(10)])
@@ -135,7 +135,7 @@ class TestQuotaRepoPoolRaceCondition:
 
         monkeypatch.setattr("asyncpg.create_pool", mock_create_pool)
 
-        repo = PostgresQuotaRepository("postgresql://test", pool_size=2)
+        repo = PostgresQuotaRepository("postgresql://test")
 
         await repo._get_pool()
         await repo._get_pool()
@@ -168,7 +168,7 @@ class TestSubscriptionRepoPoolRaceCondition:
 
         monkeypatch.setattr("asyncpg.create_pool", mock_create_pool)
 
-        repo = PostgresSubscriptionRepository("postgresql://test", pool_size=2)
+        repo = PostgresSubscriptionRepository("postgresql://test")
 
         await asyncio.gather(*[repo._get_pool() for _ in range(10)])
 

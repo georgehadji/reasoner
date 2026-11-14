@@ -87,9 +87,7 @@ class SqliteUploadUsageRepository:
 
 
 class PostgresUploadUsageRepository:
-    def __init__(self, dsn: str, pool_size: int | None = None) -> None:
-        # pool_size is accepted for compatibility and ignored: the pool is the
-        # shared per-worker one (pg_pool), sized by DB_POOL_SIZE.
+    def __init__(self, dsn: str) -> None:
         self._dsn = dsn
 
     async def _get_pool(self) -> asyncpg.Pool:
@@ -134,9 +132,7 @@ def get_upload_usage_repo() -> UploadUsageRepository:
         from reasoner.infrastructure.uploader import UPLOAD_DIR
 
         if settings.DATABASE_URL and "postgres" in settings.DATABASE_URL:
-            _repo = PostgresUploadUsageRepository(
-                settings.DATABASE_URL.replace("+asyncpg", ""), pool_size=settings.DB_POOL_SIZE
-            )
+            _repo = PostgresUploadUsageRepository(settings.DATABASE_URL.replace("+asyncpg", ""))
         else:
             _repo = SqliteUploadUsageRepository(UPLOAD_DIR / ".upload_usage.db")
     return _repo

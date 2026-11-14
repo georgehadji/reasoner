@@ -19,9 +19,11 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    # op.execute wraps the string in text(), which reads ":reserve" as a bind
+    # parameter; the backslash keeps the colon literal.
     op.execute(
         "CREATE INDEX IF NOT EXISTS idx_credit_ledger_reserve_created "
-        "ON credit_ledger (created_at) WHERE reference_id LIKE '%:reserve';"
+        r"ON credit_ledger (created_at) WHERE reference_id LIKE '%\:reserve';"
     )
 
 

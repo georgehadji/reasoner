@@ -44,9 +44,7 @@ def _to_key(row: asyncpg.Record) -> ApiKey:
 class PostgresApiKeyRepository(ApiKeyRepository):
     """API key storage in PostgreSQL."""
 
-    def __init__(self, dsn: str, pool_size: int | None = None):
-        # pool_size is accepted for compatibility and ignored: the pool is the
-        # shared per-worker one (pg_pool), sized by DB_POOL_SIZE.
+    def __init__(self, dsn: str):
         self._dsn = dsn
 
     async def _get_pool(self) -> asyncpg.Pool:

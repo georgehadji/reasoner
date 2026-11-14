@@ -41,7 +41,6 @@ pytest tests/ --cov=src/reasoner --cov-report=html
 |------|------------------|
 | `tests/conftest.py` | `auto_clean_state` — autouse cleanup between tests. |
 | `tests/integration/conftest.py` | `base_url`, `test_timeout`, `csrf_token`, `api_client` — live-server integration harness. |
-| `tests/utils/factories.py` | `create_message`, `create_llm_config`, `create_llm_response`, `create_pipeline_state`, `create_solution_candidate`, `create_critique_score`, `create_decomposition`, `create_final_solution`, `create_pipeline_started_event`, `create_phase_completed_event`. |
 | `tests/utils/mocks.py` | `MockEventStore`, `MockNLI`, `MockLLM`, `create_mock_redis`. (`MockLLMProvider` was deleted with `ports.BaseLLMProvider` in P2 — it had no callers; subclass `llm.base.BaseLLMProvider` for a provider double.) |
 | `tests/utils/async_helpers.py` | `async_run`, `await_all`, `create_future`. |
 
@@ -52,7 +51,7 @@ pytest tests/ --cov=src/reasoner --cov-report=html
 | `architecture/` (8) | `test_layer_boundaries.py`, `test_domain_modules.py`, `test_models_split.py`, `test_event_emission.py`, `test_integration_events.py`, `test_sse_events.py`, `test_regression_bugs.py` — hexagonal boundary and event-contract enforcement — plus `test_run_admission.py` (every pipeline route calls `admit_run` and `metered`), and `test_unreachable_after_try.py`, which flags any statement following a `try` that every branch already leaves (the shape that hid the per-phase quality gate; coverage cannot see it because the enclosing loop still runs). |
 | `integration/` (7) | `test_preset_pipeline.py`, `test_provenance_api.py`, `test_call_telemetry_store.py`, `test_sandbox_escape.py`, plus `conftest.py` and `sse_utils.py`. |
 | `unit/` (42) | ACR (`test_adaptive_routing`, `test_utility_scorer`, `test_constraints`, `test_capability_registry`, `test_online_learning`, `test_benchmarks`, `test_call_telemetry`, `test_acr_coverage`), watermark (`test_watermark_layer_a`, `_rules`, `_spans`, `_properties`, `_image_png/jpeg/webp/isobmff`, `_image_facade`, `_generated_images`), presets (`test_preset_bloc_diversity`, `test_preset_model_uniqueness`, `test_delphi_expert_routing` — the Delphi panel must be 4 distinct cross-bloc models, see docs/ENSEMBLE_DIVERSITY.md §4, `test_model_alias_honesty` — an alias must not name a vendor/version it does not serve, presets must not route the deprecated ones, and a caller who does gets a warning naming the replacement, `test_catalogue_source` — only src/reasoner/domain/openrouter_models.json may be loaded (a stale root copy once caused 124 false "dead model" hits), `test_pricing_resolver`), spend (`test_spend_limits`, `test_spend_cap_enforcement`), Prism (`test_prism_classifier`, `test_prism_research`), language (`test_language_pivot`, `test_language_probe`), plus numbered regressions `test_regression_BUG001-003`, `test_silent_failure_detector` (the shapes the silent-failure ratchet counts and the ones it deliberately does not), `test_quality_retry_hint` (a quality-gate retry carries the judge's hint, wrapped, and skips the token cache that holds the failed answer), and `test_synthesis_step_payload` (every method's Synthesis step serializes with `_ser_synthesis`, so `core_solution`, sources and citations reach the client). |
-| `utils/` (4) | Shared factories, mocks, async helpers (not tests). |
+| `utils/` (3) | Shared mocks and async helpers (not tests). |
 
 ## Top-level groups (239 files)
 
@@ -69,7 +68,7 @@ pytest tests/ --cov=src/reasoner --cov-report=html
 | `test_event_*` | 7 | Event bus (backpressure, isolation), event store (concurrency, GDPR ownership), emission service, event types. |
 | `test_neuro_*` | 6 | Agent-id isolation, cache wiring, CLI, fallback providers, Perplexity provider, safe indexing. |
 | `test_websocket_*` / `test_ws_*` | 6 | Auth, authz, manager, sharding, security, tickets. |
-| `test_auth_*` | 4 | Concurrency, rate limiter deps, LRU, security. |
+| `test_auth_*` | 2 | Rate limiter deps; Supabase JWT checks (local pre-check, negative cache, off-loop verify). |
 | `test_bugfix*_` / `test_bug0*` / `test_defect_hunt_fixes` | 12 | Named regression cases (enum resume, JSON repair, language preservation, token-cache clock, circuit-breaker half-open, truncated JSON, runstate eviction, rounds 1-3, defect-hunt fixes). |
 | `test_core_*`, `test_constants`, `test_temperature*` | 6 | Constants, protocol, temperatures and strategy. |
 | `test_image_*`, `test_images_metering`, `test_ocr` | 5 | Image generation, routes, model selection, metering, OCR. |
@@ -92,7 +91,7 @@ pytest tests/ --cov=src/reasoner --cov-report=html
 | `test_ic_time_budget` | 1 | Iterative critique stops before a debate round that, at its average pace, would not finish inside the Adversarial Debate phase timeout (reason `time_budget`), instead of the timeout cancelling the phase. |
 | `test_anonymous_tier` | 1 | `ANONYMOUS_TIER` sets the plan a caller with no account gets (default free, unknown values fail closed); production refuses anything but free at startup. |
 | `test_audit3_followup_gaps` | 3 | Audit 3 follow-ups: `delete_aggregate` removes the `pipeline_owners` row (SQLite and Postgres stores); the history query handler without an event store returns nothing instead of globbing a stray directory. |
-| Singletons | ~60 | One file each: `test_hypergate`, `test_headless`, `test_mcp_tools`, `test_sdk_contract`, `test_cqrs_parity`, `test_idempotency`, `test_run_metering`, `test_audit2_money_leaks` (settlement under cancellation and disconnect, billed resume and run-with-context), `test_credits`, `test_presets`, `test_preset_validation`, `test_models`, `test_parsing*`, `test_aggregates`, `test_domain_events`, `test_load`, `test_acceptance`, `test_codebase_audit`, `test_site_capabilities_sync`, and similar. |
+| Singletons | ~60 | One file each: `test_hypergate`, `test_headless`, `test_mcp_tools`, `test_sdk_contract`, `test_cqrs_parity`, `test_idempotency`, `test_run_metering`, `test_audit2_money_leaks` (settlement under cancellation and disconnect, billed resume and run-with-context), `test_credits`, `test_presets`, `test_preset_validation`, `test_models`, `test_parsing*`, `test_aggregates`, `test_domain_events`, `test_load`, `test_acceptance`, `test_codebase_audit`, `test_site_capabilities_sync`, `test_pg_pool` (shared per-worker Postgres pool, advisory locks), `test_billing_refunds_duplicates` (duplicate-subscription refund, non-USD claw-back skip, PayPal refunds), `test_credit_orphan_sweep_query` (sweep query text and lookback bound), `test_audit_ponytail_auth` (credit grant needs the admin key, MCP scope check on keys), and similar. |
 
 
 ## Key gotchas

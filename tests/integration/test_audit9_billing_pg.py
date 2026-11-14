@@ -105,7 +105,7 @@ async def test_reset_monthly_is_utc_month_start_conditional_and_keeps_tier_usage
             )
         finally:
             await conn.close()
-        quota = PostgresQuotaRepository(dsn, pool_size=2)
+        quota = PostgresQuotaRepository(dsn)
         sub_repo = _subscription_repo(dsn)
         try:
             await sub_repo.sync_quota_for_subscription(
@@ -143,7 +143,7 @@ async def test_release_after_the_month_reset_does_not_take_from_the_new_month():
     async with _fresh_database() as dsn:
         _alembic_upgrade(dsn)
         uid = await _user(dsn)
-        repo = PostgresQuotaRepository(dsn, pool_size=2)
+        repo = PostgresQuotaRepository(dsn)
         conn = await asyncpg.connect(dsn)
         try:
             await repo.get_quota(uid)  # creates the free row
