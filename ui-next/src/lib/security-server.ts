@@ -375,6 +375,13 @@ export function validateRunRequest(body: unknown): RunRequest {
   if (typeof b.smart_search === 'boolean') result.smart_search = b.smart_search;
   if (typeof b.client_run_id === 'string') result.client_run_id = b.client_run_id;
   if (Array.isArray(b.attachments)) result.attachments = b.attachments as RunRequest['attachments'];
+  if (typeof b.jurisdiction === 'string' && b.jurisdiction.length <= 200) result.jurisdiction = b.jurisdiction;
+  if (b.facts && typeof b.facts === 'object' && !Array.isArray(b.facts)) {
+    const facts = Object.entries(b.facts as Record<string, unknown>)
+      .filter((e): e is [string, string] => typeof e[1] === 'string' && e[0].length <= 200 && e[1].length <= 200)
+      .slice(0, 3);
+    if (facts.length > 0) result.facts = Object.fromEntries(facts);
+  }
 
   return result;
 }
