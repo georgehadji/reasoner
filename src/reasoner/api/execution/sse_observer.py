@@ -115,7 +115,9 @@ class RunStream:
         options: dict,
         emitter: Any,
     ) -> None:
-        payload: dict[str, Any] = {"type": "start", "preset": preset}
+        # `method` names the run's method for explicit presets too, so the UI
+        # can label the run without waiting for its first phase.
+        payload: dict[str, Any] = {"type": "start", "preset": preset, "method": method}
         if auto_selected_method:
             payload["auto_selected_method"] = auto_selected_method
         await self.both(payload)
@@ -329,6 +331,9 @@ class SseRunObserver:
             "retry_after": retry_after,
             "phase": step.num,
             "phase_name": step.name,
+            # A non-critical phase failing does not end the run; the client
+            # must keep streaming instead of treating this frame as the end.
+            "fatal": fatal,
         })
         await self._both({
             "type": "phase_error",

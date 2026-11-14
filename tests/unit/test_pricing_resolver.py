@@ -139,3 +139,10 @@ def test_application_layer_holds_no_pricing_shim():
         f"{stale} is back; alias-aware pricing belongs in "
         f"infrastructure/llm/pricing_resolver.py, which needs no injected port"
     )
+
+
+@pytest.mark.parametrize("model_id", ["ollama-qwen2", "qwen2"])
+def test_local_model_is_free(no_registry_port, model_id):
+    # Call metadata carries the served id ("qwen2"); it used to fall through to
+    # the paid default, so a run on the user's own Ollama showed a dollar cost.
+    assert get_pricing(model_id).calculate_cost(10_000, 10_000) == 0.0

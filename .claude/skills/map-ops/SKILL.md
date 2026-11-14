@@ -36,6 +36,7 @@ folders:
 | `update_mindmap_meta.py` | Post-commit: patches live counts into `ARCHITECTURE_MINDMAP.md` and regenerates `ui-next/src/lib/capabilities.generated.ts`. |
 | `update_openrouter_catalogue.py` | Refreshes the bundled OpenRouter model catalogue. |
 | `validate_presets.py` | Validates every preset in the registry. |
+| `gen_method_phases.py` | Writes `ui-next/src/lib/method-phases.generated.ts` (each method's phase plan for the run card) from the flows' `get_phases`. `tests/unit/test_method_phases_generated.py` fails on drift. |
 | `generate_preset_docs.py` | Regenerates `docs/methods_and_presets.md` and `docs/preset-phase-model-matrix.md` from `domain/preset_registry.py`. Both are pure projections of the registry; nothing produced them before, so they rotted. `--check` exits 1 when stale, for CI. |
 | `capture_article_baseline.py` | Captures and updates the Article pipeline golden baseline. |
 | `migrate_events_sqlite_to_pg.py` | SQLite to PostgreSQL event store migration. |

@@ -946,7 +946,14 @@ def _ser_5(state: PipelineState) -> dict:
         return {
             "coding_state": {
                 "final_files": [
-                    {"path": f.get("path", ""), "changed": f.get("changed", False)}
+                    # The content is the run's answer: Final Assembly is the
+                    # coding flow's last phase, so without it the UI has no code.
+                    {
+                        "path": f.get("path", ""),
+                        "content": f.get("content", ""),
+                        "language": f.get("language") or coding.get("language", ""),
+                        "changed": f.get("changed", False),
+                    }
                     for f in coding["final_files"]
                 ],
                 "readme": coding.get("readme", ""),
@@ -1106,7 +1113,12 @@ def _ser_synthesis(state: PipelineState) -> dict:
             "open_questions": _get_v(fs, "open_questions", []),
             "claim_labels": clean_labels,
             "premises": premises,
-            "evidence": _get_v(fs, "evidence", {}),
+            # EvidenceBundle dataclasses from synthesis_phase; a resumed state
+            # may already hold plain dicts. The SSE encoder takes neither raw.
+            "evidence": {
+                claim: bundle.to_dict() if hasattr(bundle, "to_dict") else bundle
+                for claim, bundle in (_get_v(fs, "evidence", {}) or {}).items()
+            },
             # Already filtered by synthesis_phase to URLs the run retrieved.
             "sources": _get_v(fs, "sources", []),
             "meta_audit": meta_audit,
