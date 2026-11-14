@@ -100,7 +100,8 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 |------|--------------|
 | `scorecard_service.py` | Aggregates telemetry into harness-level metrics (read model). |
 | `harness_guard.py` | Invariant validation for mutations; `get_model_lab`, `check_mutation_invariants`. |
-| `evidence_service.py` | Epistemic label promotion and evidence bundles. |
+| `evidence_service.py` | Epistemic label promotion: `StandardPolicy`, `HighStakesPolicy` (VERIFIED needs a PRIMARY source), `reconcile_labels`. |
+| `stakes_service.py` | `detect_stakes`, `stakes_mode`, `keep_out_of_memory` (health runs never reach Neuro). |
 
 ## services/ — billing, quota, auth, metering
 

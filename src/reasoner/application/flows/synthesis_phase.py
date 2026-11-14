@@ -188,10 +188,17 @@ def finalize_solution(raw: str, state: PipelineState, services: WorkflowServices
     # This import is lazy to avoid circular dependency at module level
     try:
         from reasoner.application.services.evidence_service import (
+            HighStakesPolicy,
             apply_promotion_rules,
             reconcile_labels,
         )
-        evidence_bundles = apply_promotion_rules(evidence_bundles, allowed_urls)
+        from reasoner.application.services.stakes_service import detect_stakes, stakes_mode
+
+        profile = detect_stakes(state.problem)
+        policy = (
+            HighStakesPolicy(profile) if profile.is_high and stakes_mode() == "active" else None
+        )
+        evidence_bundles = apply_promotion_rules(evidence_bundles, allowed_urls, policy)
         clean_labels = reconcile_labels(clean_labels, evidence_bundles)
     except Exception as exc:
         # Silence here is the worst possible outcome for this particular call:

@@ -558,6 +558,11 @@ class PipelineOrchestrator:
             if state.final_solution:
                 synthesis_text = getattr(state.final_solution, "core_solution", "") or ""
 
+            from reasoner.application.services.stakes_service import keep_out_of_memory
+
+            if synthesis_text and keep_out_of_memory(getattr(req, "problem", "")):
+                synthesis_text = ""  # health run: never persisted (plan section 7)
+
             if port is not None and synthesis_text:
                 _observe_propagation_shape(synthesis_text, run_id)
                 await port.learn(

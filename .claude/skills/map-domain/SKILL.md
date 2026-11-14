@@ -58,6 +58,7 @@ folders:
 | `report.py` | Frozen report objects: `CharHit`, `TextInspectReport`, `ScrubStats`, `ScrubResult`. |
 | `divergence.py` | Bigram-Jaccard lexical divergence for Layer B rewrite candidates; `select_most_diverged`. |
 | `stakes.py` | Frozen `StakesProfile`/`Jurisdiction`/`StakesDomain`: how costly a wrong answer is (health, legal, financial). Stdlib only. |
+| `authority_sources.py` | Declarative registry of primary/secondary source hosts per (domain, country); `authority_tier`, `rank_by_authority`. Only rows with `reviewed_on` count; seed rows ship unreviewed (plan §2.2). |
 
 ## Key entry points & gotchas
 
