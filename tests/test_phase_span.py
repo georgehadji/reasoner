@@ -188,3 +188,26 @@ async def test_a_failing_router_describe_is_recorded_not_swallowed():
     assert any(
         d.startswith("observability.phase_span.router_describe") for d in state.degradations
     ), f"expected the describe() failure to be recorded, got: {state.degradations}"
+
+
+@pytest.mark.asyncio
+async def test_span_names_the_primary_model_from_a_real_describe(fake_langfuse):
+    """ProviderRouter.describe() returns a dict, not a string.
+
+    phase_span sliced it as ``describe()[:100]``, which raises KeyError on a
+    dict, so every span recorded no model and logged a degradation.
+    """
+    from types import SimpleNamespace
+
+    from reasoner.core.observability.phase_span import PhaseSpan
+
+    class _Router:
+        def describe(self):
+            return {"[primary]": "qwen3:8b", "critic": "qwen3:8b -> gpt-4o-mini"}
+
+    state = SimpleNamespace(degradations=[])
+    async with PhaseSpan("run-3", phase_name="Critique", phase_number=3, router=_Router(), state=state):
+        pass
+
+    assert state.degradations == []
+    assert fake_langfuse.span_kwargs["input"]["model"] == "qwen3:8b"
