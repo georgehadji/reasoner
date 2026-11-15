@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import logging
 
-from reasoner.core.ports.unsettled_run_port import UnsettledRunPort
 from reasoner.application.services.credit_service import CreditService
+from reasoner.core.ports.unsettled_run_port import UnsettledRunPort
 
 logger = logging.getLogger(__name__)
 

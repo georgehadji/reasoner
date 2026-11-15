@@ -28,12 +28,13 @@ from reasoner.hypergate.sub_agents import (
     DirectDetectorSubAgent,
     LanguageDetectorSubAgent,
     MethodClassifierSubAgent,
+    StakesDetectorSubAgent,
     TieBreakerSubAgent,
     WebSearchDetectorSubAgent,
 )
 from reasoner.hypergate.sub_agents.method_classifier import _TAXONOMY
 
-# The five that HyperGateAgent._run_phase1 fires concurrently via
+# The six that HyperGateAgent._run_phase1 fires concurrently via
 # asyncio.gather, in that order, and the tie-breaker that follows them.
 _PHASE1_SUB_AGENTS = (
     LanguageDetectorSubAgent,
@@ -41,6 +42,7 @@ _PHASE1_SUB_AGENTS = (
     DirectDetectorSubAgent,
     WebSearchDetectorSubAgent,
     MethodClassifierSubAgent,
+    StakesDetectorSubAgent,
 )
 _GATE_SUB_AGENTS = (*_PHASE1_SUB_AGENTS, TieBreakerSubAgent)
 

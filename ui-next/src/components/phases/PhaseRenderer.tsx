@@ -1,5 +1,7 @@
 'use client';
 
+import { ReliabilityBanner, ScopeLine } from './ReliabilityBanner';
+import type { SynthesisReliability, SynthesisScope } from '@/lib/types';
 import { useRef, useEffect, memo } from 'react';
 import { RenderedPhase } from '@/components/chat/ChatFeed';
 import { TEXT_SIZES } from '@/lib/config';
@@ -374,6 +376,15 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
     const provenanceReport = getProvenanceReport(data);
     return (
       <SynthesisCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} highlights={synthesisHighlights} sources={synthesisSections?.sources} citations={citations} label={asAnswer ? 'Answer' : undefined} defaultOpen>
+        {(() => {
+          const d = data as Record<string, unknown>;
+          return (
+            <>
+              <ScopeLine scope={d.scope as SynthesisScope | undefined} />
+              <ReliabilityBanner reliability={d.reliability as SynthesisReliability | undefined} />
+            </>
+          );
+        })()}
         {/* The bottom line first: insights, steps and open questions explain it. */}
         <div className="mb-[var(--space-4)]"><SynthesisRenderer text={md} /></div>
         {synthesisSections && (

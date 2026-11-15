@@ -47,6 +47,8 @@ class HyperContext:
     direct_output: SubAgentOutput
     web_output: SubAgentOutput
     method_output: SubAgentOutput
+    # Not in to_dict(): the tie-breaker routes; stakes is decided after routing.
+    stakes_output: SubAgentOutput | None = None
 
     # Convenience helpers — read from outputs with safe fallbacks
     @property

@@ -99,6 +99,8 @@ folders:
 
 `benchmark_vs_diversity.py` (VS versus direct generation), `benchmark_vs_calibration.py` (verbalized entropy versus uncertainty), `benchmark_vs_latency.py` (per deployment profile), `vs_latency_overhead.md` (results).
 
+`high_stakes/` holds the high-stakes reliability corpus: `cases.jsonl` (questions, no invented reference answers), `route_eval.py` (free offline regex routing recall) and `BASELINE.md` (recorded numbers and what is not yet measured).
+
 ## Deployment and other folders
 
 | Path | What it is |

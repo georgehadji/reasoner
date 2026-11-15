@@ -34,6 +34,7 @@ import { readSSEStream } from '@/lib/sse-reader';
 import { AttachmentUploadError, uploadAttachments, type UploadedAttachment } from '@/lib/attachments';
 import { copyToClipboard } from '@/lib/utils';
 import { clearCache, generateImage, generateImageEnhancement, resumePipelineStream, submitFeedback, fetchGateDecision } from '@/lib/api-client';
+import { FactsPrompt } from '@/components/chat/FactsPrompt';
 import { MethodChoicePrompt, MethodChoiceLoading } from '@/components/chat/MethodChoicePrompt';
 
 // --- Reducer function for managing messages state ---
@@ -303,7 +304,7 @@ export default function ChatPage() {
   const submitRun = useCallback(async (
     ticket: RunTicket,
     problem: string,
-    opts?: { presetOverride?: string; skipGate?: boolean },
+    opts?: { presetOverride?: string; skipGate?: boolean; facts?: Record<string, string> },
   ) => {
 
     // ── HyperGate confirmation gate ──
@@ -320,7 +321,7 @@ export default function ChatPage() {
         try {
           const gateResult = await fetchGateDecision(problem, getAutoPreset());
           setGateChecking(false);
-          if (gateResult.needs_confirmation && gateResult.preset) {
+          if (gateResult.stakes?.missing_facts?.length || (gateResult.needs_confirmation && gateResult.preset)) {
             setPendingChoice({ problem, decision: gateResult });
             return;
           }
@@ -913,6 +914,7 @@ export default function ChatPage() {
           // The user already confirmed a specific method via the gate picker —
           // skip re-running HyperGate so the chosen preset is locked in.
           force_pipeline: !!opts?.presetOverride,
+          facts: opts?.facts && Object.keys(opts.facts).length > 0 ? opts.facts : undefined,
         };
         await startRun(req, onEvent, ticket.abort.signal);
       }
@@ -968,7 +970,7 @@ export default function ChatPage() {
 
   const handleSubmit = useCallback(async (
     providedText?: string,
-    opts?: { presetOverride?: string; skipGate?: boolean },
+    opts?: { presetOverride?: string; skipGate?: boolean; facts?: Record<string, string> },
   ) => {
     const problem = (providedText ?? composerText).trim();
     if (!problem) return;
@@ -988,6 +990,15 @@ export default function ChatPage() {
     setPendingChoice(null);
     if (!choice) return;
     handleSubmit(choice.problem, { presetOverride: preset, skipGate: true });
+  }, [pendingChoice, handleSubmit]);
+
+  // Facts come first and run on the gate's own pick: asking again which method
+  // to use would be a second prompt in a row for one submit.
+  const handleFactsSubmit = useCallback((facts: Record<string, string>) => {
+    const choice = pendingChoice;
+    setPendingChoice(null);
+    if (!choice) return;
+    handleSubmit(choice.problem, { presetOverride: choice.decision.preset ?? undefined, skipGate: true, facts });
   }, [pendingChoice, handleSubmit]);
 
   const handleMethodChoiceCancel = useCallback(() => {
@@ -1270,7 +1281,13 @@ export default function ChatPage() {
                   mounts, so a prompt above the composer was scrolled out of
                   view and Enter looked like it did nothing. */}
               {gateChecking && <MethodChoiceLoading />}
-              {pendingChoice && (
+              {pendingChoice && pendingChoice.decision.stakes?.missing_facts?.length ? (
+                <FactsPrompt
+                  questions={pendingChoice.decision.stakes.missing_facts}
+                  onSubmit={handleFactsSubmit}
+                  onCancel={handleMethodChoiceCancel}
+                />
+              ) : pendingChoice && (
                 <MethodChoicePrompt
                   decision={pendingChoice.decision}
                   alwaysAuto={autoMethodAlways}
@@ -1291,7 +1308,13 @@ export default function ChatPage() {
               </div>
             )}
             {gateChecking && <MethodChoiceLoading />}
-            {pendingChoice && (
+            {pendingChoice && pendingChoice.decision.stakes?.missing_facts?.length ? (
+              <FactsPrompt
+                questions={pendingChoice.decision.stakes.missing_facts}
+                onSubmit={handleFactsSubmit}
+                onCancel={handleMethodChoiceCancel}
+              />
+            ) : pendingChoice && (
               <MethodChoicePrompt
                 decision={pendingChoice.decision}
                 alwaysAuto={autoMethodAlways}
