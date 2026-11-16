@@ -22,8 +22,7 @@
    on --bg. Text in pink uses --ink-pink-text. Ink on a pink fill
    uses --text (6.04:1).
 
-   VALUES ARE HEX ON PURPOSE. lib/canvas-fx.ts returns mid-grey for
-   any token that is not 6-char hex, silently.
+   VALUES ARE HEX ON PURPOSE: the contrast check reads 6-char hex.
 
    CONTRAST: inks are annotated against --bg / --surface /
    --surface-2 / --surface-3. All text inks clear AA on every ground,
@@ -74,7 +73,7 @@
     --ink-overlap:   #6438A0;  /* blue over pink */
 
     /* ---- Interactive role = the blue drum. */
-    --accent:       #1F3FBF;  /* = --ink-blue; hex so check-contrast and canvas-fx can read it */
+    --accent:       #1F3FBF;  /* = --ink-blue; hex so check-contrast can read it */
     --accent-hover: #17309A;
     --accent-text:  #FBFCFA;  /* 8.09:1 on --accent */
     --accent-dim:   rgb(31 63 191 / 0.10);
@@ -100,8 +99,6 @@
     --grain-opacity: 0.07;
     --grain-blend:   multiply;
 
-    --glass-bg:      rgb(251 252 250 / 0.88);
-    --glass-bg-soft: rgb(251 252 250 / 0.72);
 
     /* Scrim darkens in BOTH themes, so it is deliberately not derived
        from --text or --bg (either would invert). */
@@ -167,8 +164,6 @@
       --grain-opacity: 0.06;
       --grain-blend:   screen;
 
-      --glass-bg:      rgb(27 29 35 / 0.86);
-      --glass-bg-soft: rgb(27 29 35 / 0.70);
       --scrim:         rgb(0 0 0 / 0.68);
       --overlay:       rgb(0 0 0 / 0.80);
 
@@ -226,8 +221,6 @@
     --grain-opacity: 0.06;
     --grain-blend:   screen;
 
-    --glass-bg:      rgb(27 29 35 / 0.86);
-    --glass-bg-soft: rgb(27 29 35 / 0.70);
     --scrim:         rgb(0 0 0 / 0.68);
     --overlay:       rgb(0 0 0 / 0.80);
 
@@ -302,10 +295,8 @@
     --site-reader-h: 32rem;       /* tallest scrolling reader inside a fragment (long run output) */
     --site-dialog:   27.5rem;   /* create dialog width */
     --site-tab:      9.5rem;    /* agenda tab column */
-    --site-band-gap: 0.25rem;
     --site-tile-gap: 0.5rem;
     --site-statement-h: 80vh;
-    --site-statement-h-phone: 46svh;
     --site-sticky-top:  14vh;
     --site-footer-gap:  30svh;
     --site-footer-gap-phone: 20svh;

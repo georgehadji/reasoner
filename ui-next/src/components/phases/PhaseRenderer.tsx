@@ -1,5 +1,7 @@
 'use client';
 
+import { ReliabilityBanner, ScopeLine } from './ReliabilityBanner';
+import type { SynthesisReliability, SynthesisScope } from '@/lib/types';
 import { useRef, useEffect, memo } from 'react';
 import { RenderedPhase } from '@/components/chat/ChatFeed';
 import { TEXT_SIZES } from '@/lib/config';
@@ -11,13 +13,21 @@ import { ClassificationCard } from './ClassificationCard';
 import { CritiqueCard } from './CritiqueCard';
 import { PerspectivesRenderer } from './PerspectivesRenderer';
 import { buildMarkdownFromPhase } from '@/lib/markdown';
-import { isSynthesisPhaseName, summarizePhase } from '@/lib/answer';
-import { copyToClipboard } from '@/lib/utils';
+import { dropSectionEcho, isSynthesisPhaseName, summarizePhase } from '@/lib/answer';
+import { copyToClipboard, cn } from '@/lib/utils';
 import { isEnabled } from '@/hooks/useFeatureFlags';
 import { getProvenanceReport } from '@/lib/provenance';
 import { ProvenanceBadge } from '@/components/provenance/ProvenanceBadge';
 
 const isSynthesisPhase = isSynthesisPhaseName;
+
+const SECTION_H = 'mb-[var(--space-2)] text-[length:var(--text-base)] font-semibold leading-[var(--lh-heading)] text-[var(--text)]';
+const SECTION_LIST = 'space-y-[var(--space-1)] pl-[var(--space-5)] text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text)]';
+
+/** A step's own name, or nothing: "Step 3" restates the list's number. */
+function namedStep(step: string | undefined): string {
+  return step && !/^step\s*\d+$/i.test(step.trim()) ? step : '';
+}
 
 interface PhaseRendererProps {
   phase: RenderedPhase;
@@ -263,7 +273,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
           {/* Phase 2: Raw VS ideas */}
           {rawIdeas.length > 0 && clusters.length === 0 && (
             <div className="space-y-2">
-              <p className={`text-[length:var(--text-xs)] font-medium uppercase tracking-wide opacity-60 ${phaseTextClass}`}>
+              <p className={`text-[length:var(--text-xs)] font-medium opacity-60 ${phaseTextClass}`}>
                 {rawIdeas.length} ideas generated
               </p>
               {rawIdeas.map((idea, i) => {
@@ -292,7 +302,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
                 const keptIdeas = clusterIdeas.filter(i => i.keep !== false);
                 return (
                   <div key={ci} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2">
-                    <p className={`text-[length:var(--text-xs)] font-semibold uppercase tracking-wide mb-2 ${phaseTextClass}`}>{String(cluster.theme ?? `Theme ${ci + 1}`)}</p>
+                    <p className={`text-[length:var(--text-xs)] font-semibold mb-2 ${phaseTextClass}`}>{String(cluster.theme ?? `Theme ${ci + 1}`)}</p>
                     {keptIdeas.map((idea, ii) => (
                       <div key={ii} className="flex items-center gap-2 py-1 border-t border-[var(--border)]">
                         <span className={`text-[length:var(--text-xs)] flex-1 ${phaseTextClass}`}>{String(idea.title ?? '')}</span>
@@ -375,32 +385,42 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
     const provenanceReport = getProvenanceReport(data);
     return (
       <SynthesisCard index={index} phase={phaseNum} name={name} tokens={tokens} models={models} subagents={subagents} duration={duration} highlights={synthesisHighlights} sources={synthesisSections?.sources} citations={citations} label={asAnswer ? 'Answer' : undefined} defaultOpen>
+        {(() => {
+          const d = data as Record<string, unknown>;
+          return (
+            <>
+              <ScopeLine scope={d.scope as SynthesisScope | undefined} />
+              <ReliabilityBanner reliability={d.reliability as SynthesisReliability | undefined} />
+            </>
+          );
+        })()}
         {/* The bottom line first: insights, steps and open questions explain it. */}
-        <div className="mb-[var(--space-4)]"><SynthesisRenderer text={md} /></div>
+        <div className="mb-[var(--space-4)]"><SynthesisRenderer text={synthesisSections ? dropSectionEcho(md) : md} /></div>
         {synthesisSections && (
-          <div className="mb-4 grid gap-4">
+          // Sections part by space, not a box each: three outlined panels in
+          // a row read as a stack of identical cards.
+          <div className="mb-[var(--space-4)] grid gap-[var(--space-6)]">
             {synthesisSections.criticalInsights.length > 0 && (
-              <section id="critical-insights" className="scroll-mt-24 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
-                <h3 className="mb-2 text-[length:var(--text-sm)] font-semibold text-[var(--text)]">Critical Insights</h3>
-                <ol className="list-decimal space-y-1 pl-5 text-[length:var(--text-sm)] text-[var(--text)]">
+              <section id="critical-insights" className="scroll-mt-24">
+                <h3 className={SECTION_H}>Critical insights</h3>
+                <ul className={cn(SECTION_LIST, 'list-disc')}>
                   {synthesisSections.criticalInsights.map((item, i) => (
                     <li key={i}>{item}</li>
                   ))}
-                </ol>
+                </ul>
               </section>
             )}
             {synthesisSections.actionBlueprint.length > 0 && (
-              <section id="action-blueprint" className="scroll-mt-24 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-[length:var(--text-sm)] font-semibold text-[var(--text)]">Action Blueprint</h3>
+              <section id="action-blueprint" className="scroll-mt-24">
+                <div className="mb-[var(--space-2)] flex items-center justify-between gap-[var(--space-2)]">
+                  <h3 className={cn(SECTION_H, 'mb-0')}>Action blueprint</h3>
                   <button
                     type="button"
                     onClick={() => {
                       const lines = synthesisSections.actionBlueprint.map((item, i) => {
-                        if (typeof item === 'string') return `- ${item}`;
-                        const step = item.step || `Step ${i + 1}`;
-                        const action = item.action || '';
-                        return `- ${step}: ${action}`;
+                        if (typeof item === 'string') return `${i + 1}. ${item}`;
+                        const step = namedStep(item.step);
+                        return `${i + 1}. ${step ? `${step}: ` : ''}${item.action || ''}`;
                       });
                       copyToClipboard(lines.join('\n'));
                     }}
@@ -409,40 +429,33 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
                     Copy actions
                   </button>
                 </div>
-                <ul className="space-y-1 text-[length:var(--text-sm)] text-[var(--text)]">
+                <ol className={cn(SECTION_LIST, 'list-decimal')}>
                   {synthesisSections.actionBlueprint.map((item, i) => {
-                    if (typeof item === 'string') {
-                      return <li key={i}>• {item}</li>;
-                    }
-                    const step = item.step || `Step ${i + 1}`;
-                    const action = item.action || '';
+                    if (typeof item === 'string') return <li key={i}>{item}</li>;
+                    const step = namedStep(item.step);
                     return (
                       <li key={i}>
-                        <span className="font-semibold">{step}:</span> {action}
+                        {step && <span className="font-semibold">{step}: </span>}
+                        {item.action || ''}
                       </li>
                     );
                   })}
-                </ul>
+                </ol>
               </section>
             )}
             {synthesisSections.openQuestions.length > 0 && (
-              <section id="open-questions" className="scroll-mt-24 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
-                <h3 className="mb-2 text-[length:var(--text-sm)] font-semibold text-[var(--text)]">Open Questions</h3>
-                <ul className="space-y-1 text-[length:var(--text-sm)] text-[var(--text)]">
+              <section id="open-questions" className="scroll-mt-24">
+                <h3 className={SECTION_H}>Open questions</h3>
+                <ul className={cn(SECTION_LIST, 'list-disc')}>
                   {synthesisSections.openQuestions.map((item, i) => (
-                    <li key={i}>• {item}</li>
+                    <li key={i}>{item}</li>
                   ))}
                 </ul>
               </section>
             )}
-
           </div>
         )}
-        {provenanceReport && (
-          <div className="mb-4">
-            <ProvenanceBadge report={provenanceReport} />
-          </div>
-        )}
+        {provenanceReport && <ProvenanceBadge report={provenanceReport} className="mb-[var(--space-4)]" />}
         {onComplete && <CompletionTrigger onComplete={onComplete} />}
       </SynthesisCard>
     );
@@ -473,7 +486,7 @@ function VettedContextBlock({ items }: { items: Array<Record<string, unknown>> }
   return (
     <div className="mb-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Vetted Context</h3>
+        <h3 className="text-[length:var(--text-xs)] font-semibold text-[var(--text-muted)]">Vetted context</h3>
         <span className={`${TEXT_SIZES.tiny} text-[var(--text-subtle)]`}>{items.length} source{items.length === 1 ? '' : 's'}</span>
       </div>
       <div className="space-y-3">

@@ -12,7 +12,7 @@ from typing import Any
 import anyio
 
 from reasoner.api.execution.cancel import StreamingConnectionContext
-from reasoner.api.execution.direct import _stream_direct_answer
+from reasoner.api.execution.direct import CANCELLED, _stream_direct_answer, race_cancel
 from reasoner.api.execution.sse_observer import RunStream
 from reasoner.api.execution.web_search import _stream_web_search_results
 from reasoner.api.history import HistoryEntry, history_repo
@@ -265,6 +265,7 @@ def _build_runner(
 
 
 _CANCEL_POLL_SECONDS = 2.0
+_STOPPED = "stopped by user"
 
 
 async def _cancel_requested(run_id: str, cancel_event: Any) -> None:
@@ -279,6 +280,15 @@ async def _cancel_requested(run_id: str, cancel_event: Any) -> None:
         except TimeoutError:
             if await _run_store.is_cancelled(run_id):
                 return
+
+
+async def _relay_remote_cancel(run_id: str, cancel_event: Any) -> None:
+    """Set the local event when a Stop lands on another worker.
+
+    Every stage of the run then sees it.
+    """
+    await _cancel_requested(run_id, cancel_event)
+    cancel_event.set()
 
 
 async def _run_phases(
@@ -311,7 +321,8 @@ async def _run_phases(
     # cancels the run task, which propagates into whichever phase coroutine is
     # in flight.
     run_task = asyncio.ensure_future(runner.run(strategy, state))
-    cancel_watch = asyncio.ensure_future(_cancel_requested(run_id, cancel_event))
+    # execute_run relays remote Stops into the event.
+    cancel_watch = asyncio.ensure_future(cancel_event.wait())
     try:
         done, _ = await asyncio.wait(
             {run_task, cancel_watch}, return_when=asyncio.FIRST_COMPLETED
@@ -397,7 +408,12 @@ async def _settle_preflight(
     (preflight, None) to go ahead; (None, reason) when the run stops here
     because it was answered without a pipeline or refused by the caller's plan.
     """
-    preflight = await orchestrator.preflight(req, initial_state, user_id=user_id)
+    preflight = await race_cancel(
+        orchestrator.preflight(req, initial_state, user_id=user_id), cancel_event
+    )
+    if preflight is CANCELLED:
+        await stream.emit({"type": "cancelled", "message": "Pipeline stopped by user"})
+        return None, _STOPPED
 
     if preflight.gate_reasoning:
         await stream.emit({
@@ -506,6 +522,8 @@ class PipelineExecutionService:
         # (HyperGate LLM calls) completes.
         await stream.emit({"type": "connecting", "message": "Running system check…"})
         keepalive = asyncio.ensure_future(stream.keepalive())
+        # Covers preflight, direct answers and the phases alike.
+        cancel_relay = asyncio.ensure_future(_relay_remote_cancel(run_id, cancel_event))
 
         state: PipelineState | None = None
         orchestrator = PipelineOrchestrator(
@@ -522,6 +540,9 @@ class PipelineExecutionService:
                 run_id, cancel_event, stream,
             )
             if preflight is None:
+                if stopped_because == _STOPPED:
+                    await stream.cancelled(None, _STOPPED)
+                    return RunOutcome("cancelled", reason=_STOPPED)
                 return RunOutcome("rejected", reason=stopped_because)
 
             pipeline, state, emitter, method = _build_run(
@@ -541,6 +562,12 @@ class PipelineExecutionService:
                 await stream.cancelled(state, "stopped by user")
                 return RunOutcome("cancelled", state, "stopped by user")
 
+            if getattr(state, "_run_fatal", False):
+                # The runner stopped on a critical or run-fatal phase failure.
+                raise RuntimeError(
+                    state.errors[-1] if state.errors else "run stopped on a fatal phase error"
+                )
+
             await _finish_run(orchestrator, req, state, user_id, run_id, run_start, stream)
             return RunOutcome("completed", state)
         except asyncio.CancelledError:
@@ -557,6 +584,9 @@ class PipelineExecutionService:
             )
         finally:
             keepalive.cancel()
+            cancel_relay.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await keepalive
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await cancel_relay
             await _teardown(conn_context, run_id)

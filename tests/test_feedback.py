@@ -55,6 +55,16 @@ class TestFeedbackStore:
         assert entries[0].rating == "up"
 
     @pytest.mark.asyncio
+    async def test_repeat_rating_does_not_overwrite_the_first(self, store):
+        """The endpoint is anonymous: a second caller must not rewrite a rating."""
+        first = FeedbackEntry(conversation_id="c", message_id="m", rating="up")
+        await store.insert(first)
+        await store.insert(FeedbackEntry(conversation_id="c", message_id="m", rating="down"))
+
+        entries = await store.get_entries(limit=10)
+        assert [e.rating for e in entries] == ["up"]
+
+    @pytest.mark.asyncio
     async def test_insert_with_context(self, store):
         """Entries with context should round-trip correctly."""
         await store.insert(

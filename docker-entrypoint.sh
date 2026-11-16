@@ -20,9 +20,10 @@ TIMEOUT="${GUNICORN_TIMEOUT:-120}"
 MAX_REQUESTS="${GUNICORN_MAX_REQUESTS:-1000}"
 MAX_REQUESTS_JITTER="${GUNICORN_MAX_REQUESTS_JITTER:-50}"
 
-# Keep-alive and graceful timeout
+# Keep-alive and graceful timeout. Graceful must exceed PIPELINE_ABSOLUTE_TIMEOUT_SECONDS (600)
+# so a deploy lets in-flight runs drain; UvicornWorker heartbeats while draining, so --timeout is safe.
 KEEP_ALIVE="${GUNICORN_KEEP_ALIVE:-5}"
-GRACEFUL_TIMEOUT="${GUNICORN_GRACEFUL_TIMEOUT:-30}"
+GRACEFUL_TIMEOUT="${GUNICORN_GRACEFUL_TIMEOUT:-660}"
 
 # SSL Configuration (Phase 1: E2EE)
 SSL_ARGS=""

@@ -214,22 +214,3 @@ class ReplayResult:
         }
 
 
-@dataclass
-class PromotionRecord:
-    """Auditable record of a promoted harness mutation."""
-    mutation: HarnessMutation = field(default_factory=HarnessMutation)
-    result: ReplayResult = field(default_factory=ReplayResult)
-    promoted_at: str = ""
-    promoted_by: str = ""      # "auto" for safe, "user:<name>" for HITL
-    artifact_path: str = ""    # path to the JSON patch artifact
-    status: str = "pending"    # "pending" | "promoted" | "rolled_back"
-
-    def to_dict(self) -> dict:
-        return {
-            **self.mutation.to_dict(),
-            "promoted_at": self.promoted_at,
-            "promoted_by": self.promoted_by,
-            "artifact_path": self.artifact_path,
-            "status": self.status,
-            "result": self.result.to_dict(),
-        }

@@ -1,7 +1,7 @@
 """Ratchet for `mypy src/reasoner` violation count.
 
 CI previously ran `mypy --strict` against exactly one file
-(infrastructure/auth_legacy.py) — decorative type-checking that never
+(domain/auth.py, formerly infrastructure/auth_legacy.py) — decorative type-checking that never
 touched the other ~250 source files. Running the pyproject.toml-configured
 (non-strict) profile over the full tree surfaced 429 pre-existing errors
 across 128 files. Hard-blocking on day one would fail every PR immediately,
@@ -10,7 +10,7 @@ scripts/count_importlinter_exceptions.py -- with one deliberate difference:
 dropping BELOW max is a note here, not a failure. Those two count deterministic
 things; this one does not. See the note in main() for the measurement.
 
-The existing `mypy --strict auth_legacy.py` check is kept alongside this,
+The existing `mypy --strict domain/auth.py` check is kept alongside this,
 unchanged — that file is already clean under --strict and stays that way.
 
 Usage: python scripts/mypy_ratchet.py --max N

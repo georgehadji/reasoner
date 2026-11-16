@@ -41,11 +41,6 @@ def is_allowed(bloc: str) -> bool:
     return allowed is None or bloc in allowed
 
 
-def is_western(tags: object = None, *, requested: bool = False) -> bool:
-    """True when a preset's tags or the request ask for a Western-only run."""
-    return requested or (isinstance(tags, (list, tuple, set, frozenset)) and WESTERN_TAG in tags)
-
-
 def run_blocs(preset_id: str | None) -> frozenset[str] | None:
     """Model blocs a run of this preset may call; None means unrestricted.
 

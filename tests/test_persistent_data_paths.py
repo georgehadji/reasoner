@@ -177,17 +177,15 @@ class _StubConn:
         pass
 
 
-def test_auth_store_creates_missing_parent_dir(tmp_path):
-    import asyncio
+def test_error_store_honors_path_and_uses_wal(tmp_path, monkeypatch):
+    from reasoner.infrastructure.persistence.error_store import ErrorStore
 
-    from reasoner.infrastructure.persistence.auth_store import AuthStore
+    target = tmp_path / "sub" / "errors.db"
+    monkeypatch.setattr(settings, "ERROR_DB_PATH", str(target))
 
-    target = tmp_path / "nope" / "nested" / "auth_keys.db"
+    store = ErrorStore()
+    conn = store._get_connection()
 
-    async def _open() -> None:
-        conn = await AuthStore(target)._get_conn()
-        await conn.close()
-
-    asyncio.run(_open())
-
-    assert target.exists()
+    assert store.db_path == target and target.exists()
+    assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+    assert conn.execute("PRAGMA busy_timeout").fetchone()[0] == 5000

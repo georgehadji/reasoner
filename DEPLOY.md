@@ -191,7 +191,6 @@ docker compose cp backend:/app/src/reasoner/events.db history/events.db
 # docker compose cp backend:/app/src/reasoner/infrastructure/events.db history/events.db
 
 docker compose cp backend:/app/src/reasoner/feedback.db history/feedback.db
-docker compose cp backend:/app/src/reasoner/auth_keys.db history/auth_keys.db
 docker compose cp backend:/app/src/reasoner/infrastructure/uploads/. uploads/
 sudo chown -R "$uid" history uploads
 ```
@@ -208,7 +207,7 @@ records live in `infrastructure/events.db` together with the events, and
 copy one as above and merge the other with the `sqlite3` CLI, for example
 `ATTACH 'other.db' AS o; INSERT OR IGNORE INTO pipeline_owners SELECT * FROM o.pipeline_owners;`.
 Paths can be overridden with `EVENT_STORE_DB_PATH`, `FEEDBACK_DB_PATH`,
-`AUTH_DB_PATH` and `UPLOAD_STORAGE_DIR` in `.env`.
+`ERROR_DB_PATH` and `UPLOAD_STORAGE_DIR` in `.env`.
 
 **Shared Neuro data directory (multi-worker or multi-host).** Neuro's L2 index
 already needs every worker to see the same `data_dir`. Account erasure relies on

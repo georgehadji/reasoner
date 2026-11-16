@@ -177,8 +177,9 @@ async def test_verification_error_is_not_applied_and_asks_for_retry(monkeypatch,
 async def test_unconfigured_webhook_id_ignores_event(monkeypatch, applied):
     monkeypatch.delenv("PAYPAL_WEBHOOK_ID")
     _verify_returns(monkeypatch, True)
-    out = await webhooks.handle_paypal_webhook(_request(_EVENT, _HEADERS))
-    assert out == {"status": "misconfigured"}
+    with pytest.raises(HTTPException) as exc:
+        await webhooks.handle_paypal_webhook(_request(_EVENT, _HEADERS))
+    assert exc.value.status_code == 503
     assert applied == []
 
 

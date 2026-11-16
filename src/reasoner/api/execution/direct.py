@@ -28,6 +28,26 @@ from reasoner.phases.direct import (
 
 logger = logging.getLogger(__name__)
 
+CANCELLED = object()
+
+
+async def race_cancel(awaitable: Any, cancel_event: asyncio.Event | None) -> Any:
+    """Result of ``awaitable``, or CANCELLED when ``cancel_event`` fires first.
+
+    The losing work is cancelled.
+    """
+    if cancel_event is None:
+        return await awaitable
+    task = asyncio.ensure_future(awaitable)
+    waiter = asyncio.ensure_future(cancel_event.wait())
+    try:
+        await asyncio.wait({task, waiter}, return_when=asyncio.FIRST_COMPLETED)
+        return task.result() if task.done() else CANCELLED
+    finally:
+        for t in (task, waiter):
+            t.cancel()
+        await asyncio.gather(task, waiter, return_exceptions=True)
+
 
 def _with_extra_cost(meta: dict[str, Any], extra_usd: float) -> dict[str, Any]:
     if extra_usd <= 0:
@@ -124,15 +144,22 @@ async def _stream_direct_answer(
     try:
         if web_search:
             from reasoner.core.settings import settings
-            response, meta = await _call_with_model_fallback(
-                router, (settings.PERPLEXITY_SEARCH_TIER,),
-                profile.system_prompt, user_prompt, profile.max_tokens, profile.temperature,
-            )
+            models = (settings.PERPLEXITY_SEARCH_TIER,)
         else:
-            response, meta = await _call_with_model_fallback(
-                router, profile.models,
+            models = profile.models
+        # A Stop from another worker only sets the event; without the race the
+        # LLM call ran to completion and was billed.
+        result = await race_cancel(
+            _call_with_model_fallback(
+                router, models,
                 profile.system_prompt, user_prompt, profile.max_tokens, profile.temperature,
-            )
+            ),
+            cancel_event,
+        )
+        if result is CANCELLED:
+            yield _event({"type": "cancelled", "message": "Pipeline stopped by user"})
+            return
+        response, meta = result
     except Exception as exc:
         logger.error("Direct answer failed: %s", exc)
         err_msg = redact_capped(f"{type(exc).__name__}: {exc}")[:120]

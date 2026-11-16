@@ -73,6 +73,16 @@ class PostgresBillingDeadLetterRepo(BillingDeadLetterPort):
         await self._ensure_table()
         failure_id = str(uuid.uuid4())
         async with self._pool.acquire(timeout=10.0) as conn:
+            # An unresolved-owner event is released, not completed, so a manual
+            # resend would otherwise add a row per delivery.
+            if payload.get("id"):
+                existing = await conn.fetchval(
+                    "SELECT id FROM failed_webhook_events WHERE provider = $1 "
+                    "AND payload->>'id' = $2 AND replayed_at IS NULL LIMIT 1",
+                    provider, str(payload["id"]),
+                )
+                if existing:
+                    return str(existing)
             await conn.execute(
                 """
                 INSERT INTO failed_webhook_events (id, provider, event_type, payload, error)

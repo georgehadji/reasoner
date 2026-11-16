@@ -56,6 +56,6 @@ describe('RunProgress', () => {
       />,
     );
     expect(screen.getByRole('button', { expanded: false })).toBeTruthy();
-    expect(screen.queryByText('Synthesis Highlights')).toBeNull();
+    expect(screen.queryByText('Synthesis highlights')).toBeNull();
   });
 });

@@ -48,8 +48,8 @@ async def _probe_postgres(database_url: str | None, is_admin: bool) -> dict[str,
         )
         # Deliberately NO reasoner_postgres_pool_* gauges from this pool: it is a
         # private probe pool (min 1, max 2), not a serving pool. The app's real
-        # pools live inside each Postgres repository (DB_POOL_SIZE connections
-        # each), so a gauge fed from here read ~1 permanently and drove
+        # pool is the shared one in infrastructure/persistence/pg_pool.py
+        # (DB_POOL_SIZE connections), so a gauge fed from here read ~1 permanently and drove
         # PostgresPoolLow/PostgresPoolExhaustion on a number unrelated to load.
         return {"status": "ok"}
     except Exception as e:

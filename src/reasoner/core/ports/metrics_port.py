@@ -105,6 +105,29 @@ def count_unverified_access(feature: str, outcome: str) -> None:
         logger.warning("unverified-access metric failed for feature=%s", feature, exc_info=True)
 
 
+_STAKES_COUNTER: Callable[[str, str, str], None] | None = None
+
+
+def set_stakes_counter(counter: Callable[[str, str, str], None] | None) -> None:
+    """Install the sink for high-stakes events: ``(kind, a, b)``."""
+    global _STAKES_COUNTER
+    _STAKES_COUNTER = counter
+
+
+def count_stakes(kind: str, a: str, b: str = "") -> None:
+    """Record a stakes event. ``detected``: a=domain, b=source. ``rerouted``: a=from_action.
+
+    Never raises: metrics must not break routing, but a failure is logged.
+    """
+    counter = _STAKES_COUNTER
+    if counter is None:
+        return
+    try:
+        counter(kind, a, b)
+    except Exception:
+        logger.warning("stakes metric failed for kind=%s", kind, exc_info=True)
+
+
 def count_quota_exceeded(tier: str) -> None:
     """Record one quota-exceeded event. Never raises: metrics must not break a caller."""
     counter = _QUOTA_EXCEEDED_COUNTER

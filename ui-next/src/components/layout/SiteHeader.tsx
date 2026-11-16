@@ -85,7 +85,8 @@ export function SiteHeader() {
     >
       {/* Arms section entrances on every marketing page (renders nothing). */}
       <Reveal />
-      <div className="mx-auto flex h-[var(--space-16)] max-w-[var(--width-wide)] items-center justify-between gap-[var(--space-3)] px-[var(--gutter)]">
+      {/* The page's own frame, so the wordmark sits on the headline's left edge. */}
+      <div className="mx-auto flex h-[var(--space-16)] max-w-[var(--site-max)] items-center justify-between gap-[var(--space-3)] px-[var(--site-margin)]">
         {/* Logo */}
         <Link
           href="/"

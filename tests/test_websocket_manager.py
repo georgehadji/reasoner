@@ -92,3 +92,31 @@ class TestWebSocketManagerConcurrency:
         # Give the async disconnect task time to run
         await asyncio.sleep(0.05)
         assert manager.get_connection_count() == 0
+
+
+class TestReplayBufferLifetime:
+    @pytest.mark.asyncio
+    async def test_bridge_event_without_local_subscriber_is_not_buffered(self):
+        manager = WebSocketManager()
+        msg = WebSocketMessage(type="event", data={"type": "phase"}, pipeline_id="p1")
+
+        await manager.broadcast_to_pipeline("p1", msg, _from_bridge=True)
+
+        assert "p1" not in manager._replay_buffers
+
+    @pytest.mark.asyncio
+    async def test_origin_worker_still_buffers_for_late_subscribers(self):
+        manager = WebSocketManager()
+        msg = WebSocketMessage(type="event", data={"type": "phase"}, pipeline_id="p1")
+
+        await manager.broadcast_to_pipeline("p1", msg)
+
+        assert len(manager._replay_buffers["p1"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_done_event_drops_buffer_when_nobody_is_subscribed(self):
+        manager = WebSocketManager()
+        for t in ("phase", "done"):
+            await manager.broadcast_event({"type": t}, "p1")
+
+        assert "p1" not in manager._replay_buffers

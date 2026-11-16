@@ -57,8 +57,8 @@ from reasoner.core.ports.model_registry_port import set_model_registry_port
 from reasoner.core.ports.shared_cache_port import set_shared_cache_port
 from reasoner.core.rerank import reset_rerank_circuit
 from reasoner.infrastructure.llm.registry import RegistryAdapter
-from reasoner.infrastructure.rate_limiter import reset_rate_limiter_state
 from reasoner.infrastructure.observability.langfuse_subscriber import reset_langfuse
+from reasoner.infrastructure.rate_limiter import reset_rate_limiter_state
 from reasoner.token_cache import reset_token_cache
 
 # The port is a process-global injected by each composition root (api/__init__.py,
@@ -68,6 +68,17 @@ from reasoner.token_cache import reset_token_cache
 # collection order and on how xdist sharded the run. Done at import time rather
 # than in a fixture so it is in place before collection, and once per worker.
 set_model_registry_port(RegistryAdapter())
+
+
+@pytest.fixture(autouse=True)
+def reset_shared_pg_pool():
+    """The shared Postgres pool is process-global; tests that fake create_pool
+    must not leak a fake pool into the next test."""
+    from reasoner.infrastructure.persistence import pg_pool
+
+    pg_pool._slots.clear()
+    yield
+    pg_pool._slots.clear()
 
 
 @pytest.fixture(autouse=True)

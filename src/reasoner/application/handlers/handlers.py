@@ -21,7 +21,6 @@ from reasoner.application.ports.run_outcome import RunOutcome
 from reasoner.application.queries import (
     GetHistoryQuery,
     GetPipelineStatusQuery,
-    ListPresetsQuery,
 )
 from reasoner.core import model_policy
 from reasoner.core.aggregates.pipeline import PipelineAggregate
@@ -532,37 +531,6 @@ class GetHistoryQueryHandler:
         }
 
 
-class ListPresetsQueryHandler:
-    """Handler for ListPresetsQuery."""
-
-    async def handle(self, query: ListPresetsQuery) -> dict[str, Any]:
-        """List available presets."""
-        from reasoner.presets import PRESETS
-
-        presets = []
-        for name, config in PRESETS.items():
-            if query.method and query.method not in name:
-                continue
-
-            presets.append({
-                "name": name,
-                "description": config.get("description", ""),
-                "method": name.split("-")[0] if "-" in name else "multi-perspective",
-                "tier": self._get_tier(name),
-            })
-
-        return {"presets": presets, "total": len(presets)}
-
-    def _get_tier(self, preset_name: str) -> str:
-        """Get preset tier from name."""
-        if "budget" in preset_name:
-            return "budget"
-        elif "premium" in preset_name:
-            return "premium"
-        else:
-            return "standard"
-
-
 # ─────────────────────────────────────────────────────────────────────
 # HANDLER REGISTRY
 # ─────────────────────────────────────────────────────────────────────
@@ -590,7 +558,6 @@ class HandlerRegistry:
         self.query_handlers = {
             "GetPipelineStatusQuery": GetPipelineStatusQueryHandler(event_store),
             "GetHistoryQuery": GetHistoryQueryHandler(event_store),
-            "ListPresetsQuery": ListPresetsQueryHandler(),
         }
 
     def attach_event_store(self, event_store: Any) -> None:

@@ -147,31 +147,19 @@ def test_one_error_tree_reaches_the_router():
     fallback chain -- the same defect as the raw SDK exceptions fixed in
     4af087e.
 
-    P2 (docs/plans/root-cause-remediation-2026-09-07.md) collapsed them: the
-    infrastructure module is now an alias shim, and base.LLMError descends from
-    core.exceptions.ProviderError, which is what the router catches.
+    P2 (docs/plans/root-cause-remediation-2026-09-07.md) collapsed them:
+    base.LLMError descends from core.exceptions.ProviderError, which is what
+    the router catches, and the infrastructure module is gone.
     """
     from reasoner.core.exceptions import ProviderError
     from reasoner.infrastructure.llm import LLMError as exported
     from reasoner.infrastructure.llm.base import LLMError as base_error
-    from reasoner.infrastructure.llm.exceptions import LLMError as legacy
 
     assert exported is base_error
-    assert legacy is base_error, "the deprecated module must alias, not redefine"
     assert issubclass(base_error, ProviderError), (
         "the router catches ProviderError; an LLMError outside that tree "
         "escapes the fallback chain entirely"
     )
-
-
-def test_deprecated_exceptions_module_warns_on_import():
-    """The compat shim must announce itself, so the aliases can be deleted."""
-    import importlib
-    import sys
-
-    sys.modules.pop("reasoner.infrastructure.llm.exceptions", None)
-    with pytest.warns(DeprecationWarning, match="reasoner.core.exceptions"):
-        importlib.import_module("reasoner.infrastructure.llm.exceptions")
 
 
 def test_every_provider_error_subclass_reaches_the_router():
@@ -244,18 +232,16 @@ def test_noop_provider_serves_a_router_instead_of_raising():
 
 
 def test_ports_defines_neither_errors_nor_a_second_provider_base():
-    """ports.py holds data types and one Protocol. Nothing else.
+    """ports.py holds DegradedLLMResponse. Nothing else.
 
     It used to carry a third LLMError tree (dead: nothing imported it, not even
     this module) and a second BaseLLMProvider with an incompatible interface
-    and no complete_with_retry(). Both are deleted in P2; what a caller needs
-    from here is Message/LLMConfig/LLMResponse/DegradedLLMResponse.
+    and no complete_with_retry(). Both are deleted in P2. Its unused data types
+    and LLMProvider Protocol followed in the backend dead-code cut.
     """
     from reasoner.infrastructure.llm import ports
 
     for gone in ("BaseLLMProvider", "LLMError", "AuthenticationError",
                  "ProviderUnavailableError", "is_retryable"):
         assert not hasattr(ports, gone), f"ports.{gone} is back"
-    for kept in ("Message", "LLMConfig", "LLMResponse", "DegradedLLMResponse",
-                 "LLMProvider"):
-        assert hasattr(ports, kept), f"ports.{kept} went missing"
+    assert hasattr(ports, "DegradedLLMResponse"), "ports.DegradedLLMResponse went missing"

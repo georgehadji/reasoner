@@ -165,7 +165,7 @@ export function CommandPalette({
 
         {recentCommands.length > 0 && !query && (
           <div className="px-2 py-2">
-            <p className="mb-1 px-2 text-[length:var(--text-2xs)] font-medium uppercase tracking-wider text-[var(--text-muted)]">Recent</p>
+            <p className="mb-1 px-2 text-[length:var(--text-2xs)] font-medium text-[var(--text-muted)]">Recent</p>
             {recentCommands.map((id) => {
               const cmd = commands.find((c) => c.id === id);
               if (!cmd) return null;

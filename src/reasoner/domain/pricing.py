@@ -171,26 +171,3 @@ def format_cost(cost_usd: float) -> str:
         return f"${cost_usd:.2f}"
 
 
-def print_cost_summary(phase_costs: dict[str, float], total_cost: float) -> str:
-    """
-    Print formatted cost summary.
-    
-    Args:
-        phase_costs: {phase_name: cost_in_usd}
-        total_cost: Total cost in USD
-    
-    Returns:
-        Formatted string for display
-    """
-    lines = [
-        "💰 Cost Summary",
-        "─" * 60,
-    ]
-
-    for phase, cost in phase_costs.items():
-        lines.append(f"  {phase:30s} {format_cost(cost):>10s}")
-
-    lines.append("─" * 60)
-    lines.append(f"  {'TOTAL':30s} {format_cost(total_cost):>10s}")
-
-    return "\n".join(lines)

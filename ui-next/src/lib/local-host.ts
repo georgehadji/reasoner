@@ -18,7 +18,7 @@ const noSubscribe = () => () => {};
 
 /**
  * Whether the app is being served from this machine, where it runs without
- * sign-in (ENABLE_LEGACY_API_KEY). False during server rendering and
+ * sign-in (ALLOW_ANONYMOUS_RUNS). False during server rendering and
  * hydration, so the first client render matches the server's HTML.
  */
 export function useIsLocalHost(): boolean {

@@ -19,7 +19,7 @@ from uuid import UUID
 import jwt
 
 from reasoner.application.ports.auth_port import AuthPort
-from reasoner.auth import AuthenticationError
+from reasoner.domain.auth import AuthenticationError
 from reasoner.domain.saas import User
 
 logger = logging.getLogger(__name__)
@@ -53,12 +53,28 @@ class SupabaseAuthAdapter(AuthPort):
     # shortcut: a token revoked server-side stays valid here for up to 60s.
     _CACHE_TTL_SECONDS = 60.0
     _CACHE_MAX = 1024
+    # A token Supabase rejected is refused locally for this long, so replaying one
+    # cannot force a blocking round trip per request.
+    _REJECT_TTL_SECONDS = 30.0
 
     def __init__(self, supabase_url: str, supabase_service_key: str):
         from supabase import Client, create_client
 
         self._client: Client = create_client(supabase_url, supabase_service_key)
         self._cache: OrderedDict[str, tuple[float, User]] = OrderedDict()
+        self._rejected: OrderedDict[str, float] = OrderedDict()
+
+    def _precheck(self, token: str) -> None:
+        """Refuse malformed, expired or foreign-issuer tokens without a network call."""
+        try:
+            claims = jwt.decode(token, options={"verify_signature": False})
+        except jwt.PyJWTError as exc:
+            raise AuthenticationError("Invalid or expired token", status_code=401) from exc
+        # No issuer check: a forger sets any iss, and a custom Supabase domain
+        # changes the real one, which would lock every user out.
+        exp = claims.get("exp")
+        if not isinstance(exp, int | float) or exp <= time.time():
+            raise AuthenticationError("Invalid or expired token", status_code=401)
 
     async def authenticate(self, token: str) -> User:
         """
@@ -77,7 +93,17 @@ class SupabaseAuthAdapter(AuthPort):
         cached = self._cache.get(key)
         if cached and cached[0] > time.time():
             return cached[1]
-        user = await self._verify(token)
+        if self._rejected.get(key, 0.0) > time.time():
+            raise AuthenticationError("Invalid or expired token", status_code=401)
+        self._precheck(token)
+        try:
+            user = await self._verify(token)
+        except AuthenticationError as exc:
+            if getattr(exc, "rejected", False):  # not a Supabase outage
+                self._rejected[key] = time.time() + self._REJECT_TTL_SECONDS
+                while len(self._rejected) > self._CACHE_MAX:
+                    self._rejected.popitem(last=False)
+            raise
         expires = time.time() + self._CACHE_TTL_SECONDS
         try:
             # Already verified by Supabase; decoded only to bound the cache.
@@ -99,7 +125,9 @@ class SupabaseAuthAdapter(AuthPort):
             supabase_user = response.user
 
             if supabase_user is None:
-                raise AuthenticationError("Invalid or expired token", status_code=401)
+                err = AuthenticationError("Invalid or expired token", status_code=401)
+                err.rejected = True
+                raise err
 
             # Deterministic UUID from Supabase user id
             user_id = UUID(supabase_user.id) if supabase_user.id else UUID(
@@ -138,7 +166,10 @@ class SupabaseAuthAdapter(AuthPort):
             raise
         except Exception as exc:
             logger.warning("Supabase auth validation failed: %s", exc)
-            raise AuthenticationError(f"Auth validation failed: {exc}", status_code=401) from exc
+            err = AuthenticationError(f"Auth validation failed: {exc}", status_code=401)
+            # supabase-py's AuthApiError carries the HTTP status; 4xx means the token was refused.
+            err.rejected = 400 <= (getattr(exc, "status", 0) or 0) < 500
+            raise err from exc
 
     async def delete_identity(self, user_id: str) -> None:
         """Delete the Supabase auth user, which also ends its sessions (BIL-18).

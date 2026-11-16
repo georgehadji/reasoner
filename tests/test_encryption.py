@@ -2,18 +2,14 @@
 Regression tests for reasoner.security.encryption and its persistence consumers.
 
 Each test here corresponds to a defect that was verified broken at runtime:
-  - AuthStore reads raised ValueError (no aiosqlite row_factory)
   - get_encryption_service() rejected the kwargs its only caller passes
   - Blind indexes were empty for every non-ASCII language
-  - A key mismatch silently produced an API key with zero scopes
 """
 
 from __future__ import annotations
 
 import base64
-import json
 import os
-from datetime import UTC, datetime
 
 import pytest
 from cryptography.fernet import Fernet, InvalidToken
@@ -280,7 +276,7 @@ def test_v2_malformed_token_raises_invalid_token_not_value_error(svc_v2, malform
     """
     Regression: base64-decoding a v2 token happened outside the exception
     handler that normalizes failures, so a truncated/corrupt row raised a
-    bare ValueError instead of InvalidToken. auth_store.py's decrypt_optional
+    bare ValueError instead of InvalidToken. A decrypt_optional
     path has no catch-all fallback (by design, see the key-mismatch test
     above) — an unnormalized ValueError there would crash the auth request
     instead of surfacing as a clean, expected failure mode.
@@ -566,124 +562,3 @@ def test_explicit_keys_do_not_poison_the_singleton(monkeypatch, keys):
         reset_encryption_service()
 
 
-# ── AuthStore integration ──
-
-
-@pytest.fixture
-def auth_store(tmp_path, monkeypatch, keys):
-    k1, _, bi = keys
-    monkeypatch.setenv("ENCRYPTION_KEY", k1)
-    monkeypatch.setenv("BLIND_INDEX_KEY", bi)
-    reset_encryption_service()
-    from reasoner.infrastructure.persistence.auth_store import AuthStore
-
-    yield AuthStore(tmp_path / "auth.db")
-    reset_encryption_service()
-
-
-@pytest.mark.asyncio
-@pytest.mark.integration
-async def test_auth_store_roundtrips_encrypted_metadata(auth_store):
-    """Regression: reads raised ValueError because row_factory was never set."""
-    await auth_store.insert(
-        key_hash="hash-1",
-        name="ci-deploy-key",
-        scopes={"read", "write"},
-        is_active=True,
-        rate_limit_tier="high",
-        created_at=datetime.now(UTC),
-        expires_at=None,
-        created_by="admin",
-    )
-
-    row = await auth_store.get_by_hash("hash-1")
-    assert row is not None
-    assert row["name"] == "ci-deploy-key"
-    assert row["scopes"] == {"read", "write"}
-    assert row["is_active"] is True
-
-    assert len(await auth_store.list_all()) == 1
-
-
-@pytest.mark.asyncio
-@pytest.mark.integration
-async def test_auth_store_persists_ciphertext_not_plaintext(auth_store):
-    """The whole point: plaintext must never touch the database file."""
-    import aiosqlite
-
-    await auth_store.insert(
-        key_hash="hash-2",
-        name="super-secret-name",
-        scopes={"admin"},
-        is_active=True,
-        rate_limit_tier="default",
-        created_at=datetime.now(UTC),
-        expires_at=None,
-        created_by=None,
-    )
-
-    async with aiosqlite.connect(auth_store._db_path) as conn:
-        async with conn.execute("SELECT name, scopes FROM api_keys") as cur:
-            name, scopes = await cur.fetchone()
-
-    assert "super-secret-name" not in name
-    assert "admin" not in scopes
-    assert name.startswith("gAAAAA") and scopes.startswith("gAAAAA")
-
-
-@pytest.mark.asyncio
-@pytest.mark.integration
-async def test_auth_store_raises_rather_than_dropping_scopes_on_key_mismatch(
-    auth_store, keys
-):
-    """
-    Regression: the old broad `except Exception` fallback returned an API key
-    with an EMPTY scope set when the key had rotated away — a silent
-    authorization change instead of a loud failure.
-    """
-    _, k2, bi = keys
-    await auth_store.insert(
-        key_hash="hash-3",
-        name="rotated",
-        scopes={"admin", "write"},
-        is_active=True,
-        rate_limit_tier="default",
-        created_at=datetime.now(UTC),
-        expires_at=None,
-        created_by=None,
-    )
-
-    auth_store._encryption = EncryptionService(keys=[k2], blind_index_key=bi)
-    with pytest.raises(InvalidToken):
-        await auth_store.get_by_hash("hash-3")
-
-
-@pytest.mark.asyncio
-@pytest.mark.integration
-async def test_auth_store_reads_legacy_plaintext_rows(auth_store):
-    """Rows written before encryption was enabled must still be readable."""
-    import aiosqlite
-
-    async with aiosqlite.connect(auth_store._db_path) as conn:
-        await conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS api_keys (
-                key_hash TEXT PRIMARY KEY, name TEXT NOT NULL, scopes TEXT NOT NULL,
-                is_active INTEGER NOT NULL DEFAULT 1,
-                rate_limit_tier TEXT NOT NULL DEFAULT 'default',
-                created_at TEXT NOT NULL, expires_at TEXT, created_by TEXT,
-                last_used_at TEXT, usage_count INTEGER NOT NULL DEFAULT 0
-            );
-            """
-        )
-        await conn.execute(
-            "INSERT INTO api_keys (key_hash, name, scopes, is_active, rate_limit_tier,"
-            " created_at, usage_count) VALUES (?, ?, ?, 1, 'default', ?, 0)",
-            ("legacy-1", "old-plaintext-key", json.dumps(["read"]),
-             datetime.now(UTC).isoformat()),
-        )
-        await conn.commit()
-
-    row = await auth_store.get_by_hash("legacy-1")
-    assert row["name"] == "old-plaintext-key"
-    assert row["scopes"] == {"read"}

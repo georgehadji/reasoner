@@ -156,31 +156,22 @@ def test_capabilities_page_renders_no_ungated_sycophancy_claim() -> None:
         prev_end = pos
 
 
-def test_rail_and_section_agree() -> None:
-    """The rail's stage-03 entry and the §6 Sycophancy section must point at each other.
+def test_sycophancy_link_and_section_agree() -> None:
+    """The /about link to the Sycophancy section must resolve.
 
-    Before this test existed, stage 03 linked to /how-it-works#adjudication
-    while the site had no #sycophancy section at all — a claim with nothing to
-    click through to. The rail stayed on the home page when the mechanism
-    sections moved to /capabilities, so the href is now cross-page; what the
-    test guards is unchanged — the link must resolve to the section that
-    exists.
+    Once, the site linked to a sycophancy claim with no section behind it.
+    The link that guarded this lived on the home-page rail (MechanismDiagram),
+    which was removed unrendered; /about now carries the only link, so the
+    test follows it.
     """
-    rail = Path("ui-next/src/components/landing/MechanismDiagram.tsx").read_text(encoding="utf-8")
+    about = Path("ui-next/src/app/about/page.tsx").read_text(encoding="utf-8")
     page = CAPABILITIES_PAGE.read_text(encoding="utf-8")
 
     assert 'id="sycophancy"' in page, "CapabilitiesPage.tsx must define the #sycophancy anchor"
-    assert "href: '/capabilities#sycophancy'" in rail, (
-        "MechanismDiagram's sycophancy stage must link to '/capabilities#sycophancy' "
-        "now that the section lives there — see docs/plans/sycophancy-mitigation.md W10c."
+    assert 'href="/capabilities#sycophancy"' in about, (
+        "/about must link to '/capabilities#sycophancy' — see "
+        "docs/plans/sycophancy-mitigation.md W10c."
     )
-
-    controls = mindmap._detect_sycophancy_controls()
-    if controls["premiseAudit"]:
-        assert "stage: 'Critique'" not in rail.split("failure: 'Sycophancy'")[1].split("},")[0], (
-            "Once premiseAudit ships, the honest stage label is 'Premises', not "
-            "'Critique' — the premise audit runs in Phase 1, before critique."
-        )
 
 
 def test_capabilities_excludes_image_generation_models() -> None:

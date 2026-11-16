@@ -310,5 +310,9 @@ class FinalSolution:
     verification_audit: dict[str, Any] = field(default_factory=dict)
     # Evidence bundles per claim (keyed by claim text, value = EvidenceBundle)
     evidence: dict[str, EvidenceBundle] = field(default_factory=dict)
+    # High-stakes runs: {"jurisdiction": "GR" | None, "as_of": "YYYY-MM-DD"}. Empty otherwise.
+    scope: dict[str, Any] = field(default_factory=dict)
+    # High-stakes runs: {"level": "answer"|"answer_with_caveats"|"refer", "reasons": [...]}.
+    reliability: dict[str, Any] = field(default_factory=dict)
 
 

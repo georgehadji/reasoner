@@ -9,7 +9,6 @@ Covers:
 
 from __future__ import annotations
 
-import asyncio
 
 import pytest
 
@@ -124,55 +123,3 @@ async def test_clear_cache_clears_memory_and_disk(seeded_memory_cache, tmp_path,
     assert "regression-test-key" not in _MEMORY_CACHE
     assert not test_file.exists()
     assert result["cleared"] >= 1
-
-
-# ─────────────────────────────────────────────────────────────────────
-# BUG-003: AuthManager.generate_key must be async-safe
-# ─────────────────────────────────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_generate_key_is_async_and_stores_key():
-    """
-    Regression: generate_key must be awaitable and correctly store the key
-    under the internal asyncio lock.
-    """
-    from reasoner.auth import AuthManager
-
-    manager = AuthManager()
-    raw_key = await manager.generate_key("test-key")
-
-    assert isinstance(raw_key, str)
-    assert len(raw_key) > 0
-
-    key_hash = manager._hash_key(raw_key)
-    assert key_hash in manager._keys
-    assert manager._keys[key_hash].name == "test-key"
-
-
-@pytest.mark.asyncio
-async def test_generate_key_concurrent_safety():
-    """
-    Regression: concurrent generate_key calls must not corrupt _keys.
-    """
-    from reasoner.auth import AuthManager
-
-    manager = AuthManager()
-
-    async def generate_many(n: int) -> list[str]:
-        return [await manager.generate_key(f"key-{i}") for i in range(n)]
-
-    # Run two batches concurrently
-    batch_a, batch_b = await asyncio.gather(
-        generate_many(50),
-        generate_many(50),
-    )
-
-    all_keys = batch_a + batch_b
-    all_hashes = [manager._hash_key(k) for k in all_keys]
-
-    # No duplicates, no missing keys
-    assert len(all_hashes) == len(set(all_hashes))
-    for h in all_hashes:
-        assert h in manager._keys
-
-    assert len(manager._keys) == 100

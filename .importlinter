@@ -61,7 +61,6 @@ ignore_imports=
     reasoner.infrastructure.websocket.manager -> reasoner.application.ports.pipeline_ownership_port
     # ── infrastructure → application (renderer family + event-bus + webhooks) ──
     reasoner.infrastructure.renderer -> reasoner.application.services.renderers.*
-    reasoner.infrastructure.persistence.snapshots -> reasoner.application.event_bus
     reasoner.infrastructure.websocket.manager -> reasoner.application.event_bus
     reasoner.infrastructure.websocket.manager -> reasoner.application.services.auth_service
     reasoner.infrastructure.server_check -> reasoner.application.handlers

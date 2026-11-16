@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from uuid import UUID
 from unittest.mock import AsyncMock, MagicMock
+from uuid import UUID
 
 import pytest
 
@@ -19,18 +19,12 @@ def mock_pool():
 
 
 @pytest.fixture
-def repo(mock_pool):
-    # _pool is a CLASS attribute and _get_pool() reads it off the class, so an
-    # instance-level `r._pool = mock_pool` no longer shadows it -- _get_pool()
-    # saw None and called asyncpg.create_pool() against postgresql://test,
-    # which is why these "mocked pool" tests died on socket.gaierror. Patch the
-    # class attribute and restore it so the process-wide pool stays clean.
-    original = PostgresQuotaRepository._pool
-    PostgresQuotaRepository._pool = mock_pool
-    try:
-        yield PostgresQuotaRepository("postgresql://test")
-    finally:
-        PostgresQuotaRepository._pool = original
+def repo(mock_pool, monkeypatch):
+    # _get_pool() delegates to get_shared_pool; hand it the mock pool.
+    from reasoner.infrastructure.persistence import quota_repo_postgres as mod
+
+    monkeypatch.setattr(mod, "get_shared_pool", AsyncMock(return_value=mock_pool))
+    return PostgresQuotaRepository("postgresql://test")
 
 
 @pytest.mark.asyncio

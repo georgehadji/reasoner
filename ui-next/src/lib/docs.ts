@@ -964,7 +964,7 @@ An agent that has never seen this API can bootstrap from:
 
 ## Self-hosted deployments
 
-The endpoints above work identically on a self-hosted instance – same paths, same \`rsn_live_\` account keys, same metering. One addition: with \`ENABLE_LEGACY_API_KEY=true\`, a legacy admin key also authenticates on these paths, for instances mid-migration off the pre-account-key auth system. New deployments should leave that flag off and mint account keys instead.
+The endpoints above work identically on a self-hosted instance – same paths, same \`rsn_live_\` account keys, same metering.
 `,
   },
   {

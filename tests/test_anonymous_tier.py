@@ -1,7 +1,7 @@
 """ANONYMOUS_TIER: the plan a caller with no account is treated as.
 
 Defaults to FREE, as before. A local or self-hosted instance that runs without
-sign-in (ENABLE_LEGACY_API_KEY=true) had no way past FREE's $0.07 per-run
+sign-in (ALLOW_ANONYMOUS_RUNS=true) had no way past FREE's $0.07 per-run
 ceiling and preset-tier gate, so article-budget and every premium preset were
 refused ("refused by plan limit (per_run)", 2026-11-09). Production refuses any
 value but "free" at startup.

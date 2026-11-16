@@ -148,17 +148,44 @@ async def test_record_shared_uses_valkey_counter_and_falls_back(monkeypatch):
     spend_tracker.reset()
 
     class Fake:
+        """Records round trips: the counter and its TTL must share one."""
+
         def __init__(self):
             self.n = 0.0
             self.expired = None
+            self.trips = 0
 
-        async def incrbyfloat(self, key, amt):
-            self.key = key
-            self.n += amt
-            return self.n
+        def pipeline(self, transaction=True):
+            return _Pipe(self)
 
-        async def expire(self, key, s):
-            self.expired = s
+    class _Pipe:
+        def __init__(self, owner):
+            self.o, self.ops = owner, []
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        def incrbyfloat(self, key, amt):
+            self.ops.append(("incr", key, amt))
+
+        def expire(self, key, s):
+            self.ops.append(("expire", key, s))
+
+        async def execute(self):
+            self.o.trips += 1
+            out = []
+            for op, key, v in self.ops:
+                if op == "incr":
+                    self.o.key = key
+                    self.o.n += v
+                    out.append(self.o.n)
+                else:
+                    self.o.expired = v
+                    out.append(True)
+            return out
 
     fake = Fake()
     monkeypatch.setattr(vclient, "_pool", fake)
@@ -166,10 +193,11 @@ async def test_record_shared_uses_valkey_counter_and_falls_back(monkeypatch):
     assert await spend_tracker.record_shared("u9", 0.5) == pytest.approx(1.5)
     assert fake.key == f"spend:u9:{spend_tracker.current_period()}"
     assert fake.expired == 40 * 86400
+    assert fake.trips == 2, "one round trip per record_shared call"
     assert spend_tracker.get("u9") == pytest.approx(1.5)
 
     class Broken:
-        async def incrbyfloat(self, *a):
+        def pipeline(self, transaction=True):
             raise ConnectionError("down")
 
     monkeypatch.setattr(vclient, "_pool", Broken())

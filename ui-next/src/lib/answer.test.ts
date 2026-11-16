@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   answerMarkdown,
+  dropSectionEcho,
   extractHeadings,
   findAnswer,
   slugify,
@@ -210,3 +211,25 @@ describe('headings', () => {
     ]);
   });
 });
+
+describe('dropSectionEcho', () => {
+  it('cuts the answer where a section the card renders is echoed', () => {
+    const md = 'Switching suppliers risks quality.\n\n**Critical Insights:**\n\n- Capacity at peak';
+    expect(dropSectionEcho(md)).toBe('Switching suppliers risks quality.');
+  });
+
+  it('also catches a markdown heading', () => {
+    expect(dropSectionEcho('Bottom line.\n\n## Open questions\n- Why?')).toBe('Bottom line.');
+  });
+
+  it('leaves an answer that only mentions the words mid-sentence', () => {
+    const md = 'Review the action blueprint before signing.';
+    expect(dropSectionEcho(md)).toBe(md);
+  });
+
+  it('never empties an answer that starts with a section', () => {
+    const md = 'Critical insights: none yet.';
+    expect(dropSectionEcho(md)).toBe(md);
+  });
+});
+

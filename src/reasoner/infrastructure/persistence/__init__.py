@@ -15,10 +15,8 @@ from reasoner.infrastructure.persistence.event_store import (
     reset_event_store,
 )
 from reasoner.infrastructure.persistence.snapshots import (
-    ReadModelProjection,
     SnapshotManager,
     SnapshotStrategy,
-    setup_read_model_projections,
 )
 
 __all__ = [
@@ -31,11 +29,9 @@ __all__ = [
     'PostgreSQLEventStore',
     'get_postgres_store',
     'initialize_postgres_store',
-    # Snapshots & CQRS
+    # Snapshots
     'SnapshotStrategy',
     'SnapshotManager',
-    'ReadModelProjection',
-    'setup_read_model_projections',
 ]
 
 

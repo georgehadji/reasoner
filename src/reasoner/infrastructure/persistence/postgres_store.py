@@ -20,7 +20,12 @@ from datetime import datetime
 from typing import Any
 
 from aiocircuitbreaker import CircuitBreaker  # New import
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential  # New import
+from tenacity import (  # New import
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 try:
     import asyncpg
@@ -48,6 +53,7 @@ from reasoner.core.events.domain_events import (
     WidgetEventType,
 )
 from reasoner.core.ports.crypto_port import EncryptionPort
+from reasoner.infrastructure.persistence.pg_pool import get_shared_pool
 from reasoner.security.encryption import get_encryption_service
 
 # Only transient connectivity failures are worth retrying. Anything else
@@ -125,13 +131,10 @@ class PostgreSQLEventStore:
         if self._pool is not None:
             return
 
-        # Primary pool (read-write)
-        self._pool = await asyncpg.create_pool(
-            dsn=self.connection_string,
-            min_size=2,
-            max_size=self.pool_size,
-            command_timeout=DEFAULT_DB_COMMAND_TIMEOUT,
-        )
+        # Primary pool (read-write): the shared per-worker pool, sized by
+        # DB_POOL_SIZE (pool_size is kept for compatibility). It is closed by
+        # close_shared_pools(), not by close().
+        self._pool = await get_shared_pool(self.connection_string)
 
         # Read replica pool (optional)
         if self.use_read_replica and self.read_replica_url:
@@ -143,12 +146,8 @@ class PostgreSQLEventStore:
                     command_timeout=DEFAULT_DB_COMMAND_TIMEOUT,
                 )
             except Exception as exc:
-                # If read-replica setup fails, close the primary pool to avoid
-                # leaking connections, then re-raise so callers can retry.
-                try:
-                    await self._pool.close()
-                except Exception:
-                    pass  # Best-effort cleanup; preserve original exception
+                # Re-raise so callers can retry; the shared primary pool stays
+                # open for the other adapters.
                 self._pool = None
                 raise exc
 
@@ -1160,8 +1159,7 @@ class PostgreSQLEventStore:
 
     async def close(self) -> None:
         """Close connection pools."""
-        if self._pool:
-            await self._pool.close()
+        self._pool = None  # shared pool, closed by close_shared_pools()
         if self._read_pool:
             await self._read_pool.close()
 

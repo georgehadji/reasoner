@@ -73,7 +73,13 @@ class ErrorStore:
         retention_days: int = 30,
     ):
         if db_path is None:
-            db_path = Path(__file__).parent.parent.parent / "errors.db"
+            from reasoner.core.settings import settings
+
+            # ERROR_DB_PATH puts the file on a mounted volume; the package dir
+            # is replaced on every container redeploy.
+            db_path = settings.ERROR_DB_PATH or (
+                Path(__file__).parent.parent.parent / "errors.db"
+            )
 
         self.db_path = Path(db_path)
         self.retention_days = retention_days
@@ -94,11 +100,20 @@ class ErrorStore:
     def _get_connection(self) -> sqlite3.Connection:
         """Get or create database connection."""
         if self._connection is None:
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
             self._connection = sqlite3.connect(
                 str(self.db_path),
                 check_same_thread=False,
             )
             self._connection.row_factory = sqlite3.Row
+            # Several workers write this file. busy_timeout goes first so the WAL
+            # switch below waits for a competing worker instead of failing.
+            self._connection.execute("PRAGMA busy_timeout=5000")
+            try:
+                self._connection.execute("PRAGMA journal_mode=WAL")
+            except sqlite3.OperationalError:
+                # Another worker is mid-switch; WAL is persistent, so one of us wins.
+                logger.warning("error store: WAL switch lost a race, continuing", exc_info=True)
         return self._connection
 
     async def _run_in_executor(self, func: Callable, *args) -> Any:

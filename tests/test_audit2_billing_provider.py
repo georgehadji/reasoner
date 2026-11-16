@@ -128,7 +128,7 @@ async def test_unresolved_webhook_is_dead_lettered_and_acknowledged(monkeypatch)
     ):
         assert await webhooks.handle_stripe_webhook(request) == {"status": "ok"}
     record.assert_awaited_once()
-    release.assert_not_awaited()  # the claim stays: no retry can do better
+    release.assert_awaited_once()  # released, not done: replay must still be able to apply it
 
 
 # ── BIL-14: one live subscription per user ─────────────────────────────

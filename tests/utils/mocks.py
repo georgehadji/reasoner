@@ -62,22 +62,6 @@ class MockEventStore:
         self.snapshots.pop(aggregate_id, None)
 
 
-class MockAuthStore:
-    """In-memory auth store for testing."""
-
-    def __init__(self):
-        self.keys: dict[str, dict[str, Any]] = {}
-
-    async def get(self, key_hash: str) -> dict[str, Any] | None:
-        return self.keys.get(key_hash)
-
-    async def set(self, key_hash: str, data: dict[str, Any]) -> None:
-        self.keys[key_hash] = data
-
-    async def delete(self, key_hash: str) -> None:
-        self.keys.pop(key_hash, None)
-
-
 def create_mock_redis() -> MagicMock:
     """Create a mock Redis client with async methods."""
     mock = MagicMock()
@@ -103,7 +87,6 @@ class MockNLI:
             self.score_entailment = AsyncMock(side_effect=scores)
         else:
             self.score_entailment = AsyncMock(side_effect=[0.9, 0.5, 0.3, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
-
 
 
 class MockLLM:

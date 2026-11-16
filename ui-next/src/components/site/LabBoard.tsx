@@ -4,10 +4,11 @@ import { useId, useState } from 'react';
 import { MARQUEE_LABS } from '@/lib/capabilities.generated';
 
 /**
- * Large marks on tiles: the labs a run can reach, each tile one lab and the
- * country it is based in. The heading tile carries the Western-only switch;
- * turned on, every lab outside the US and EU is marked "not used", which is
- * what the provider builder enforces (core/model_policy.restrict_blocs()).
+ * The labs a run can reach, grouped by the country each is based in. The
+ * heading panel carries the Western-only switch; turned on, every group
+ * outside the US and EU is marked "not used", which is what the provider
+ * builder enforces (core/model_policy.restrict_blocs()). Grouped, not one tile
+ * per lab: a tile held a name and a country and was otherwise empty.
  *
  * An unmapped lab renders without a country: a missing origin is a gap, a
  * guessed one is a false claim.
@@ -28,6 +29,12 @@ const LAB_ORIGIN: Readonly<Record<string, string>> = {
 };
 const WESTERN = new Set(['US', 'France']);
 
+/** Countries in the order their first lab appears; '' collects unmapped labs. */
+const BY_ORIGIN = MARQUEE_LABS.reduce((m, lab) => {
+  const origin = LAB_ORIGIN[lab] ?? '';
+  return m.set(origin, [...(m.get(origin) ?? []), lab]);
+}, new Map<string, string[]>());
+
 export function LabBoard() {
   const [western, setWestern] = useState(false);
   const switchId = useId();
@@ -35,8 +42,8 @@ export function LabBoard() {
 
   return (
     <section id="labs" aria-labelledby="labs-h" className="mx-auto w-full max-w-[var(--site-max)] px-[var(--site-margin)] py-[var(--space-32)]">
-      <ul className="grid list-none grid-cols-2 gap-[var(--site-tile-gap)] lg:grid-cols-4" data-reveal>
-        <li className="col-span-2 flex min-h-[var(--space-48)] flex-col justify-between gap-[var(--space-8)] rounded-[var(--site-radius)] bg-[var(--site-accent)] p-[var(--space-6)] text-[var(--site-accent-ink)] lg:row-span-2">
+      <div className="grid gap-[var(--site-tile-gap)] lg:grid-cols-2" data-reveal>
+        <div className="flex flex-col justify-between gap-[var(--space-8)] rounded-[var(--site-radius)] bg-[var(--site-accent)] p-[var(--space-6)] text-[var(--site-accent-ink)] lg:p-[var(--space-10)]">
           <h2 id="labs-h" className="font-display text-[length:var(--site-head)] leading-[var(--site-lh-head)]">
             You choose which labs see it.
           </h2>
@@ -64,29 +71,36 @@ export function LabBoard() {
               {used} of {MARQUEE_LABS.length} labs in use
             </p>
           </div>
-        </li>
+        </div>
 
-        {MARQUEE_LABS.map((lab) => {
-          const origin = LAB_ORIGIN[lab];
-          const off = western && !WESTERN.has(origin ?? '');
-          return (
-            <li
-              key={lab}
-              className={`flex aspect-[3/2] flex-col justify-between rounded-[var(--site-radius)] p-[var(--space-6)] transition-colors duration-[var(--dur-state)] ${
-                off ? 'bg-[var(--site-bg)] text-[var(--site-muted)]' : 'bg-[var(--site-surface)] text-[var(--site-ink)]'
-              }`}
-            >
-              <span className={`font-display text-[length:var(--site-lead)] leading-[var(--site-lh-head)] ${off ? 'line-through decoration-2' : ''}`}>
-                {lab}
-              </span>
-              <span className="text-[length:var(--site-small)] text-[var(--site-muted)]">
-                {origin ?? ''}
-                {off ? ' · not used' : ''}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+        <dl className="flex flex-col justify-center gap-[var(--space-10)] rounded-[var(--site-radius)] bg-[var(--site-surface)] p-[var(--space-6)] lg:p-[var(--space-10)]">
+          {[...BY_ORIGIN].map(([origin, labs]) => {
+            const off = western && !WESTERN.has(origin);
+            return (
+              <div key={origin || 'unmapped'}>
+                <dt className="text-[length:var(--site-small)] text-[var(--site-muted)]">
+                  {origin || 'Origin not recorded'}
+                  {off ? ' · not used' : ''}
+                </dt>
+                <dd className="mt-[var(--space-2)]">
+                  <ul className="flex list-none flex-wrap gap-x-[var(--space-6)] gap-y-[var(--space-2)]">
+                    {labs.map((lab) => (
+                      <li
+                        key={lab}
+                        className={`font-display text-[length:var(--site-lead)] leading-[var(--site-lh-head)] transition-colors duration-[var(--dur-state)] ${
+                          off ? 'text-[var(--site-muted)] line-through decoration-2' : 'text-[var(--site-ink)]'
+                        }`}
+                      >
+                        {lab}
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      </div>
       <p className="mt-[var(--space-6)] max-w-[60ch] text-[length:var(--site-body)] leading-[var(--site-lh-body)]">
         Every provider a request can reach is listed in{' '}
         <a href="/subprocessors" className="site-link">

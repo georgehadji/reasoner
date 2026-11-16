@@ -25,7 +25,7 @@ export function EmailVerifyBanner() {
       <span className="flex-1">
         {send.status === 'ok'
           ? `Link sent to ${email}. Check your inbox.`
-          : `Confirm ${email} to unlock your free credits and API keys.`}
+          : `Confirm ${email} to get your free credits and API keys.`}
       </span>
       {send.status !== 'ok' && (
         <button

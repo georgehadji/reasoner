@@ -65,18 +65,23 @@ def harness(monkeypatch):
     router.describe.return_value = "test-router"
 
     calls = SimpleNamespace(
-        phase_runs=0, reset=[], monitor=None, persisted=[], preflight_error=None, block_phase=None
+        phase_runs=0, reset=[], monitor=None, persisted=[], preflight_error=None, block_phase=None,
+        phase_error=None, critical=False,
     )
 
     async def phase_fn(state, services):
         calls.phase_runs += 1
         if calls.block_phase is not None:
             await calls.block_phase.wait()
+        if calls.phase_error is not None:
+            raise calls.phase_error
         state.errors.append(f"attempt-{calls.phase_runs}") if False else None
 
     class _Strategy:
         def get_phases(self, state):
-            return [PhaseStep(2.0, PHASE_NAME, phase_fn, lambda s: {"ok": True})]
+            return [
+                PhaseStep(2.0, PHASE_NAME, phase_fn, lambda s: {"ok": True}, critical=calls.critical)
+            ]
 
     class _Factory:
         def get_strategy(self, method):
@@ -341,3 +346,46 @@ async def test_disconnect_leaves_a_terminal_event_in_the_store(harness):
     assert terminal, "no terminal event was persisted on disconnect"
     assert terminal[-1].event_type == EventType.PIPELINE_CANCELLED
     assert "client_disconnected" in terminal[-1].reason
+
+
+@pytest.mark.asyncio
+async def test_critical_phase_failure_ends_the_run_as_failed(harness):
+    """The runner stops on a critical failure, but execute_run used to finish it as completed."""
+    from reasoner.core.events.domain_events import EventType
+
+    harness.critical = True
+    harness.phase_error = ValueError("boom")
+    events, outcome = await _execute(harness)
+
+    assert outcome.status == "failed"
+    assert not any(e.get("type") == "done" and not e.get("errors") for e in events)
+    assert any(e.event_type == EventType.PIPELINE_FAILED for e in harness.persisted)
+
+
+@pytest.mark.asyncio
+async def test_non_critical_phase_failure_still_completes(harness):
+    harness.phase_error = ValueError("boom")
+    _events, outcome = await _execute(harness)
+
+    assert outcome.status == "completed"
+
+
+@pytest.mark.asyncio
+async def test_stop_from_another_worker_cancels_a_hung_preflight(harness, monkeypatch):
+    """Only _run_phases watched Redis; a Stop during preflight was never seen."""
+    import reasoner.api.execution.pipeline as mod
+
+    async def hang(self, req, initial_state=None, user_id=None):
+        await asyncio.Event().wait()
+
+    async def remote_flag(run_id):
+        return True
+
+    monkeypatch.setattr(mod.PipelineOrchestrator, "preflight", hang)
+    monkeypatch.setattr(mod._run_store, "is_cancelled", remote_flag, raising=False)
+    monkeypatch.setattr(mod, "_CANCEL_POLL_SECONDS", 0.05)
+
+    events, outcome = await asyncio.wait_for(_execute(harness), timeout=5)
+
+    assert outcome.status == "cancelled"
+    assert any(e.get("type") == "cancelled" for e in events)

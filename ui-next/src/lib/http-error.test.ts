@@ -39,7 +39,7 @@ describe('formatRetryAfter', () => {
 });
 
 describe('describeHttpError: unverified email', () => {
-  const confirm = 'Confirm your email to unlock your free credits and API keys. Check your inbox for the link.';
+  const confirm = 'Confirm your email to get your free credits and API keys. Check your inbox for the link.';
 
   it('a 402 marked email_unverified asks for the confirmation, not money', () => {
     const body = JSON.stringify({ error: 'Insufficient credits', detail: { email_unverified: true, upgrade_url: '/pricing' } });

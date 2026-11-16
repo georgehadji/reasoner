@@ -36,8 +36,8 @@ async def _seed(conn) -> str:
     ))
     await conn.execute(
         "INSERT INTO subscriptions (user_id, tier, status, current_period_start, "
-        "current_period_end, stripe_sub_id) VALUES ($1, 'pro', 'active', now(), now(), 'sub_1')",
-        uid,
+        "current_period_end, stripe_sub_id) VALUES ($1, 'pro', 'active', now(), now(), $2)",
+        uid, f"sub_{uuid4().hex}",  # stripe_sub_id is unique; tests seed several users
     )
     await conn.execute(
         "INSERT INTO usage_quotas (user_id, tier, used_queries, max_queries, period_start) "
@@ -157,7 +157,7 @@ async def test_api_key_cap_holds_under_parallel_creates():
             user_id = str(await _seed(conn))
         finally:
             await conn.close()
-        repo = PostgresApiKeyRepository(dsn, pool_size=10)
+        repo = PostgresApiKeyRepository(dsn)
         before = await repo.count_live_for_user(user_id)
         results = await asyncio.gather(*(
             repo.create(user_id, f"k{i}", f"h-{uuid4()}", "p", frozenset({"read"}), max_live=5)

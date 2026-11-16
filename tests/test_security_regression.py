@@ -12,7 +12,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from reasoner.api import app
-from reasoner.auth import AuthManager
 from reasoner.infrastructure.auth import set_auth_adapter
 from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
 
@@ -116,16 +115,9 @@ class TestBug001AdminEndpointHardening:
 class TestBug002KeyValidationRequiresAuth:
     """BUG-002: /api/keys/validate must require authentication."""
 
-    @pytest.fixture
-    async def valid_bearer_token(self):
-        """Generate a real bearer token for tests."""
-        manager = AuthManager()
-        token = await manager.generate_key("test-token", scopes={"read"})
-        return token
-
     def test_validate_keys_no_auth_returns_401(self):
         """Unauthenticated POST to /api/keys/validate must 401."""
-        response = client.post("/api/keys/validate")
+        response = TestClient(app).post("/api/keys/validate")
         assert response.status_code == 401
 
     def test_validate_keys_invalid_auth_returns_401(self):
@@ -136,22 +128,12 @@ class TestBug002KeyValidationRequiresAuth:
         )
         assert response.status_code == 401
 
+    def test_validate_keys_non_admin_returns_403(self):
+        """A signed-in non-admin must not spend the operator's provider keys."""
+        assert client.post("/api/keys/validate").status_code == 403  # default header: non-admin JWT
+
     def test_validate_keys_with_auth_returns_summary(self, monkeypatch):
         """Authenticated request must return summary without burning quota."""
-        import asyncio
-
-        from reasoner.api.auth_deps import _get_auth_manager_instance_auth_deps
-
-        # Use the app's singleton auth manager so the key is recognized
-        auth_manager = _get_auth_manager_instance_auth_deps()
-        loop = asyncio.new_event_loop()
-        try:
-            token = loop.run_until_complete(
-                auth_manager.generate_key("test-token", scopes={"read"})
-            )
-        finally:
-            loop.close()
-
         # Mock build_provider to avoid actual LLM calls
         with patch("reasoner.api.routes.keys.build_provider") as mock_build:
             mock_provider = MagicMock()
@@ -160,7 +142,7 @@ class TestBug002KeyValidationRequiresAuth:
 
             response = client.post(
                 "/api/keys/validate",
-                headers={"Authorization": f"Bearer {token}"},
+                headers={"Authorization": f"Bearer {_admin_token}"},
             )
 
         assert response.status_code == 200

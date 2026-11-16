@@ -113,6 +113,8 @@ class WorkflowRunner:
             # quality layer even with the flag off.
             success = await self.services.run_phase(step, state)
             if not success and (step.critical or getattr(state, "_run_fatal", False)):
+                # The driver reads this: the run stopped early, it did not finish.
+                state._run_fatal = True
                 break
         return state
 

@@ -55,7 +55,6 @@ migration.
 
 ### 2.2. Encrypted Data Fields
 Encryption is applied transparently in the persistence layer:
-- **API Keys:** Key names and permission scopes are encrypted in the SQLite `auth_store`.
 - **Pipeline State:** Entire execution snapshots, including problem descriptions, thoughts, and final solutions, are encrypted in the PostgreSQL `snapshots` table.
 - **Event Payloads:** All domain event data (PHASE_COMPLETED, etc.) is encrypted in the `events` table.
 - **Read Models:** Denormalized CQRS read models are encrypted in the `read_models` table.
@@ -97,8 +96,8 @@ Security relies on the protection of `ENCRYPTION_KEY` and `BLIND_INDEX_KEY`.
 ## 5. Architecture
 
 `core/ports/crypto_port.py` defines `EncryptionPort` (structural, `@runtime_checkable`)
-— `EncryptionService` implements it, and infrastructure call sites (`auth_store.py`,
-`postgres_store.py`, `migrate_encryption_v2.py`) type-annotate against the port rather
+— `EncryptionService` implements it, and infrastructure call sites
+(`postgres_store.py`, `migrate_encryption_v2.py`) type-annotate against the port rather
 than the concrete class. There is no `set_encryption_port()` injection yet: every
 current caller reads the module-level singleton via `get_encryption_service()`
 directly, and none need to swap implementations independently. Add DI when a real

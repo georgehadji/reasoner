@@ -25,7 +25,6 @@ from fastapi import WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
 from reasoner.core.constants import (
-    DEFAULT_HEARTBEAT_INTERVAL,
     WS_MAX_REPLAY_BUFFERS,
     WS_REPLAY_TTL_SECONDS,
 )
@@ -44,6 +43,9 @@ logger = logging.getLogger(__name__)
 WS_BRIDGE_CHANNEL = "reasoner:ws:events"
 # A stalled client must not hold its send lock (or the heartbeat) indefinitely.
 WS_SEND_TIMEOUT_S = 5.0
+
+
+_TERMINAL_EVENT_TYPES = frozenset({"done", "cancelled"})
 
 
 class ReplayState(StrEnum):
@@ -132,7 +134,6 @@ class WebSocketManager:
         self.dropped_after_complete: int = 0
 
         # Background task for heartbeats
-        self._heartbeat_task: asyncio.Task | None = None
 
         # Global lock for state mutations
         self._lock: asyncio.Lock = asyncio.Lock()
@@ -291,7 +292,7 @@ class WebSocketManager:
         Delivers to this worker's subscribers, then (unless the message came
         from the bridge) publishes it so other workers deliver to theirs.
         """
-        await self._deliver_local(pipeline_id, message)
+        await self._deliver_local(pipeline_id, message, from_bridge=_from_bridge)
         if self._bridge_enabled and not _from_bridge:
             await self._publish(pipeline_id, message)
 
@@ -355,8 +356,25 @@ class WebSocketManager:
         self._bridge_enabled = True
         self._bridge_task = asyncio.create_task(self._bridge_loop())
 
-    async def _deliver_local(self, pipeline_id: str, message: WebSocketMessage) -> None:
+    async def _deliver_local(
+        self, pipeline_id: str, message: WebSocketMessage, *, from_bridge: bool = False
+    ) -> None:
         async with self._lock:
+            # Every worker hears every run; only the one with a subscriber needs it.
+            # shortcut: a late subscriber on another worker gets live events but no
+            # replay; upgrade by replaying from the event store on subscribe.
+            if from_bridge and pipeline_id not in self.subscriptions:
+                return
+            # SSE runs never send "complete"; their terminal event is done/cancelled.
+            run_ended = (
+                message.type == "event"
+                and isinstance(message.data, dict)
+                and message.data.get("type") in _TERMINAL_EVENT_TYPES
+            )
+            if run_ended and pipeline_id not in self.subscriptions:
+                self._drop_replay_locked(pipeline_id)
+                return
+            terminal = run_ended or message.type == "complete"
             state = self._replay_state.get(pipeline_id, ReplayState.OPEN)
             if state is ReplayState.COMPLETE:
                 # A late event must not append to a finished run's buffer: a
@@ -368,7 +386,7 @@ class WebSocketManager:
             # Buffer event for late-joining subscribers
             if pipeline_id not in self._replay_buffers:
                 self._replay_buffers[pipeline_id] = deque(maxlen=self._max_replay_events)
-            if message.type == "complete":
+            if terminal:
                 state = WS_REPLAY.move(state, ReplayState.COMPLETE)
             self._replay_state[pipeline_id] = state
             self._replay_buffers[pipeline_id].append(message)
@@ -429,50 +447,6 @@ class WebSocketManager:
         )
         await self.broadcast_to_pipeline(pipeline_id, message)
 
-    async def broadcast_progress(
-        self,
-        phase: str,
-        status: str,
-        pipeline_id: str,
-        progress: dict[str, Any] | None = None,
-    ) -> None:
-        """Broadcast pipeline progress update."""
-        message = WebSocketMessage(
-            type='progress',
-            data={
-                'phase': phase,
-                'status': status,
-                'progress': progress or {},
-            },
-            pipeline_id=pipeline_id,
-        )
-        await self.broadcast_to_pipeline(pipeline_id, message)
-
-    async def broadcast_complete(
-        self,
-        result: dict[str, Any],
-        pipeline_id: str,
-    ) -> None:
-        """Broadcast pipeline completion."""
-        message = WebSocketMessage(
-            type='complete',
-            data={'result': result},
-            pipeline_id=pipeline_id,
-        )
-        await self.broadcast_to_pipeline(pipeline_id, message)
-
-    async def broadcast_error(
-        self,
-        error: str,
-        pipeline_id: str,
-    ) -> None:
-        """Broadcast error to pipeline subscribers."""
-        message = WebSocketMessage(
-            type='error',
-            data={'error': error},
-            pipeline_id=pipeline_id,
-        )
-        await self.broadcast_to_pipeline(pipeline_id, message)
 
     def get_connection_count(self) -> int:
         """Get number of active connections."""
@@ -481,41 +455,6 @@ class WebSocketManager:
     def get_subscriber_count(self, pipeline_id: str) -> int:
         """Get number of subscribers for a pipeline."""
         return len(self.subscriptions.get(pipeline_id, set()))
-
-    async def start_heartbeat(self, interval: float = DEFAULT_HEARTBEAT_INTERVAL) -> None:
-        """Start heartbeat task to detect dead connections."""
-        async def heartbeat_loop():
-            while True:
-                await asyncio.sleep(interval)
-
-                # Snapshot connections under lock, then ping outside the lock.
-                async with self._lock:
-                    connection_ids = list(self.active_connections.keys())
-
-                for connection_id in connection_ids:
-                    try:
-                        async with self._lock:
-                            if connection_id not in self.active_connections:
-                                continue
-                            websocket = self.active_connections[connection_id]
-                        conn_lock = self._connection_locks.setdefault(connection_id, asyncio.Lock())
-                        async with conn_lock:
-                            await asyncio.wait_for(
-                                websocket.send_json({'type': 'ping'}), WS_SEND_TIMEOUT_S
-                            )
-                    except Exception:
-                        self.disconnect(connection_id)
-
-        self._heartbeat_task = asyncio.create_task(heartbeat_loop())
-
-    async def stop_heartbeat(self) -> None:
-        """Stop heartbeat task."""
-        if self._heartbeat_task:
-            self._heartbeat_task.cancel()
-            try:
-                await self._heartbeat_task
-            except asyncio.CancelledError:
-                pass
 
 
 # ─────────────────────────────────────────────────────────────────────

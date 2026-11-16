@@ -99,3 +99,43 @@ async def test_an_event_valkey_already_finished_is_marked_done(monkeypatch, leas
 
     handle.assert_not_awaited()
     done.assert_awaited_once_with("WH-1", "paypal")
+
+
+@pytest.mark.asyncio
+async def test_unresolved_owner_is_acknowledged_but_released_for_replay(monkeypatch, lease):
+    """A 'done' row makes replay_failed_webhooks mark the dead letter replayed
+    without ever applying it, so the lease must be released instead."""
+    from reasoner.domain.saas import UnresolvedBillingOwnerError
+
+    done, release = lease
+    monkeypatch.setattr(
+        BillingService, "handle_webhook",
+        AsyncMock(side_effect=UnresolvedBillingOwnerError("no user")),
+    )
+    monkeypatch.setattr(webhooks, "_record_webhook_failure", AsyncMock())
+
+    out = await webhooks.handle_paypal_webhook(_request(_EVENT, _HEADERS))
+
+    assert out == {"status": "ok"}
+    release.assert_awaited_once_with("WH-1", "paypal")
+    done.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_valkey_collision_releases_lease_and_asks_for_retry(monkeypatch, lease):
+    _, release = lease
+
+    class _Busy(_Valkey):
+        async def set(self, *a, **k):
+            return None
+
+    monkeypatch.setattr(webhooks, "get_valkey_pool", lambda: _Busy())
+    handle = AsyncMock()
+    monkeypatch.setattr(BillingService, "handle_webhook", handle)
+
+    with pytest.raises(HTTPException) as exc:
+        await webhooks.handle_paypal_webhook(_request(_EVENT, _HEADERS))
+
+    assert exc.value.status_code == 503
+    release.assert_awaited_once_with("WH-1", "paypal")
+    handle.assert_not_awaited()

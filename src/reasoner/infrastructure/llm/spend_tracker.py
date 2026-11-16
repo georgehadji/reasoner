@@ -52,8 +52,14 @@ async def record_shared(subject: str, cost_usd: float) -> float:
         from reasoner.infrastructure.valkey.guarded import get_guarded_valkey
 
         valkey = get_guarded_valkey(get_valkey_pool())
-        total = float(await valkey.run(lambda: valkey.client.incrbyfloat(key, cost_usd)))
-        await valkey.expire(key, _TTL_SECONDS)
+        async def _incr_and_expire() -> float:
+            # One round trip per call instead of INCRBYFLOAT then EXPIRE.
+            async with valkey.client.pipeline(transaction=True) as pipe:
+                pipe.incrbyfloat(key, cost_usd)
+                pipe.expire(key, _TTL_SECONDS)
+                return (await pipe.execute())[0]
+
+        total = float(await valkey.run(_incr_and_expire))
     except Exception as exc:
         logger.warning("Shared spend counter unavailable, using local: %s", exc)
         return record(subject, cost_usd)

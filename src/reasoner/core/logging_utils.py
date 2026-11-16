@@ -9,10 +9,8 @@ from __future__ import annotations
 import json
 import logging
 import logging.handlers
-import queue as queue_module
 import re
 import sys
-import time
 import uuid
 from collections.abc import Mapping
 from contextvars import ContextVar
@@ -36,44 +34,6 @@ _log_context: ContextVar[Mapping[str, Any]] = ContextVar(
 
 
 # ── Queue-based async logging (Phase 1.4: replaces blocking print()) ──────────
-
-_log_raw_queue: queue_module.Queue | None = None
-_log_listener: logging.handlers.QueueListener | None = None
-
-
-def setup_queue_logging(level: int = logging.INFO) -> None:
-    """Configure queue-based logging to stdout (non-blocking I/O).
-
-    Call once at application startup. Replaces the synchronous ``print()``
-    in ``StructuredLogger._log`` with a QueueHandler + QueueListener.
-    """
-    global _log_raw_queue, _log_listener
-
-    # Close existing listener if reconfiguring
-    if _log_listener is not None:
-        _log_listener.stop()
-
-    q: queue_module.Queue = queue_module.Queue(-1)  # unbounded
-    queue_handler = logging.handlers.QueueHandler(q)
-
-    # JSON stdout handler
-    stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.setLevel(level)
-    stream_handler.setFormatter(logging.Formatter("%(message)s"))
-
-    listener = logging.handlers.QueueListener(q, stream_handler, respect_handler_level=True)
-    listener.start()
-
-    _log_raw_queue = q
-    _log_listener = listener
-
-
-def stop_queue_logging() -> None:
-    """Stop the queue listener (call on app shutdown)."""
-    global _log_listener
-    if _log_listener is not None:
-        _log_listener.stop()
-        _log_listener = None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -495,18 +455,7 @@ class StructuredLogger:
             preset=ctx.get("preset"),
         )
 
-        # Output as JSON via non-blocking queue handler
-        if _log_raw_queue is not None:
-            # Put raw JSON string directly on the queue; QueueListener's
-            # stream_handler writes it to stdout (formatter="%(message)s")
-            msg_log_record = self.logger.makeRecord(
-                self.logger.name, getattr(logging, level.value), "", 0,
-                entry.to_json(), (), None,
-            )
-            _log_raw_queue.put(msg_log_record)
-        else:
-            # Fallback: direct print (before logging is configured)
-            print(entry.to_json(), file=sys.stdout)
+        print(entry.to_json(), file=sys.stdout)
 
         # Also log to standard logger for development
         std_level = getattr(logging, level.value)
@@ -531,80 +480,8 @@ class StructuredLogger:
         self._log(LogLevel.ERROR, message, extra, exc_info=True)
 
 
-# Pre-configured loggers for each component
-api_logger = StructuredLogger("api", LogSource.API)
 pipeline_logger = StructuredLogger("pipeline", LogSource.PIPELINE)
 llm_logger = StructuredLogger("llm", LogSource.LLM)
-parsing_logger = StructuredLogger("parsing", LogSource.PARSING)
-presets_logger = StructuredLogger("presets", LogSource.PRESETS)
-
-
-# Decorator for timing async functions
-def timed_async(correlation_extra: dict[str, Any] | None = None):
-    """Decorator to log execution time of async functions."""
-    def decorator(func):
-        async def wrapper(*args, **kwargs):
-            logger = pipeline_logger
-            func_name = func.__name__
-            start_time = time.monotonic()
-
-            logger.info(
-                f"Starting {func_name}",
-                extra={
-                    "event": "function_start",
-                    "function": func_name,
-                    **(correlation_extra or {}),
-                },
-            )
-
-            try:
-                result = await func(*args, **kwargs)
-                duration = time.monotonic() - start_time
-                logger.info(
-                    f"Completed {func_name}",
-                    extra={
-                        "event": "function_complete",
-                        "function": func_name,
-                        "duration_seconds": round(duration, 3),
-                        **(correlation_extra or {}),
-                    },
-                )
-                return result
-            except Exception as e:
-                duration = time.monotonic() - start_time
-                logger.error(
-                    f"Failed {func_name}",
-                    extra={
-                        "event": "function_error",
-                        "function": func_name,
-                        "duration_seconds": round(duration, 3),
-                        "error": str(e),
-                        "error_type": type(e).__name__,
-                        **(correlation_extra or {}),
-                    },
-                )
-                raise
-
-        return wrapper
-    return decorator
-
-
-def setup_production_logging() -> None:
-    """Auto-configure logging based on environment (Phase 4.2 hardening).
-
-    Production: JSON-structured logs to stdout (consumed by log aggregators).
-    Development: Human-readable format with timestamps.
-    Testing: Suppress log output.
-    """
-    from reasoner.core.settings import settings
-
-    env = getattr(settings, 'ENVIRONMENT', 'development')
-    if env == 'production':
-        configure_logging(level='INFO', json_output=True)
-    elif env == 'testing':
-        configure_logging(level='WARNING', json_output=False)
-    else:
-        configure_logging(level='DEBUG', json_output=False)
 
 
 def configure_logging(level: str = "INFO", json_output: bool = False) -> None:

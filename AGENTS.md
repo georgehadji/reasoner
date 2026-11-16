@@ -264,7 +264,7 @@ Copy `.env.example` to `.env` and fill in:
 |----------|---------|
 | `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Supabase project credentials |
 | `JWT_SECRET_KEY` | Local dev JWT fallback when Supabase is unavailable |
-| `ENABLE_LEGACY_API_KEY` | Set `true` for v1 API backward compatibility |
+| `ALLOW_ANONYMOUS_RUNS` | Set `true` to allow account-less runs (fallback: legacy `ENABLE_LEGACY_API_KEY`) |
 
 **Database & Cache**
 | Variable | Purpose |
@@ -317,7 +317,7 @@ Copy `.env.example` to `.env` and fill in:
 - **Admin endpoint hardening:** Admin endpoints require BOTH a valid JWT with `admin` scope AND a correct `X-Admin-Key` header; uses `secrets.compare_digest()` for constant-time comparison
 - **Environment guard:** `ENVIRONMENT=development` explicitly logs an insecure-CORS warning on startup
 - **Safe logging:** `install_global_redaction()` (called from `reasoner/__init__.py`) redacts API keys and secrets from all log output
-- **Horizontal Scaling Limitations:** Rate limiter, circuit breaker, and auth store are in-memory by default. For multi-worker deployments, enable `AUTH_PERSISTENCE_ENABLED=true`, set `RATE_LIMITER_MODE=redis` / `CIRCUIT_BREAKER_MODE=redis`, and place a shared rate limiter (e.g., Redis or reverse-proxy) in front of the app.
+- **Horizontal Scaling Limitations:** Rate limiter and circuit breaker are in-memory by default. For multi-worker deployments, set `RATE_LIMITER_MODE=redis` / `CIRCUIT_BREAKER_MODE=redis`, and place a shared rate limiter (e.g., Redis or reverse-proxy) in front of the app.
 
 ---
 

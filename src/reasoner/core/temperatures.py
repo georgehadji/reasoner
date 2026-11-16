@@ -80,25 +80,3 @@ PHASE_REASONING_EFFORT: dict[str, str] = {
 REASONING_TEMPERATURE_FLOOR: float = 0.6
 
 
-def temperature_for(phase: str, *, is_reasoning_model: bool = False) -> float:
-    """Resolve the effective temperature for a phase.
-
-    Applies REASONING_TEMPERATURE_FLOOR when the routed model runs an internal
-    chain-of-thought, so low structured-phase temps don't starve it.
-    """
-    base = PHASE_TEMPERATURES.get(phase, PHASE_TEMPERATURES["primary"])
-    if is_reasoning_model and base < REASONING_TEMPERATURE_FLOOR:
-        return REASONING_TEMPERATURE_FLOOR
-    return base
-
-
-def reasoning_extra_body(phase: str) -> dict[str, dict[str, str]] | None:
-    """Return an OpenRouter ``extra_body`` reasoning override for a phase.
-
-    Returns ``{"reasoning": {"effort": <level>}}`` or None when the phase has
-    no configured effort. Models that don't support reasoning ignore this.
-    """
-    effort = PHASE_REASONING_EFFORT.get(phase)
-    if not effort:
-        return None
-    return {"reasoning": {"effort": effort}}
