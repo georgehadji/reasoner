@@ -393,7 +393,7 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         rows={1}
-        aria-label={isImageMode ? 'Describe the image to generate' : 'Ask anything'}
+        aria-label={isImageMode ? 'Describe the image to generate' : 'Problem'}
         className="w-full resize-none bg-transparent px-[var(--space-5)] pt-[var(--space-4)] text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text)] transition-[height] duration-[var(--dur-micro)] ease-[var(--ease-standard)] placeholder:text-[var(--text-muted)] placeholder:transition-colors placeholder:duration-[var(--dur-micro)] focus:outline-none"
         style={{ minHeight: minH }}
       />
