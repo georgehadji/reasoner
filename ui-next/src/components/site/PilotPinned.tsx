@@ -63,7 +63,7 @@ export function PilotPinned() {
                 ref={(el) => {
                   refs.current[i] = el;
                 }}
-                className="flex min-h-[var(--site-statement-h-phone)] flex-col justify-center lg:min-h-[var(--site-statement-h)]"
+                className="flex flex-col justify-center py-[var(--space-6)] lg:min-h-[var(--site-statement-h)] lg:py-0"
               >
                 <p
                   className={`font-display text-[length:var(--site-head)] leading-[var(--site-lh-head)] transition-colors duration-[var(--dur-state)] ${
@@ -80,9 +80,11 @@ export function PilotPinned() {
           </ol>
         </div>
 
-        {/* order-first on phones: the stage sticks at the top above the
-            statements. Desktop: columns 7-12, sticky at 14vh. */}
-        <div className="order-first lg:order-none lg:col-span-6 lg:col-start-7">
+        {/* Phones: no pin. A sticky stage in its own grid cell has nowhere to
+            travel, so the statements stack at their natural height and the
+            brief follows them, in the state the last one reached. Desktop:
+            columns 7-12, sticky at 14vh. */}
+        <div className="lg:col-span-6 lg:col-start-7">
           <div className="sticky top-[var(--site-sticky-top)] z-10 rounded-[var(--site-radius)] bg-[var(--site-surface)] p-[var(--space-6)] lg:p-[var(--space-10)]">
             <div data-ui aria-live="polite" className="mx-auto w-full max-w-[var(--site-fragment)] rounded-[var(--radius-lg)] border border-[var(--site-line)] bg-[var(--site-bg)]">
               <div className="flex items-center justify-between border-b border-[var(--site-line)] px-[var(--space-4)] py-[var(--space-3)]">
