@@ -91,7 +91,7 @@ export function UpgradeModal({ open, onClose }: UpgradeModalProps) {
           </div>
 
           <p id="upgrade-desc" className="mb-[var(--space-6)] text-[var(--text-2)]">
-            You&apos;ve reached your free tier limit. Upgrade to Pro to unlock all premium presets.
+            You&apos;ve reached your free tier limit. Upgrade to Pro to run the premium presets.
           </p>
 
           {error && (

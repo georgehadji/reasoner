@@ -296,7 +296,7 @@ export default function SignupPage() {
               ? 'Account created'
               : submitting
                 ? 'Creating account…'
-                : 'Sign Up'}
+                : 'Sign up'}
           </Button>
         </form>
 

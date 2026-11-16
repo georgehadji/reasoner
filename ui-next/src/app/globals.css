@@ -656,29 +656,6 @@
   .stagger-children > *:nth-child(5) { animation-delay: calc(var(--stagger-step) * 4); }
   .stagger-children > *:nth-child(6) { animation-delay: calc(var(--stagger-step) * 5); }
 
-  /* Glass — derived from --surface so it tracks the theme.
-     Previously hardcoded rgba(10,15,22,.70), a colour from the retired
-     blue-black palette that no longer matched any surface token. */
-  .glass {
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px) saturate(1.4);
-    -webkit-backdrop-filter: blur(20px) saturate(1.4);
-    border: 1px solid var(--border);
-  }
-
-  .glass-card {
-    background: var(--glass-bg-soft);
-    backdrop-filter: blur(12px) saturate(1.2);
-    -webkit-backdrop-filter: blur(12px) saturate(1.2);
-    border: 1px solid var(--border);
-  }
-
-  /* Dot-grid background pattern */
-  .dot-grid {
-    background-image: radial-gradient(var(--border-strong) 1px, transparent 1px);
-    background-size: 32px 32px;
-  }
-
   /* Scrollbar styling */
   .scrollbar-thin {
     scrollbar-width: thin;

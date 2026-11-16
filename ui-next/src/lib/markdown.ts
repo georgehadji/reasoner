@@ -118,7 +118,7 @@ export function buildMarkdownFromPhase(
         });
       }
       if (Array.isArray(c.vetting_flags) && c.vetting_flags.length) {
-        append(`  ⚠️ Vetting flags: ${c.vetting_flags.length}\n`);
+        append(`  Vetting flags: ${c.vetting_flags.length}\n`);
       }
     });
     append('\n');
@@ -877,8 +877,8 @@ export function buildMarkdownFromPhase(
       (ws.cove_verification_answers as Array<Record<string, any>>).forEach((a) => {
         const verdict = typeof a.verdict === 'string' ? a.verdict : '?';
         const answer = typeof a.answer === 'string' ? a.answer : '';
-        const icon = verdict === 'supports' ? '✅' : verdict === 'contradicts' ? '❌' : '⚠️';
-        append(`- ${icon} ${answer}\n`);
+        const label = verdict === 'supports' ? 'Supports' : verdict === 'contradicts' ? 'Contradicts' : 'Unclear';
+        append(`- **${label}:** ${answer}\n`);
       });
       append('\n');
     }
@@ -893,8 +893,8 @@ export function buildMarkdownFromPhase(
         (ws.claims as Array<Record<string, any>>).slice(0, 5).forEach((c, i) => {
           const text = typeof c.text === 'string' ? c.text : '';
           const status = typeof c.status === 'string' ? c.status : '';
-          const icon = status === 'verified' ? '✅' : status === 'weak' ? '⚠️' : status === 'rejected' ? '❌' : '';
-          append(`  ${i + 1}. ${icon} ${text}\n`);
+          const label = status === 'verified' ? '**Verified:** ' : status === 'weak' ? '**Weak:** ' : status === 'rejected' ? '**Rejected:** ' : '';
+          append(`  ${i + 1}. ${label}${text}\n`);
         });
         if (ws.claims.length > 5) append(`  ... and ${ws.claims.length - 5} more\n`);
         append('\n');
@@ -974,7 +974,7 @@ export function buildMarkdownFromPhase(
     if (Array.isArray(ws.factcheck_reviews) && ws.factcheck_reviews.length) {
       append('**Fact-Check Reviews**\n');
       (ws.factcheck_reviews as Array<Record<string, any>>).forEach((fr, i) => {
-        const verified = fr.verified === true ? '✅' : '⚠️';
+        const verified = fr.verified === true ? '**Verified**' : '**Not verified**';
         const conf = typeof fr.confidence === 'number' ? `${Math.round(fr.confidence * 100)}%` : '?';
         append(`${i + 1}. ${verified} Paragraph ${fr.paragraph_num || i + 1} — confidence: ${conf}\n`);
         if (Array.isArray(fr.unverified_claims) && fr.unverified_claims.length) {

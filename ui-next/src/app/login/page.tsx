@@ -289,7 +289,7 @@ export default function LoginPage() {
             loading={submitting}
             aria-busy={submitting}
           >
-            {success ? 'Signed in' : submitting ? 'Signing in…' : 'Sign In'}
+            {success ? 'Signed in' : submitting ? 'Signing in…' : 'Sign in'}
           </Button>
         </form>
 

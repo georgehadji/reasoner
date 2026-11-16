@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useEffect, useCallback, useMemo, useSyncExternalStore } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '@/stores/app-store';
 import { EXAMPLE_PROMPTS, LIMITS, TIMING, API } from '@/lib/config';
 import { cn } from '@/lib/utils';
@@ -93,34 +93,6 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
   const isImageMode = useAppStore((s) => s.isImageMode);
   const toggleImageMode = useAppStore((s) => s.toggleImageMode);
   const hasContent = composerText.trim().length > 0 || attachments.length > 0;
-
-  const user = useAppStore((s) => s.user);
-
-  /* The greeting depends on the client's clock, so the server cannot render it.
-     Two wrong ways to handle that, both previously tried here:
-       - compute it during render behind `typeof window` + suppressHydrationWarning
-         -> React then *accepts the server text as correct and never patches it*,
-            so the greeting stays stuck on the fallback for the whole
-            pre-interaction session (nothing else re-renders this component for a
-            logged-out visitor -- `user` is not persisted by the store);
-       - setState inside an effect -> works, but is what react-hooks/set-state-in-effect
-         correctly flags, since an effect is not where derived state belongs.
-     useSyncExternalStore is React's actual primitive for a client-only value:
-     it hands back the server snapshot during SSR and hydration (so the markup
-     matches with nothing suppressed), then re-renders once with the client
-     snapshot. The store never emits, so this subscribes to nothing. */
-  const isClient = useSyncExternalStore(
-    useCallback(() => () => {}, []),
-    () => true,
-    () => false,
-  );
-  const greeting = useMemo(() => {
-    if (!isClient) return 'Ready when you are';
-    const hour = new Date().getHours();
-    const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-    const name = user?.email?.split('@')[0];
-    return name ? `${part}, ${name}` : part;
-  }, [isClient, user]);
 
   const [estimate, setEstimate] = useState<{ tokens: number; cost: string; duration: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -467,37 +439,40 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
     return (
       <div className="flex h-full w-full flex-col items-center justify-center px-[var(--gutter)] py-[var(--space-8)]">
         <div className="w-full max-w-[var(--width-chat)]">
-          {/* Serif, and the only display-scale type in the app shell. The
-              greeting is the one moment the product speaks before it works.
-              No suppressHydrationWarning: `greeting` starts at the neutral
-              server value and is replaced post-mount by the effect above, so
-              there is no mismatch to suppress -- and suppressing one here
-              would silence genuine future mismatches in this element. */}
-          <h1 className="mb-[var(--space-8)] text-center font-display text-[length:var(--text-4xl)] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
-            {isImageMode ? 'What should we picture?' : greeting}
+          {/* Says what the product does instead of greeting: a clock-based
+              "Good morning" and "How can I help you today?" made this the
+              same empty state as every chat assistant, which Reasoner is not. */}
+          <h1 className="font-display text-[length:var(--text-2xl)] leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+            {isImageMode ? 'What should we picture?' : 'Name one problem.'}
           </h1>
+          <p className="mb-[var(--space-6)] mt-[var(--space-2)] max-w-[60ch] text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-2)]">
+            {isImageMode
+              ? 'Describe what you want to see, and it is drawn by an image model.'
+              : 'A hard one goes to rival labs at once. A critic from another lab scores the answers, and each claim comes back labelled verified, hypothesis or unknown.'}
+          </p>
 
           {inputBox(96, isImageMode ? 'Describe the image you want to generate…' : 'How can I help you today?')}
 
           {!isImageMode && (
-            <div className="mt-[var(--space-6)] flex flex-wrap justify-center gap-[var(--space-2)]">
+            <ul className="-ml-[var(--space-2)] mt-[var(--space-6)] flex list-none flex-col items-start gap-[var(--space-1)]" aria-label="Example problems">
               {EXAMPLE_PROMPTS.slice(0, 4).map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => {
-                    setComposerText(prompt);
-                    textareaRef.current?.focus();
-                  }}
-                  className="flex h-10 max-w-full cursor-pointer items-center rounded-[var(--radius-pill)] border border-[var(--border)] px-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-2)] transition-colors duration-[var(--dur-micro)] hover:border-[var(--border-strong)] hover:bg-[var(--surface)] hover:text-[var(--text)]"
-                >
-                  <span className="truncate">{prompt}</span>
-                </button>
+                <li key={prompt} className="max-w-full">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setComposerText(prompt);
+                      textareaRef.current?.focus();
+                    }}
+                    className="min-h-[var(--space-10)] max-w-full cursor-pointer rounded-[var(--radius)] px-[var(--space-2)] text-left text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 transition-colors duration-[var(--dur-micro)] hover:text-[var(--text)] hover:decoration-[var(--text)]"
+                  >
+                    {prompt}
+                  </button>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
 
-          <div className="mt-[var(--space-6)] text-center text-[length:var(--text-xs)] leading-[var(--lh-ui)] text-[var(--text-subtle)]">
+          <div className="mt-[var(--space-6)] text-[length:var(--text-xs)] leading-[var(--lh-ui)] text-[var(--text-subtle)]">
             {isImageMode
               ? 'Enter to generate · Shift+Enter for newline'
               : `Enter to send · Shift+Enter for newline · Esc to stop`}

@@ -265,7 +265,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
           {/* Phase 2: Raw VS ideas */}
           {rawIdeas.length > 0 && clusters.length === 0 && (
             <div className="space-y-2">
-              <p className={`text-[length:var(--text-xs)] font-medium uppercase tracking-wide opacity-60 ${phaseTextClass}`}>
+              <p className={`text-[length:var(--text-xs)] font-medium opacity-60 ${phaseTextClass}`}>
                 {rawIdeas.length} ideas generated
               </p>
               {rawIdeas.map((idea, i) => {
@@ -294,7 +294,7 @@ export const PhaseRenderer = memo(function PhaseRenderer({ phase, onComplete, fo
                 const keptIdeas = clusterIdeas.filter(i => i.keep !== false);
                 return (
                   <div key={ci} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2">
-                    <p className={`text-[length:var(--text-xs)] font-semibold uppercase tracking-wide mb-2 ${phaseTextClass}`}>{String(cluster.theme ?? `Theme ${ci + 1}`)}</p>
+                    <p className={`text-[length:var(--text-xs)] font-semibold mb-2 ${phaseTextClass}`}>{String(cluster.theme ?? `Theme ${ci + 1}`)}</p>
                     {keptIdeas.map((idea, ii) => (
                       <div key={ii} className="flex items-center gap-2 py-1 border-t border-[var(--border)]">
                         <span className={`text-[length:var(--text-xs)] flex-1 ${phaseTextClass}`}>{String(idea.title ?? '')}</span>
@@ -484,7 +484,7 @@ function VettedContextBlock({ items }: { items: Array<Record<string, unknown>> }
   return (
     <div className="mb-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-4">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Vetted Context</h3>
+        <h3 className="text-[length:var(--text-xs)] font-semibold text-[var(--text-muted)]">Vetted context</h3>
         <span className={`${TEXT_SIZES.tiny} text-[var(--text-subtle)]`}>{items.length} source{items.length === 1 ? '' : 's'}</span>
       </div>
       <div className="space-y-3">

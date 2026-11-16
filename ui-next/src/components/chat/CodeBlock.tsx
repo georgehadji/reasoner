@@ -36,7 +36,7 @@ export function CodeBlock({
   return (
     <div className="code-block">
       <div className="code-block-header">
-        <span className="uppercase tracking-wide">{language}</span>
+        <span>{language}</span>
         <button
           type="button"
           onClick={handleCopy}

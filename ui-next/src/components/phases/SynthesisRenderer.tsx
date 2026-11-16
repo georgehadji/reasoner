@@ -48,7 +48,7 @@ export const SynthesisRenderer = memo(function SynthesisRenderer({
 
       {footnotes.length > 0 && (
         <section className="mt-8 border-t border-[var(--border)] pt-4">
-          <h3 className="mb-3 text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
+          <h3 className="mb-3 text-[length:var(--text-xs)] font-semibold text-[var(--text-muted)]">
             References
           </h3>
           <ol className="space-y-2 text-[length:var(--text-sm)] text-[var(--text)]">

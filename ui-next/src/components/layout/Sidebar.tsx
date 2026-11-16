@@ -368,14 +368,13 @@ function SidebarComponent({
 
               {/* Empty state */}
               {filtered.length === 0 && (
-                <div className="flex flex-col items-center gap-2 py-12 text-center">
-                  <History className="h-8 w-8 text-[var(--text-subtle)]" aria-hidden="true" />
-                  <p className="text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-muted)]">No conversations yet</p>
-                  {/* --text-subtle measures 4.29:1 on --sidebar-bg (it clears
-                      4.7:1 only on the lighter --bg), so this rail steps up
-                      one level rather than reusing the page's quietest tone. */}
-                  <p className="text-[length:var(--text-xs)] leading-[var(--lh-ui)] text-[var(--text-muted)]">Start reasoning to see history here</p>
-                </div>
+                /* One plain line at the list's own edge, not a centred icon
+                   and two captions. A search with no hits says so, rather
+                   than claiming there is no history at all. --text-muted, not
+                   --text-subtle: subtle measures 4.29:1 on --sidebar-bg. */
+                <p className="px-[var(--space-2)] py-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-muted)]">
+                  {query.trim() || activeTag ? 'Nothing matches this search.' : 'Problems you run are listed here.'}
+                </p>
               )}
 
               {/* Grouped list */}
