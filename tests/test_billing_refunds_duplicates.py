@@ -105,6 +105,42 @@ async def test_non_usd_refund_is_not_clawed_back(credits):
     assert [c[1:] for c in credits.charges] == [(50.0, "refund:ch_1")]
 
 
+class _StatusRepo(_Repo):
+    def __init__(self, existing):
+        super().__init__(existing=existing)
+        self.statuses = []
+
+    async def set_subscription_status(self, sid, status, at):
+        self.statuses.append((sid, status))
+        return True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("charge_sub", "expected"),
+    [
+        ("sub_dup", []),  # refunded duplicate: the live subscription is left alone
+        ("sub_live", [("sub_live", "past_due")]),  # genuine full refund of the live one
+        (None, [("sub_live", "past_due")]),  # unknown charge subscription: act as before
+    ],
+)
+async def test_full_refund_flips_only_the_subscription_it_paid_for(charge_sub, expected):
+    repo = _StatusRepo(_sub("sub_live"))
+    event = SimpleNamespace(user_id=repo.existing.user_id, stripe_subscription_id=charge_sub)
+    obj = {"id": "ch_1", "amount_refunded": 2000, "currency": "usd", "refunded": True}
+    await BillingService(_Port())._apply_webhook("charge.refunded", event, repo, None, obj)
+    assert repo.statuses == expected
+
+
+@pytest.mark.asyncio
+async def test_partial_refund_does_not_flip_status():
+    repo = _StatusRepo(_sub("sub_live"))
+    event = SimpleNamespace(user_id=repo.existing.user_id, stripe_subscription_id="sub_live")
+    obj = {"id": "ch_2", "amount_refunded": 500, "currency": "usd", "refunded": False}
+    await BillingService(_Port())._apply_webhook("charge.refunded", event, repo, None, obj)
+    assert repo.statuses == []
+
+
 def test_paypal_refund_events_are_rows_in_both_tables():
     for ev in ("PAYMENT.SALE.REFUNDED", "PAYMENT.SALE.REVERSED"):
         assert ev in PAYPAL_HANDLERS and ev in PAYPAL_EVENT_STATUS
