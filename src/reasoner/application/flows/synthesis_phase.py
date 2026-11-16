@@ -7,6 +7,7 @@ import re
 
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
+from reasoner.application.services.run_steps import record_answerability
 from reasoner.core.constants import (
     DEFAULT_MAX_TOKENS,
     get_token_budget,
@@ -119,6 +120,14 @@ def _rank_sources_by_authority(state: PipelineState) -> None:
 
 
 async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) -> None:
+    await _synthesize(state, services)
+    # Inside the phase, not after the run: the SSE driver serializes this
+    # phase's frame (reliability included) the moment the phase returns, and
+    # the web path never reaches ReasonerPipeline.run (audit A-01).
+    record_answerability(state)
+
+
+async def _synthesize(state: PipelineState, services: WorkflowServices) -> None:
     services.log("SYNTHESIS", "Synthesizing final solution...", state)
     _rank_sources_by_authority(state)
 

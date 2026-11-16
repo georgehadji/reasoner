@@ -1,14 +1,14 @@
 """Answerability assessment and its pipeline hook (plan §5).
 
 Behaviour under test: application/services/answerability (pure) and
-ReasonerPipeline._assess_answerability. No existing test file covers them.
+run_steps.record_answerability. No existing test file covers them.
 """
 
 from types import SimpleNamespace
 
 import pytest
 
-from reasoner.application.pipeline import ReasonerPipeline
+from reasoner.application.services.run_steps import record_answerability
 from reasoner.application.services.answerability import (
     ANSWER,
     ANSWER_WITH_CAVEATS,
@@ -59,14 +59,14 @@ def test_reasons_are_reported():
 
 def _pipeline_with(fs, critics=()):
     state = SimpleNamespace(final_solution=fs, critic_scores=list(critics), degradations=[])
-    return ReasonerPipeline.__new__(ReasonerPipeline), state
+    return None, state
 
 
 def test_hook_sets_reliability_only_on_scoped_runs():
     pipe, state = _pipeline_with(
         SimpleNamespace(scope={}, claim_labels={"a": H}, verification_audit={}, reliability={})
     )
-    pipe._assess_answerability(state)
+    record_answerability(state)
     assert state.final_solution.reliability == {}
 
     pipe, state = _pipeline_with(
@@ -75,10 +75,10 @@ def test_hook_sets_reliability_only_on_scoped_runs():
             verification_audit={}, reliability={},
         )
     )
-    pipe._assess_answerability(state)
+    record_answerability(state)
     assert state.final_solution.reliability["level"] == ANSWER_WITH_CAVEATS
 
 
 def test_hook_with_no_solution_is_a_noop():
     pipe, state = _pipeline_with(None)
-    pipe._assess_answerability(state)
+    record_answerability(state)

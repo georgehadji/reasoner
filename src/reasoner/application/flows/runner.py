@@ -35,8 +35,9 @@ def resolve_phases(strategy: WorkflowStrategy, state: PipelineState) -> list[Pha
     Both drivers built this themselves and disagreed on the result. The SSE
     driver appended the Layer B egress rewrite and the CLI did not, so watermark
     egress rewriting has never applied to a CLI, headless or MCP run. Resolving
-    the list in one place is what makes "one execution engine" true rather than
-    "two engines that currently agree".
+    the list in one place makes the phase loop shared. It does not make the
+    drivers identical: ReasonerPipeline.run wraps the loop in billed run-level
+    steps the SSE driver skips (see application/services/run_steps.py).
     """
     phases = list(strategy.get_phases(state))
 
