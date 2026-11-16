@@ -55,8 +55,7 @@ export const CHIP =
   'px-[var(--space-2)] py-[var(--space-1)]';
 
 export const MICRO_LABEL =
-  'text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-tight)] ' +
-  'tracking-[var(--tracking-label)] text-[var(--text-muted)]';
+  'text-[length:var(--text-xs)] font-semibold leading-[var(--lh-tight)] text-[var(--text-muted)]';
 
 export const ICON_SM = 'h-[var(--space-3)] w-[var(--space-3)] shrink-0';
 

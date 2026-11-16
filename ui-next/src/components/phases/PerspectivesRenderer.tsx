@@ -6,8 +6,10 @@ import { epistemicClassName, extractEpistemicMarks } from '@/lib/remark-epistemi
  * inline epistemic labels — labelling starts here, not at synthesis (see
  * `demo-record.ts`'s docblock on `RunPosition.excerpt`). Prose still renders
  * through `MarkdownRenderer`, whose `remarkEpistemic` plugin marks the same
- * labels inline; this adds a marginal gutter per position summarizing them,
+ * labels inline; this adds one count line per position summarizing them,
  * since a position can carry six labels in a paragraph a reader skims once.
+ * Counts, not the labels again: a gutter repeating every label in order said
+ * nothing the paragraph had not.
  */
 
 interface Candidate {
@@ -23,12 +25,15 @@ export function PerspectivesRenderer({ candidates }: { candidates: Candidate[] }
   return (
     <div className="space-y-[var(--space-6)]">
       {candidates.map((c, i) => {
-        const marks = extractEpistemicMarks(c.content);
+        const counts = extractEpistemicMarks(c.content).reduce(
+          (m, { label }) => m.set(label, (m.get(label) ?? 0) + 1),
+          new Map<string, number>(),
+        );
         const model = c.model_used ? c.model_used.split('/').pop() : '';
         return (
           // .misregister: each position prints on its own pink plate,
           // offset differently, never in register with the others.
-          <article key={i} className="misregister grid grid-cols-1 gap-[var(--space-4)] border border-[var(--border-strong)] bg-[var(--surface)] p-[var(--space-4)] lg:grid-cols-[1fr_auto]">
+          <article key={i} className="misregister border border-[var(--border-strong)] bg-[var(--surface)] p-[var(--space-4)]">
             <div className="min-w-0">
               <h4 className="mb-[var(--space-2)] text-[length:var(--text-sm)] font-semibold capitalize text-[var(--text)]">
                 {c.perspective}
@@ -38,6 +43,16 @@ export function PerspectivesRenderer({ candidates }: { candidates: Candidate[] }
                   </span>
                 )}
               </h4>
+              {counts.size > 0 && (
+                <p className="mb-[var(--space-3)] flex flex-wrap gap-x-[var(--space-3)] gap-y-[var(--space-1)] text-[length:var(--text-xs)] text-[var(--text-muted)]">
+                  {[...counts].map(([label, n]) => (
+                    <span key={label}>
+                      {n}
+                      <span className={epistemicClassName(`epistemic-${label.toLowerCase()}`)}>{label}</span>
+                    </span>
+                  ))}
+                </p>
+              )}
               <div className="markdown-body">
                 <MarkdownRenderer>{c.content}</MarkdownRenderer>
               </div>
@@ -49,19 +64,6 @@ export function PerspectivesRenderer({ candidates }: { candidates: Candidate[] }
                 </ul>
               )}
             </div>
-            {marks.length > 0 && (
-              <aside
-                aria-label={`Epistemic labels for ${c.perspective}`}
-                className="flex shrink-0 flex-row flex-wrap gap-[var(--space-1)] border-t border-[var(--border)] pt-[var(--space-2)] lg:w-40 lg:flex-col lg:border-l lg:border-t-0 lg:pl-[var(--space-4)] lg:pt-0"
-              >
-                {marks.map((mark, mi) => (
-                  <span key={mi} className={epistemicClassName(`epistemic-${mark.label.toLowerCase()}`)}>
-                    {mark.label}
-                    {mark.qualifier ? ` ${mark.qualifier}` : ''}
-                  </span>
-                ))}
-              </aside>
-            )}
           </article>
         );
       })}

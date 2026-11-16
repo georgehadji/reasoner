@@ -117,9 +117,9 @@ function ImageGenerationIndicator({ prompt }: { prompt?: string }) {
     <div className="mb-[var(--space-2)] w-full max-w-[var(--width-content)] overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-[var(--space-4)] shadow-[var(--shadow)]">
       <div className="relative overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)]/[0.8] p-[var(--space-5)] backdrop-blur">
         <div className="relative mb-[var(--space-4)] flex flex-wrap items-center justify-between gap-[var(--space-3)]">
-          <div className="flex items-center gap-[var(--space-2)] text-[length:var(--text-xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
+          <div className="flex items-center gap-[var(--space-2)] text-[length:var(--text-xs)] font-semibold leading-[var(--lh-ui)] text-[var(--text-muted)]">
             <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
-            Rendering Image
+            Rendering image
           </div>
           <div className="inline-flex items-center gap-[var(--space-1)] rounded-[var(--radius-pill)] border border-[var(--border)] bg-[var(--surface-2)] px-[var(--space-3)] py-[var(--space-1)] text-[length:var(--text-xs)] font-medium text-[var(--text)]">
             <span
@@ -642,8 +642,8 @@ function ChatFeedComponent({
           >
             <div className="flex items-center justify-between gap-[var(--space-3)] border-b border-[var(--border)] px-[var(--space-4)] py-[var(--space-3)]">
               <div className="min-w-0">
-                <div className="text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-ui)] tracking-[var(--tracking-label)] text-[var(--text-muted)]">
-                  Generated Image
+                <div className="text-[length:var(--text-xs)] font-semibold leading-[var(--lh-ui)] text-[var(--text-muted)]">
+                  Generated image
                 </div>
                 <div className="truncate text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text)]">
                   LLM model used:{' '}

@@ -190,7 +190,7 @@ export function SynthesisCard({
                 <>
                 {highlights && highlights.length > 0 && (
                   <section className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-[var(--space-3)]">
-                    <h3 className={cn(MICRO_LABEL, 'mb-[var(--space-2)]')}>Synthesis Highlights</h3>
+                    <h3 className={cn(MICRO_LABEL, 'mb-[var(--space-2)]')}>Synthesis highlights</h3>
                     <div className="flex flex-wrap gap-[var(--space-2)]">
                       {highlights.map((highlight) => (
                         <div

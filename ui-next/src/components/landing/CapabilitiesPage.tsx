@@ -337,7 +337,6 @@ export default function CapabilitiesPage() {
             The only section where the reader is the source of the
             distortion. Every Body paragraph below must correspond to a true
             SYCOPHANCY_CONTROLS entry and sit behind its guard: see
-            MechanismDiagram's stage-03 comment and
             tests/test_site_capabilities_sync.py, which parses this section.
             Do not add a paragraph here without adding its detector to
             scripts/update_mindmap_meta.py first. */}

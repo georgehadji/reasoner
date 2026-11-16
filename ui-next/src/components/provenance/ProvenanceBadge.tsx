@@ -21,6 +21,8 @@ interface ProvenanceBadgeProps {
 export function ProvenanceBadge({ report, className }: ProvenanceBadgeProps) {
   const [isOpen, setIsOpen] = useState(false);
   const total = totalRemoved(report);
+  // A clean result is the expected case; a badge announcing it is noise.
+  if (total === 0) return null;
 
   return (
     <>
@@ -33,7 +35,7 @@ export function ProvenanceBadge({ report, className }: ProvenanceBadgeProps) {
         )}
       >
         <Eraser className="h-3 w-3" aria-hidden="true" />
-        {total > 0 ? `${total} carrier${total === 1 ? '' : 's'} removed` : 'No hidden characters found'}
+        {`${total} hidden character${total === 1 ? '' : 's'} removed`}
       </button>
 
       <ProvenanceReport isOpen={isOpen} onClose={() => setIsOpen(false)} report={report} />

@@ -253,3 +253,15 @@ export function extractHeadings(md: string): Array<{ level: 2 | 3; text: string;
   }
   return out;
 }
+
+/* shortcut: small models (seen with qwen3:8b) also write the insights, steps
+   and questions into core_solution, so the synthesis card showed them twice.
+   Cut the answer text where an echoed section heading starts; upgrade by
+   stripping them in the backend synthesis parser. */
+const SECTION_ECHO = /^[ \t]*(?:#{1,6}[ \t]*|\*\*)?(?:critical insights|action blueprint|open questions)\b/im;
+
+/** The answer text without sections the card already renders on its own. */
+export function dropSectionEcho(md: string): string {
+  const m = SECTION_ECHO.exec(md);
+  return m && m.index > 0 ? md.slice(0, m.index).trimEnd() : md;
+}
