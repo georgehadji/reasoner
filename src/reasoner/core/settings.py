@@ -694,6 +694,12 @@ if settings.ENVIRONMENT == "production":
     ):
         if os.getenv(provider_key) and not os.getenv(webhook_var):
             raise RuntimeError(f"{webhook_var} must be set in production when {provider_key} is.")
+    # Production auth is Supabase only: get_auth_adapter refuses the local HS256
+    # adapter, so without these every authenticated call would fail at runtime.
+    if not (settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY):
+        raise RuntimeError(
+            "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in production."
+        )
     # Without trusted proxies every caller behind the load balancer shares its
     # IP, so per-IP rate limits and the anonymous trial cap act on one bucket.
     if not settings.TRUSTED_PROXIES and os.getenv("ALLOW_NO_TRUSTED_PROXIES", "").lower() not in (

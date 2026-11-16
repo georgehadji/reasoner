@@ -1281,6 +1281,7 @@
       "tests/unit/test_answerability.py",
       "tests/unit/test_audit6_hardening.py",
       "tests/unit/test_audit6_llm_fixes.py",
+      "tests/unit/test_auth_adapter_production_guard.py",
       "tests/unit/test_benchmarks.py",
       "tests/unit/test_brainstorming_vs.py",
       "tests/unit/test_cached_quota_repo_types.py",
