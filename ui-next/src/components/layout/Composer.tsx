@@ -449,7 +449,7 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
               : 'A hard one goes to rival labs at once. A critic from another lab scores the answers, and each claim comes back labelled verified, hypothesis or unknown.'}
           </p>
 
-          {inputBox(96, isImageMode ? 'Describe the image you want to generate…' : 'How can I help you today?')}
+          {inputBox(96, isImageMode ? 'Describe the image you want to generate…' : 'A decision, a plan to test, a claim to check…')}
 
           {!isImageMode && (
             <ul className="-ml-[var(--space-2)] mt-[var(--space-6)] flex list-none flex-col items-start gap-[var(--space-1)]" aria-label="Example problems">
