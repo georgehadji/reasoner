@@ -257,7 +257,13 @@ class BillingService:
         await claw_back_credits(str(sub.user_id), key, cents, obj.get("currency"), event_type)
         if is_dispute or obj.get("refunded"):
             existing = await repo.get_subscription_by_user(str(sub.user_id))
-            if existing is not None and existing.stripe_subscription_id:
+            # A charge that paid for another subscription (a refunded duplicate
+            # checkout) must not downgrade the one the user is on. Unknown
+            # (None) keeps the old behaviour so a real chargeback still lands.
+            other = sub.stripe_subscription_id not in (
+                None, getattr(existing, "stripe_subscription_id", None),
+            )
+            if existing is not None and existing.stripe_subscription_id and not other:
                 await repo.set_subscription_status(
                     existing.stripe_subscription_id, "past_due", event_at
                 )
