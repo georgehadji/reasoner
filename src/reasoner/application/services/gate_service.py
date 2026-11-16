@@ -321,9 +321,10 @@ async def decide_route(problem: str, preset: str) -> dict[str, Any]:
 
     from reasoner.application.services.stakes_service import stakes_mode, stakes_summary
 
-    stakes = stakes_summary(problem) if stakes_mode() != "off" else None
+    mode = stakes_mode()
+    stakes = stakes_summary(problem) if mode != "off" else None
     # Only in active mode does a missing fact hold the run for a question.
-    asks_facts = bool(stakes and stakes["missing_facts"] and stakes_mode() == "active")
+    asks_facts = bool(stakes and stakes["missing_facts"] and mode == "active")
 
     return {
         "action": decision.action,

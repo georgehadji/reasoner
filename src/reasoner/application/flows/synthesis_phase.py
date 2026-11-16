@@ -85,29 +85,25 @@ def enforce_citations(text: str, allowed_urls: set[str]) -> tuple[str, list[str]
 def _stakes_block(state: PipelineState) -> str:
     """Scope instruction for a high-stakes run in active mode; "" otherwise."""
     from reasoner.application.services.stakes_service import (
-        detect_stakes,
+        active_profile,
         scope_for,
         scope_prompt_block,
-        stakes_mode,
     )
 
-    profile = detect_stakes(state.problem)
-    if not profile.is_high or stakes_mode() != "active":
-        return ""
-    return scope_prompt_block(profile.domain, scope_for(state.problem))
+    profile = active_profile(state.problem)
+    return scope_prompt_block(profile.domain, scope_for(state.problem)) if profile else ""
 
 
 def _rank_sources_by_authority(state: PipelineState) -> None:
     """Active high-stakes run: put primary sources first, so the synthesis context keeps them."""
     from reasoner.application.services.stakes_service import (
-        detect_stakes,
+        active_profile,
         resolve_jurisdiction,
-        stakes_mode,
     )
     from reasoner.domain.authority_sources import rank_by_authority
 
-    profile = detect_stakes(state.problem)
-    if not profile.is_high or stakes_mode() != "active":
+    profile = active_profile(state.problem)
+    if not profile:
         return
     country = resolve_jurisdiction(state.problem)
     if state.vetted_context:
@@ -230,25 +226,19 @@ def finalize_solution(raw: str, state: PipelineState, services: WorkflowServices
             apply_promotion_rules,
             reconcile_labels,
         )
-        from reasoner.application.services.stakes_service import (
-            detect_stakes,
-            scope_for,
-            stakes_mode,
-        )
+        from reasoner.application.services.stakes_service import active_profile, scope_for
         from reasoner.domain.stakes import Jurisdiction, StakesProfile
 
-        profile = detect_stakes(state.problem)
-        active = profile.is_high and stakes_mode() == "active"
-        scope = scope_for(state.problem) if active else {}
+        profile = active_profile(state.problem)
         policy = (
             HighStakesPolicy(
                 StakesProfile(
                     domain=profile.domain,
                     confidence=profile.confidence,
-                    jurisdiction=Jurisdiction(country=scope["jurisdiction"]),
+                    jurisdiction=Jurisdiction(country=scope_for(state.problem)["jurisdiction"]),
                 )
             )
-            if active
+            if profile
             else None
         )
         evidence_bundles = apply_promotion_rules(evidence_bundles, allowed_urls, policy)
