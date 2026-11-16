@@ -17,6 +17,19 @@
       "port": 8003
     },
     {
+      "name": "reasoner-ollama",
+      "runtimeExecutable": "C:/Users/tesse/rv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "asgi:app", "--host", "0.0.0.0", "--port", "8003"],
+      "env": {
+        "OLLAMA_API_KEY": "ollama",
+        "MULTI_PROVIDER_FALLBACK_ENABLED": "false",
+        "JEV_MODE": "off",
+        "RATE_LIMITER_REDIS_FAILURE_MODE": "fail_open"
+      },
+      "port": 8003,
+      "autoPort": false
+    },
+    {
       "name": "ui-next",
       "runtimeExecutable": "npm",
       "runtimeArgs": [
@@ -26,6 +39,19 @@
       "cwd": "ui-next",
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "ui-next-3005",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3005"
+      ],
+      "cwd": "ui-next",
+      "port": 3005
     }
   ]
 }
