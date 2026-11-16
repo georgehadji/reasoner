@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { NeuroPanel } from './NeuroPanel';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { API, LIMITS, PIPELINE_DEFAULTS } from '@/lib/config';
+import { API, LIMITS } from '@/lib/config';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {

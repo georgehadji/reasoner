@@ -5,7 +5,6 @@ import { useAppStore } from '@/stores/app-store';
 import { EXAMPLE_PROMPTS, LIMITS, TIMING, API } from '@/lib/config';
 import { cn } from '@/lib/utils';
 import { isEnabled } from '@/hooks/useFeatureFlags';
-import { useSubscription } from '@/hooks/useSubscription';
 import { ArrowUp, Sparkles, Plus, X, FileText, Image as ImageIcon, Upload, Lock, Square, ShieldCheck } from 'lucide-react';
 import { Tooltip } from '@/components/ui/Tooltip';
 
@@ -17,7 +16,6 @@ interface ComposerProps {
   isFollowup?: boolean;
 }
 
-const MAX_FILE_SIZE = LIMITS.maxFileSizeBytes;
 const ALLOWED_TYPES = [
   'application/pdf',
   'text/plain',
@@ -56,6 +54,7 @@ function AttachmentChip({ att, onRemove }: AttachmentChipProps) {
   return (
     <div className="group inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] px-[var(--space-3)] py-[var(--space-1)] text-[length:var(--text-xs)] leading-[var(--lh-ui)] text-[var(--text-muted)] transition-colors duration-[var(--dur-micro)] hover:border-[var(--border-strong)]">
       {isImage && att.previewUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element -- blob: object URL; next/image cannot optimise it
         <img src={att.previewUrl} alt="" className="h-5 w-5 rounded-[var(--radius-sm)] object-cover" />
       ) : (
         <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -250,7 +249,6 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
   }
 
   function TierToggle() {
-    const { subscription } = useSubscription();
     const isPremium = tier === 'premium';
     const isLocked = false;
     const costNum = estimate ? parseFloat(estimate.cost) : NaN;
