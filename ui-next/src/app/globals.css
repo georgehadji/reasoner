@@ -656,52 +656,70 @@
   .stagger-children > *:nth-child(5) { animation-delay: calc(var(--stagger-step) * 4); }
   .stagger-children > *:nth-child(6) { animation-delay: calc(var(--stagger-step) * 5); }
 
-  /* Scrollbar styling */
+  /* Scrollbars — one style for every scroller, the page included.
+     A floating pill on a transparent track: the thumb is inset by a
+     transparent border, and the inset shrinks on hover so the bar grows
+     under the pointer. Sage/blue (--accent) only while dragged. Colours
+     are role tokens, so `.site` pages get the charcoal-world remap free.
+
+     Chromium 121+ ignores ::-webkit-scrollbar on any element that sets
+     scrollbar-width or scrollbar-color, so the standard properties go
+     only to engines without the pseudo-elements (Firefox). */
+  :root {
+    --scrollbar-size:        var(--space-3);
+    --scrollbar-inset:       var(--space-1);
+    --scrollbar-inset-hover: calc(var(--space-1) / 2);
+  }
+
   .scrollbar-thin {
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-strong) transparent;
+    --scrollbar-size:        var(--space-2);
+    --scrollbar-inset:       calc(var(--space-1) / 2);
+    --scrollbar-inset-hover: calc(var(--space-1) / 4);
   }
 
-  .scrollbar-thin::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: var(--border-strong);
-    border-radius: var(--radius-sm);
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: var(--text-subtle);
-  }
-
-  /* Thicker scrollbar for chat and main content areas */
+  /* Kept as a name for the chat feed; the default is now this size. */
   .scrollbar-gray {
-    scrollbar-width: auto;
-    scrollbar-color: var(--border-strong) transparent;
+    --scrollbar-size: var(--space-3);
   }
 
-  .scrollbar-gray::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  .scrollbar-gray::-webkit-scrollbar-track {
+  ::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
     background: transparent;
   }
 
-  .scrollbar-gray::-webkit-scrollbar-thumb {
-    background: var(--border-strong);
-    border-radius: var(--radius-sm);
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
   }
 
-  .scrollbar-gray::-webkit-scrollbar-thumb:hover {
-    background: var(--text-subtle);
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--border-strong);
+    background-clip: padding-box;
+    border: var(--scrollbar-inset) solid transparent;
+    border-radius: var(--radius-pill);
+    min-height: var(--space-8);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--text-subtle);
+    border-width: var(--scrollbar-inset-hover);
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background-color: var(--accent);
+    border-width: var(--scrollbar-inset-hover);
+  }
+
+  ::-webkit-scrollbar-button {
+    display: none;
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-strong) transparent;
+    }
   }
 
   /* Accessibility */
