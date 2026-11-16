@@ -25,6 +25,7 @@ from reasoner.application.services.adaptive_routing import build_adaptive_routin
 from reasoner.application.services.pipeline_service import PipelineService
 from reasoner.application.services.preset_service import PresetService
 from reasoner.application.services.run_metering import track_run_spend
+from reasoner.application.services.run_steps import drain_fallback_events
 from reasoner.application.services.spend_limit_service import (
     RUN_TIER_LOOKUP_TIMEOUT_S,
     apply_spend_limits,
@@ -305,7 +306,12 @@ async def _run_phases(
     This used to be a second phase loop -- its own retries, timeouts, quality
     gate and fatality rule -- kept here only so SSE frames could be emitted
     between the steps. The frames are an observer now, and WorkflowRunner runs
-    the phases for this driver exactly as it does for the CLI.
+    the phases for this driver as it does for the CLI.
+
+    The phase loop is shared; the run-level steps around it are not.
+    ReasonerPipeline.run adds translation, fusion and post-synthesis
+    verification (all billed) and this driver does not. Unbilled steps live in
+    application/services/run_steps.py so both drivers apply them.
     """
     from reasoner.application.flows.factory import WorkflowFactory
 
@@ -476,7 +482,11 @@ async def _finish_run(
     run_id: str,
     run_start: float,
     stream: RunStream,
+    router: Any,
 ) -> None:
+    # Events that landed after the early drain in execute_run, before postflight
+    # persists them (the CLI path drains at the end of ReasonerPipeline.run).
+    drain_fallback_events(state, router)
     tokens = _token_totals(state)
     await _record_history(req, state, user_id, tokens)
     await stream.done(state, tokens, time.monotonic() - run_start)
@@ -551,6 +561,8 @@ class PipelineExecutionService:
             # Cancelled, failed or disconnected runs end without a cost frame;
             # the metering wrapper reads the state's running total instead.
             run_state = state
+            # Preflight's fallback events, so phase spans and the SSE frames see them.
+            drain_fallback_events(state, preflight.router)
             track_run_spend(lambda: run_state.total_cost_usd or 0.0)
             await _announce_start(req, preflight, method, emitter, user_id, stream)
             await _enhance_prompt(req, pipeline, state, stream)
@@ -568,7 +580,9 @@ class PipelineExecutionService:
                     state.errors[-1] if state.errors else "run stopped on a fatal phase error"
                 )
 
-            await _finish_run(orchestrator, req, state, user_id, run_id, run_start, stream)
+            await _finish_run(
+                orchestrator, req, state, user_id, run_id, run_start, stream, preflight.router
+            )
             return RunOutcome("completed", state)
         except asyncio.CancelledError:
             # Disconnect is a normal exit, so its terminal write must survive
