@@ -32,6 +32,7 @@ from reasoner.core.degrade import degraded
 # New imports for event emission
 from reasoner.core.events.domain_events import PipelineEventType, make_event
 from reasoner.core.events.ports import EventPublisher
+from reasoner.core.exceptions import ProviderError
 from reasoner.core.temperatures import PHASE_TEMPERATURES
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.infrastructure.llm.caching import user_cache_prefix
@@ -47,6 +48,17 @@ def _get_event_bus() -> EventPublisher:
     """Lazy import to avoid circular dependency with api/__init__.py."""
     from reasoner.application.event_bus.bus import get_event_bus
     return get_event_bus()
+
+
+def _raise_provider_cause(raw: Any) -> None:
+    """Re-raise the provider error behind a degraded response, if it has one.
+
+    A RuntimeError built from ``raw.error`` hides the type, so the runner's
+    is_run_fatal never saw a 402 and is_retryable never saw a 429: a run out
+    of credit ground through every phase and reported success.
+    """
+    if isinstance(getattr(raw, "cause", None), ProviderError):
+        raise raw.cause
 
 # Regex for fenced code blocks inside prompts
 _CODE_FENCE_RE = re.compile(r"```(\w+)?\n(.*?)\n```", re.DOTALL)
@@ -304,6 +316,7 @@ class LLMExecutor:
                     from reasoner.infrastructure.llm.ports import DegradedLLMResponse
                     if isinstance(raw, DegradedLLMResponse):
                         await self._account_call_cost(state, role, raw.metadata or {})
+                        _raise_provider_cause(raw)
                         raise RuntimeError(f"Degraded response from {model_id}: {raw.error}")
 
                     if not raw or not raw.strip():
@@ -391,6 +404,8 @@ class LLMExecutor:
                 )
                 await bus.publish(event)
 
+                if isinstance(last_error, ProviderError):
+                    raise last_error  # keeps a 402/429 visible to the runner
                 raise RuntimeError(f"All cascading models failed for role={role}: {last_error}") from last_error
             else:
                 logger.error(f"Unknown error in cascading for role={role}")
@@ -472,6 +487,7 @@ class LLMExecutor:
 
                 # Discarded attempts were billed even though the call failed.
                 await self._account_call_cost(state, role, raw.metadata or {})
+                _raise_provider_cause(raw)
                 raise RuntimeError(raw.error)
 
             if not raw or not raw.strip():

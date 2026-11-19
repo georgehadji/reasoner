@@ -762,7 +762,7 @@ class ProviderRouter:
                     if direct:
                         return direct[0], _carry(direct[1])
                     return DegradedLLMResponse(
-                        text="", error=str(exc),
+                        text="", error=str(exc), cause=exc,
                         metadata=_carry({"model": provider.model}),
                     ), {}
                 logger.warning(
@@ -775,7 +775,7 @@ class ProviderRouter:
                     return await _execute_call(fallback, is_fallback=True)
                 else:
                     return DegradedLLMResponse(
-                        text="", error=str(exc),
+                        text="", error=str(exc), cause=exc,
                         metadata=_carry({"model": assigned.model}),
                     ), {}
 
