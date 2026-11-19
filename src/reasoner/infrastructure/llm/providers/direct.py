@@ -334,7 +334,9 @@ def build_fallback_provider(name: str) -> BaseLLMProvider:
         },
         "xai": {
             "base_url": "https://api.x.ai/v1",
-            "model": "grok-2-latest",
+            # grok-2-latest was retired (404). grok-4.3 is the cheapest current
+            # general Grok, and the registry prices it (x-ai/grok-4.3).
+            "model": "grok-4.3",
         },
         "perplexity": {
             "base_url": "https://api.perplexity.ai",
