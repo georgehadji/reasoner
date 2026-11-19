@@ -49,6 +49,17 @@ _LOCAL_MODEL_IDS = frozenset(
 )
 _FREE = ModelPricing(0.0, 0.0)
 
+# The direct-provider lanes (providers/direct.py) report the vendor's own model
+# name ("claude-sonnet-5"), which is the catalogue id minus its "vendor/"
+# prefix. Index that bare name, dropping any name two vendors share, so a
+# direct call is priced at its real rate instead of the $1/$5 default.
+_by_name: dict[str, str | None] = {}
+for _mid in PRICING_DB:
+    if "/" in _mid:
+        _name = _mid.split("/", 1)[1]
+        _by_name[_name] = None if _name in _by_name else _mid
+_BARE_NAME_TO_ID = {name: mid for name, mid in _by_name.items() if mid}
+
 
 def get_pricing(model_id: str) -> ModelPricing:
     """Pricing for *model_id*, resolving registry aliases.
@@ -71,6 +82,8 @@ def get_pricing(model_id: str) -> ModelPricing:
     # does) turns a hit into a miss for exactly those entries.
     if served in PRICING_DB:
         return PRICING_DB[served]
+    if model_id in _BARE_NAME_TO_ID:
+        return PRICING_DB[_BARE_NAME_TO_ID[model_id]]
 
     logger.warning(
         "No pricing for model %r (registry served id: %r) — falling back to the "
