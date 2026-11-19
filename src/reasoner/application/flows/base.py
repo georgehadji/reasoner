@@ -11,6 +11,17 @@ from reasoner.core.ports.llm_port import LLMPort
 from reasoner.domain.pipeline_state import PipelineState
 
 
+def next_round_fits(durations: list[float], elapsed: float, budget: float) -> bool:
+    """Whether one more round, as slow as the slowest so far, fits the budget. Pure.
+
+    For flows that loop inside one phase (self-refine, iterative critique): the
+    phase timeout cancels the whole phase, finished rounds included, so a loop
+    stops before a round that would not finish. The slowest round, not the
+    average, is the estimate: one slow round is enough to hit the timeout.
+    """
+    return not durations or elapsed + max(durations) <= budget
+
+
 class PhaseStep:
     """A single step in a reasoning flow."""
     def __init__(

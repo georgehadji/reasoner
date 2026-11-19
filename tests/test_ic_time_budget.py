@@ -93,3 +93,30 @@ async def test_fast_rounds_are_not_cut_short(monkeypatch):
 
     assert state.adversarial_convergence_reason != "time_budget"
     assert len(state.adversarial_rounds) >= 2
+
+
+class _UnevenServices(_SlowServices):
+    """Each call advances the clock by the next entry of *seconds*."""
+
+    def __init__(self, clock, seconds: list[float]):
+        super().__init__(clock, 0.0)
+        self._seconds = list(seconds)
+
+    async def call_llm(self, *a, **k):
+        self._step = self._seconds.pop(0) if self._seconds else 1.0
+        return await super().call_llm(*a, **k)
+
+
+@pytest.mark.asyncio
+async def test_one_slow_round_sets_the_estimate_not_the_average(monkeypatch):
+    clock = _Clock()
+    monkeypatch.setattr(ic_flow, "_clock", clock)
+    # round 1: 10s, round 2: 80s -> 90s elapsed of a 162s budget (180s x 0.9).
+    # The average (45s) would allow round 3; the slowest round (80s) does not.
+    services = _UnevenServices(clock, [5.0, 5.0, 40.0, 40.0])
+    state = PipelineState(problem="p")
+
+    await IterativeCritiqueFlow()._run_debate_loop(state, services)
+
+    assert len(state.adversarial_rounds) == 2
+    assert state.adversarial_convergence_reason == "time_budget"
