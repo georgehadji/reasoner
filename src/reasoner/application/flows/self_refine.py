@@ -12,8 +12,14 @@ the score is the model's own claim, and the final answer says so in
 ``open_questions``.
 
 Stop reasons: ``target_reached``, ``evaluator_unavailable``,
-``max_rounds_reached``, ``no_improvement``, ``time_budget`` and ``llm_error``
-(a provider call failed after at least one round had finished).
+``max_rounds_reached``, ``no_improvement``, ``time_budget``, ``llm_error``
+(a provider call failed after at least one round had finished) and
+``model_changed`` (the router fell back to another model after round 1).
+
+Scores are only comparable when one model gave them all, so a router fallback
+never mixes models in the trail: a round whose evaluation came from a model
+other than its draft's counts as degraded, and a later round that ran on a
+model other than round 1's is dropped and ends the loop.
 
 Finished rounds are never thrown away. Each one is appended to state as soon as
 it completes, the loop phase is non-critical, and synthesis works from the best
@@ -121,6 +127,11 @@ def stop_reason(rounds: list[dict], *, target: float = SR_TARGET_SCORE,
     return ""
 
 
+def _same_model(a: str, b: str) -> bool:
+    """True unless both models are known and differ (meta may omit the model)."""
+    return not a or not b or a == b
+
+
 def best_round(rounds: list[dict]) -> dict | None:
     """Highest-scoring real round (latest on a tie); the last round if none is real."""
     real = [r for r in rounds if not r["degraded"]]
@@ -172,19 +183,19 @@ class SelfRefineFlow(WorkflowStrategy):
 
     async def _evaluate(
         self, services: WorkflowServices, state: PipelineState, answer: str, round_num: int,
-    ) -> tuple[float | None, list[dict], float | None]:
-        """(effective score, flaws, raw score). Score is None when unusable."""
-        data, _ = await self._call(
+    ) -> tuple[float | None, list[dict], float | None, str]:
+        """(effective score, flaws, raw score, model). Score is None when unusable."""
+        data, model = await self._call(
             services, state, sr_phases.EVALUATOR_SYSTEM,
             sr_phases.evaluator_prompt(state, answer, round_num, SR_TARGET_SCORE),
             "self_refine_evaluate",
         )
         raw = parse_score((data or {}).get("score"))
         if raw is None:
-            return None, [], None
+            return None, [], None, model
         flaws_in = (data or {}).get("flaws")
         flaws = [f for f in flaws_in if isinstance(f, dict)] if isinstance(flaws_in, list) else []
-        return effective_score(raw, flaws), flaws, raw
+        return effective_score(raw, flaws), flaws, raw, model
 
     async def _run_round(self, services: WorkflowServices, state: PipelineState,
                          prev: dict | None, n: int) -> dict:
@@ -195,16 +206,22 @@ class SelfRefineFlow(WorkflowStrategy):
                 raise PhaseError("Self-refine produced no first draft",
                                  phase=3, phase_name=_LOOP_PHASE)
             answer = prev["answer"]  # keep what we have; the round counts as degraded
-            score, flaws, raw = None, [], None
+            score, flaws, raw, eval_model = None, [], None, model
         else:
-            score, flaws, raw = await self._evaluate(services, state, answer, n)
+            score, flaws, raw, eval_model = await self._evaluate(services, state, answer, n)
+            if score is not None and not _same_model(eval_model, model):
+                # Another model graded this answer: not a self-score.
+                services.log("SR", f"Round {n}: scored by {eval_model}, drafted by "
+                                   f"{model}; score discarded", state)
+                score, flaws, raw = None, [], None
         is_degraded = score is None
         if is_degraded:
             flaws = (prev["flaws"] if prev else []) or [_PLACEHOLDER_FLAW]
         return {
             # A degraded round has no score, not a score of 0: "unknown" must
             # never reach the model, or the trail, as "very bad".
-            "round": n, "answer": answer, "model": model, "flaws": flaws,
+            "round": n, "answer": answer, "model": model, "eval_model": eval_model,
+            "flaws": flaws,
             "score": score, "raw_score": raw,
             "capped": raw is not None and score is not None and score < raw,
             "degraded": is_degraded,
@@ -243,6 +260,13 @@ class SelfRefineFlow(WorkflowStrategy):
                     raise
                 reason = degraded("self_refine.round", "llm_error", exc=exc, state=state,
                                   detail=f"stopped at round {n}, keeping {len(rounds)} rounds")
+                break
+            run_model = rounds[0].get("model", "") if rounds else ""
+            if not (_same_model(record["model"], run_model)
+                    and _same_model(record["eval_model"], run_model)):
+                reason = "model_changed"
+                services.log("SR", f"Stopped at round {n}: it ran on {record['model']}, "
+                                   f"not {run_model}; its score is not comparable", state)
                 break
             record["seconds"] = _clock() - round_start
             rounds.append(record)

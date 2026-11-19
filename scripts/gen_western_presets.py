@@ -170,15 +170,24 @@ def _build(pid: str, base: dict) -> dict:
     if not dfs(0):
         raise RuntimeError(f"{wid}: no Western assignment satisfies check_preset")
 
-    # Fallbacks: Western, and never the model the role already runs on.
+    # Fallbacks: Western, and never the model the role already runs on. A
+    # self-refine grader also falls back off its own lab and off synthesis's,
+    # so the final voice never comes from the lab that scored the answer.
+    # Not every role: a Perplexity search role must fall back to Perplexity.
+    def ok(role: str, alias: str) -> bool:
+        runs_on = preset["routing"].get(role, preset["primary_id"])
+        if resolved_model_of(alias) == resolved_model_of(runs_on):
+            return False
+        if preset["method"] != "self-refine" or role == "synthesis":
+            return True
+        return _vendor_of(alias) not in {_vendor_of(runs_on),
+                                         _vendor_of(preset["routing"]["synthesis"])}
+
     fallbacks = dict(preset.get("fallback_routing", {}))
     for role, model in list(fallbacks.items()):
-        runs_on = resolved_model_of(preset["routing"].get(role, preset["primary_id"]))
-        if _western(model) and resolved_model_of(model) != runs_on:
+        if _western(model) and ok(role, model):
             continue
-        fallbacks[role] = next(
-            a for a in _ranked(model, role, {}) if resolved_model_of(a) != runs_on
-        )
+        fallbacks[role] = next(a for a in _ranked(model, role, {}) if ok(role, a))
 
     # A role with no fallback retries on the primary; when that costs more than
     # the router allows (tests/test_preset_fallback_budget.py), name one.
