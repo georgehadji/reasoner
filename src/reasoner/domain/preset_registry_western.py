@@ -839,6 +839,32 @@ WESTERN_PRESETS: dict[str, dict] = {
         },
         'tags': ['premium', 'reasoning', 'self-improvement', 'western-only'],
     },
+    'self-refine-western-budget': {
+        'method': 'self-refine',
+        'primary_id': 'grok-4.3',
+        'routing': {
+            'synthesis': 'llama-4-maverick',
+            'expert_1': 'mistral-medium',
+            'post_synthesis_verify': 'sonar',
+        },
+        'fallback_routing': {
+            'expert_1': 'mistral-small-2603',
+        },
+        'tags': ['budget', 'self-refine', 'iterative', 'western-only'],
+    },
+    'self-refine-western-premium': {
+        'method': 'self-refine',
+        'primary_id': 'gpt-5',
+        'routing': {
+            'synthesis': 'grok-4.3',
+            'expert_1': 'mistral-medium-3-5',
+            'post_synthesis_verify': 'sonar-pro',
+        },
+        'fallback_routing': {
+            'primary': 'codestral',
+        },
+        'tags': ['premium', 'self-refine', 'iterative', 'western-only'],
+    },
     'socratic-western-budget': {
         'method': 'socratic',
         'primary_id': 'ministral-14b',

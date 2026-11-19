@@ -179,6 +179,7 @@ _METHOD_TO_SLUG: dict[str, str] = {
     "socratic": "socratic",
     "multi_perspective": "multi-perspective",
     "iterative_critique": "iterative-critique",  # v3.1: new LLM debate method
+    "self_refine": "self-refine",
     "research": "research",
     "jury": "jury",
     "pre_mortem": "pre-mortem",

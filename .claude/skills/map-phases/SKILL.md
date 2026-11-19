@@ -39,6 +39,7 @@ folders:
 | `pot.py` | Program-of-Thoughts: generate code, execute, interpret. |
 | `self_discover.py` | Select, adapt, implement reasoning modules. |
 | `iterative_critique.py` | Two cross-lab models debating to convergence: generator, critic, revision, synthesis. |
+| `self_refine.py` | Self-Refine prompts: draft, strict self-evaluation (flaws first, then 0-10), revision, synthesis told the score is self-reported. |
 | `brainstorming.py` | Verbalized Sampling divergence: generate k ideas with probabilities, cluster, develop, synthesize. |
 | `coding.py` (15KB) | Spec, generate, review; `_CODE_QUALITY_CONTRACT`, `strip_reasoning_from_code`. |
 | `writing.py` (26KB) | Creative/long-form writing with CoVe-style draft/verify/answer/revise and hallucination guards. |
