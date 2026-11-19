@@ -12,13 +12,15 @@ from reasoner.application.flows.self_refine import (
     SelfRefineFlow,
     best_round,
     effective_score,
+    next_round_fits,
     parse_score,
     stop_reason,
 )
-from reasoner.core.exceptions import PhaseError
+from reasoner.core.exceptions import AuthenticationError, PhaseError, ProviderError
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.hypergate.hyperagent import named_method
 from reasoner.presets import get_method_from_preset
+from reasoner.quality.criteria import reset_phase_state
 
 
 def _rnd(n: int, score: float, degraded: bool = False) -> dict:
@@ -33,6 +35,7 @@ class _Scripted:
         self.severity = severity
         self.roles: list[str] = []
         self.drafts = 0
+        self.prompts: list[str] = []  # draft/revise user prompts, in order
         self._clock, self._step = clock, step
 
     def log(self, *a, **k):
@@ -48,6 +51,7 @@ class _Scripted:
                 return "not json at all", {"model": "m"}
             flaws = [{"flaw": f"flaw-{len(self.roles)}", "severity": self.severity}]
             return json.dumps({"flaws": flaws, "score": score}), {"model": "m"}
+        self.prompts.append(user_prompt)
         self.drafts += 1
         key = "answer" if self.drafts == 1 else "revised_answer"
         return json.dumps({key: f"answer-{self.drafts}"}), {"model": "m"}
@@ -61,7 +65,9 @@ class _Clock:
 
 
 @pytest.mark.parametrize(("raw", "expected"), [
-    (9, 9.0), ("9/10", 9.0), ("8.5", 8.5), (95, 9.5), (12, 1.2), (10, 10.0),
+    (9, 9.0), ("9/10", 9.0), ("8.5", 8.5), (95, 9.5), (10, 10.0),
+    # just over 10 is an overshoot, not a percentage; 20-100 or an explicit % is
+    (10.5, 10.0), (12, 10.0), (15, 10.0), (20, 2.0), (85, 8.5), ("85%", 8.5), ("8.5 %", 0.85),
     (-1, None), ("great", None), ({"a": 1}, None), (None, None), (True, None),
     (float("nan"), None),
 ])
@@ -105,7 +111,7 @@ async def test_loop_runs_until_the_score_reaches_nine():
     sr = state.self_refine_state
     assert [r["score"] for r in sr["rounds"]] == [6, 8, 9.2]
     assert sr["target_reached"] is True and sr["stop_reason"] == "target_reached"
-    assert sr["best_answer"] == "answer-3"
+    assert best_round(sr["rounds"])["answer"] == "answer-3"
     # one model throughout: every loop call runs under the same routing role
     assert set(services.roles) == {"expert_1"}
 
@@ -132,7 +138,8 @@ async def test_unreachable_target_stops_at_the_round_limit_with_the_best_answer(
 
     sr = state.self_refine_state
     assert sr["stop_reason"] == "max_rounds_reached" and sr["target_reached"] is False
-    assert sr["best_round"] == 5 and sr["best_score"] == 8
+    best = best_round(sr["rounds"])
+    assert best["round"] == 5 and best["score"] == 8
 
 
 @pytest.mark.asyncio
@@ -144,7 +151,8 @@ async def test_unusable_evaluations_end_the_loop_without_claiming_success():
 
     sr = state.self_refine_state
     assert sr["stop_reason"] == "evaluator_unavailable" and sr["target_reached"] is False
-    assert sr["best_score"] is None and sr["best_answer"]
+    best = best_round(sr["rounds"])
+    assert best["degraded"] and best["score"] is None and best["answer"]
 
 
 @pytest.mark.asyncio
@@ -178,4 +186,115 @@ def test_method_is_registered_end_to_end():
     assert named_method("use the self-refine method on this") == "self_refine"
     steps = SelfRefineFlow().get_phases(PipelineState())
     assert [s.name for s in steps] == ["Self-Refine Loop", "Synthesis"]
-    assert steps[0].critical is True
+    # loop non-critical keeps finished rounds on failure; synthesis fails the run
+    assert steps[0].critical is False and steps[1].critical is True
+
+
+class _FailsOnCall(_Scripted):
+    """_Scripted that raises *exc* on the given 1-based call."""
+
+    def __init__(self, scores, fail_on, exc):
+        super().__init__(scores)
+        self.calls, self.fail_on, self.exc = 0, fail_on, exc
+
+    async def call_llm(self, *a, **k):
+        self.calls += 1
+        if self.calls == self.fail_on:
+            raise self.exc
+        return await super().call_llm(*a, **k)
+
+
+@pytest.mark.asyncio
+async def test_a_provider_failure_mid_loop_keeps_the_finished_rounds():
+    # calls: draft1 eval1 draft2 eval2 draft3 <- fails
+    services = _FailsOnCall([6, 8, 9], fail_on=5, exc=ProviderError("upstream 503"))
+    state = PipelineState(problem="p")
+
+    await SelfRefineFlow()._run_loop(state, services)
+
+    sr = state.self_refine_state
+    assert sr["stop_reason"] == "llm_error" and sr["target_reached"] is False
+    assert [r["round"] for r in sr["rounds"]] == [1, 2]
+    assert best_round(sr["rounds"])["answer"] == "answer-2"
+    assert any("self_refine.round" in str(d) for d in state.degradations)
+
+
+@pytest.mark.asyncio
+async def test_a_run_fatal_error_mid_loop_still_ends_the_run():
+    services = _FailsOnCall([6, 8], fail_on=3, exc=AuthenticationError("bad key"))
+    with pytest.raises(AuthenticationError):
+        await SelfRefineFlow()._run_loop(PipelineState(problem="p"), services)
+
+
+@pytest.mark.asyncio
+async def test_a_failure_in_round_one_propagates():
+    services = _FailsOnCall([], fail_on=1, exc=ProviderError("down"))
+    with pytest.raises(ProviderError):
+        await SelfRefineFlow()._run_loop(PipelineState(problem="p"), services)
+
+
+@pytest.mark.asyncio
+async def test_revision_builds_on_the_best_round_not_the_last():
+    services = _Scripted([8.5, 7.0, 9.0])
+    await SelfRefineFlow()._run_loop(PipelineState(problem="p"), services)
+
+    # round 3 revises round 1's answer (8.5), not round 2's regression (7.0)
+    assert "answer-1" in services.prompts[2] and "8.5/10" in services.prompts[2]
+
+
+@pytest.mark.asyncio
+async def test_an_unusable_evaluation_is_never_shown_to_the_model_as_zero():
+    services = _Scripted([None, 9.0])
+    state = PipelineState(problem="p")
+    await SelfRefineFlow()._run_loop(state, services)
+
+    assert state.self_refine_state["rounds"][0]["score"] is None
+    assert "self-score unavailable" in services.prompts[1]
+    assert "0/10" not in services.prompts[1]
+
+
+@pytest.mark.asyncio
+async def test_resume_continues_from_rounds_in_state():
+    state = PipelineState(problem="p")
+    state.self_refine_state["rounds"] = [
+        {**_rnd(1, 6), "answer": "answer-1"}, {**_rnd(2, 7), "answer": "answer-2"},
+    ]
+    services = _Scripted([9.0])
+
+    await SelfRefineFlow()._run_loop(state, services)
+
+    sr = state.self_refine_state
+    assert [r["round"] for r in sr["rounds"]] == [1, 2, 3]
+    assert sr["stop_reason"] == "target_reached" and services.drafts == 1
+
+
+@pytest.mark.asyncio
+async def test_resume_of_a_finished_loop_makes_no_calls():
+    state = PipelineState(problem="p")
+    state.self_refine_state["rounds"] = [_rnd(1, 9.5)]
+    services = _Scripted([])
+
+    await SelfRefineFlow()._run_loop(state, services)
+
+    assert services.roles == []
+    assert state.self_refine_state["stop_reason"] == "target_reached"
+
+
+def test_a_quality_retry_starts_the_loop_clean():
+    state = PipelineState(problem="p")
+    state.self_refine_state["rounds"] = [_rnd(1, 6)]
+    reset_phase_state("Self-Refine Loop", state)
+    assert state.self_refine_state == {}
+
+
+def test_next_round_is_budgeted_at_the_slowest_round():
+    assert next_round_fits([], 0.0, 10.0)
+    # the mean (90s) would fit, 70 + 90 <= 216; the slowest (150s) does not
+    assert not next_round_fits([30.0, 150.0], 70.0, 216.0)
+    assert next_round_fits([30.0, 50.0], 70.0, 216.0)
+
+
+@pytest.mark.asyncio
+async def test_synthesis_without_rounds_fails_loudly():
+    with pytest.raises(PhaseError):
+        await SelfRefineFlow()._run_synthesis(PipelineState(problem="p"), _Scripted([]))

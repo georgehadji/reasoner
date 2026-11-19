@@ -78,18 +78,26 @@ def evaluator_prompt(state: PipelineState, answer: str, round_num: int, target: 
     )
 
 
-def revision_prompt(state: PipelineState, answer: str, flaws: list[dict], score: float) -> str:
+def _score_label(score: float | None) -> str:
+    # None is "the self-evaluation was unusable", never a score of 0.
+    return "self-score unavailable" if score is None else f"self-scored {score:g}/10"
+
+
+def revision_prompt(
+    state: PipelineState, answer: str, flaws: list[dict], score: float | None,
+) -> str:
     return (
         f'{get_language_instruction(state)}\n\n'
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
-        f'YOUR PREVIOUS ANSWER (self-scored {score:g}/10):\n{_wrap_external_content(answer)}\n\n'
+        f'YOUR PREVIOUS ANSWER ({_score_label(score)}):\n{_wrap_external_content(answer)}\n\n'
         f'FLAWS YOU FOUND IN IT:\n{_wrap_external_content(json.dumps(flaws, indent=2))}\n\n'
         f'Write the complete revised answer.\n\n'
         f'Output JSON: {{"revised_answer": "<complete answer>"}}'
     )
 
 
-def synthesis_prompt(state: PipelineState, sr: dict, best_answer: str) -> str:
+def synthesis_prompt(state: PipelineState, sr: dict, best: dict) -> str:
+    """*best* is the best round's record (flows.self_refine.best_round)."""
     trail = [
         {"round": r["round"], "self_score": r.get("score"), "flaws": (r.get("flaws") or [])[:3]}
         for r in sr.get("rounds", [])
@@ -105,8 +113,8 @@ def synthesis_prompt(state: PipelineState, sr: dict, best_answer: str) -> str:
         f'Problem: {_wrap_user_input(state.problem)}\n\n'
         f'Self-scoring trail ({len(trail)} rounds, target reached: {reached}):\n'
         f'{_wrap_external_content(json.dumps(trail, indent=2))}\n\n'
-        f'Best answer (self-scored {sr.get("best_score")}/10):\n'
-        f'{_wrap_external_content(best_answer)}\n\n'
+        f'Best answer (round {best["round"]}, {_score_label(best.get("score"))}):\n'
+        f'{_wrap_external_content(best["answer"])}\n\n'
         f'{note}'
         f'Produce the final synthesis.\n\n'
         f'{SYNTHESIS_OUTPUT_FORMAT}'

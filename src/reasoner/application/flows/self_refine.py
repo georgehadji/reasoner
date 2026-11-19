@@ -11,11 +11,23 @@ just under the target if a HIGH or MED flaw sits next to it. Synthesis is told
 the score is the model's own claim, and the final answer says so in
 ``open_questions``.
 
+Stop reasons: ``target_reached``, ``evaluator_unavailable``,
+``max_rounds_reached``, ``no_improvement``, ``time_budget`` and ``llm_error``
+(a provider call failed after at least one round had finished).
+
+Finished rounds are never thrown away. Each one is appended to state as soon as
+it completes, the loop phase is non-critical, and synthesis works from the best
+round in state, so a provider failure or a phase timeout mid-loop still yields
+the best answer reached. The loop also continues from rounds already in state
+(``--resume``); a quality-gate retry starts clean through
+``quality.criteria.reset_phase_state``.
+
 State lives in ``state.self_refine_state`` (``MethodState.data["self_refine"]``).
 """
 
 from __future__ import annotations
 
+import math
 import time
 from typing import Any
 
@@ -31,7 +43,8 @@ from reasoner.core.constants_limits import (
     get_phase_timeout,
     get_token_budget,
 )
-from reasoner.core.exceptions import PhaseError
+from reasoner.core.degrade import degraded
+from reasoner.core.exceptions import PhaseError, is_run_fatal
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.parsing import extract_json
 
@@ -50,21 +63,26 @@ _PLACEHOLDER_FLAW = {
 def parse_score(value: Any) -> float | None:
     """A 0-10 score from whatever shape the model returned, or None if unusable.
 
-    Accepts numbers and strings like "9" or "9/10"; 11-100 is read as a
-    percentage. Anything else (a dict, a word, a negative) is None, not 0:
+    Accepts numbers and strings like "9", "9/10" or "85%". A bare number from
+    20 to 100 is read as a percentage; one just over 10 (10.5, 15) is an
+    overshoot and caps at 10 -- reading 10.5 as 1.05 would call a near-perfect
+    answer terrible. Anything else (a dict, a word, a negative) is None, not 0:
     an unreadable score must not look like a very bad one.
     """
     if isinstance(value, bool):
         return None
+    percent = False
     if isinstance(value, str):
         value = value.split("/")[0].strip()
+        percent = value.endswith("%")
+        value = value.rstrip("%").strip()
     try:
         score = float(value)
     except (TypeError, ValueError):
         return None
-    if score != score or score < 0:  # NaN or negative
+    if math.isnan(score) or score < 0:
         return None
-    if 10 < score <= 100:
+    if percent or 20 <= score <= 100:
         score /= 10
     return min(score, 10.0)
 
@@ -106,25 +124,34 @@ def best_round(rounds: list[dict]) -> dict | None:
     return rounds[-1] if rounds else None
 
 
+def next_round_fits(durations: list[float], elapsed: float, budget: float) -> bool:
+    """Whether one more round, as slow as the slowest so far, fits the budget. Pure.
+
+    The slowest round, not the average: one slow round is enough for the phase
+    timeout to cancel the phase.
+    """
+    return not durations or elapsed + max(durations) <= budget
+
+
 class SelfRefineFlow(WorkflowStrategy):
     """Self-score loop: one model drafts, scores itself and revises until 9/10."""
 
     def get_phases(self, state: PipelineState) -> list[PhaseStep]:
+        # The loop is non-critical so a timeout or provider failure keeps the
+        # rounds already in state; synthesis is critical and fails the run
+        # when there is no round at all to synthesise.
         return [
-            PhaseStep(3, _LOOP_PHASE, self._run_loop, _ser_5, critical=True),
-            PhaseStep(4, "Synthesis", self._run_synthesis, _ser_synthesis),
+            PhaseStep(3, _LOOP_PHASE, self._run_loop, _ser_5),
+            PhaseStep(4, "Synthesis", self._run_synthesis, _ser_synthesis, critical=True),
         ]
 
     async def _call(self, services: WorkflowServices, state: PipelineState, system: str,
                     user: str, budget_key: str) -> tuple[dict | None, str]:
         """One JSON call to the self-refine model. (None, model) when unparseable."""
-        result = await services.call_llm(
+        raw, meta = await services.call_llm(
             role=_ROLE, system_prompt=system, user_prompt=user, state=state,
             max_tokens=get_token_budget(budget_key),
         )
-        if result is None:
-            raise RuntimeError("Self-refine LLM returned None")
-        raw, meta = result
         model = (meta or {}).get("model", "")
         try:
             data = extract_json(raw)
@@ -163,81 +190,98 @@ class SelfRefineFlow(WorkflowStrategy):
         flaws = [f for f in flaws_in if isinstance(f, dict)] if isinstance(flaws_in, list) else []
         return effective_score(raw, flaws), flaws, raw
 
+    async def _run_round(self, services: WorkflowServices, state: PipelineState,
+                         prev: dict | None, n: int) -> dict:
+        """Draft (or revise *prev*) and self-evaluate: one round's record."""
+        answer, model = await self._draft(services, state, prev)
+        if not answer:
+            if prev is None:
+                raise PhaseError("Self-refine produced no first draft",
+                                 phase=3, phase_name=_LOOP_PHASE)
+            answer = prev["answer"]  # keep what we have; the round counts as degraded
+            score, flaws, raw = None, [], None
+        else:
+            score, flaws, raw = await self._evaluate(services, state, answer, n)
+        is_degraded = score is None
+        if is_degraded:
+            flaws = (prev["flaws"] if prev else []) or [_PLACEHOLDER_FLAW]
+        return {
+            # A degraded round has no score, not a score of 0: "unknown" must
+            # never reach the model, or the trail, as "very bad".
+            "round": n, "answer": answer, "model": model, "flaws": flaws,
+            "score": score, "raw_score": raw,
+            "capped": raw is not None and score is not None and score < raw,
+            "degraded": is_degraded,
+        }
+
     async def _run_loop(self, state: PipelineState, services: WorkflowServices) -> None:
         sr = state.self_refine_state
-        sr.clear()
-        sr.update(rounds=[], stop_reason="", target_reached=False, best_round=0,
-                  best_score=None, best_answer="", target=SR_TARGET_SCORE)
-        rounds: list[dict] = sr["rounds"]
+        sr.setdefault("target", SR_TARGET_SCORE)
+        rounds: list[dict] = sr.setdefault("rounds", [])
 
-        # The phase timeout cancels the whole phase, finished rounds included.
-        # Stop before a round that, at the pace so far, would not finish in it.
+        # Continues from rounds already in state (a resumed run). The phase
+        # timeout cancels the phase, so each round is appended the moment it
+        # finishes, and the loop stops before a round that would not fit.
         started = _clock()
         budget = get_phase_timeout(_LOOP_PHASE) * SR_TIME_BUDGET_FRACTION
-        reason = ""
+        reason = stop_reason(rounds)
         while not reason:
             n = len(rounds) + 1
-            if rounds:
-                elapsed = _clock() - started
-                if elapsed + elapsed / len(rounds) > budget:
-                    reason = "time_budget"
-                    services.log("SR", f"Stopped after round {len(rounds)}: the next round "
-                                       f"would not fit the phase limit", state)
-                    break
+            durations = [r["seconds"] for r in rounds if "seconds" in r]
+            if not next_round_fits(durations, _clock() - started, budget):
+                reason = "time_budget"
+                services.log("SR", f"Stopped after round {len(rounds)}: the next round "
+                                   f"would not fit the phase limit", state)
+                break
             services.log("SR", f"--- Round {n}/{SR_MAX_ROUNDS} ---", state)
-            prev = rounds[-1] if rounds else None
-            answer, model = await self._draft(services, state, prev)
-            if not answer:
-                if prev is None:
-                    raise PhaseError("Self-refine produced no first draft",
-                                     phase=3, phase_name=_LOOP_PHASE)
-                answer = prev["answer"]  # keep what we have; the round counts as degraded
-                score, flaws, raw = None, [], None
-            else:
-                score, flaws, raw = await self._evaluate(services, state, answer, n)
-            degraded = score is None
-            if degraded:
-                flaws = (prev["flaws"] if prev else []) or [_PLACEHOLDER_FLAW]
-            rounds.append({
-                "round": n, "answer": answer, "model": model, "flaws": flaws,
-                "score": 0.0 if score is None else score, "raw_score": raw,
-                "capped": raw is not None and score is not None and score < raw,
-                "degraded": degraded,
-            })
-            shown = "unavailable" if degraded else f"{score:g}"
+            # Revise the best answer so far, not the latest: a round that
+            # regressed must not become the base of the next one.
+            prev = best_round(rounds)
+            round_start = _clock()
+            try:
+                record = await self._run_round(services, state, prev, n)
+            except Exception as exc:
+                # Round 1 has nothing to fall back to, and a run-fatal error
+                # (credits, auth) fails every later call too: both propagate.
+                if prev is None or is_run_fatal(exc):
+                    raise
+                reason = degraded("self_refine.round", "llm_error", exc=exc, state=state,
+                                  detail=f"stopped at round {n}, keeping {len(rounds)} rounds")
+                break
+            record["seconds"] = _clock() - round_start
+            rounds.append(record)
+            shown = "unavailable" if record["degraded"] else f"{record['score']:g}"
             services.log("SR", f"Round {n}: self-score {shown}", state)
             reason = stop_reason(rounds)
 
-        best = best_round(rounds)
         sr["stop_reason"] = reason
         sr["target_reached"] = reason == "target_reached"
-        if best:
-            sr["best_round"] = best["round"]
-            sr["best_score"] = None if best["degraded"] else best["score"]
-            sr["best_answer"] = best["answer"]
 
     async def _run_synthesis(self, state: PipelineState, services: WorkflowServices) -> None:
         sr = state.self_refine_state
+        # Derived from the rounds, the one source: it holds even when the loop
+        # phase timed out before recording a stop reason.
+        best = best_round(sr.get("rounds", []))
+        if best is None:
+            raise PhaseError("Self-refine produced no rounds to synthesise",
+                             phase=4, phase_name="Synthesis")
         services.log("SR", "Synthesizing the refined answer", state)
-        result = await services.call_llm(
+        raw, _ = await services.call_llm(
             role="synthesis",
             system_prompt=sr_phases.SYNTHESIS_SYSTEM,
-            user_prompt=sr_phases.synthesis_prompt(state, sr, sr.get("best_answer", "")),
+            user_prompt=sr_phases.synthesis_prompt(state, sr, best),
             state=state,
         )
-        if result is None:
-            raise RuntimeError("Synthesis LLM returned None")
-        solution = finalize_solution(result[0], state, services)
+        solution = finalize_solution(raw, state, services)
 
         extra = ["The quality score is the model's own assessment of its answer, "
                  "not independent verification."]
         if not sr.get("target_reached"):
             extra.append(f"The model did not reach {SR_TARGET_SCORE:g}/10 "
-                         f"({sr.get('stop_reason') or 'no reason recorded'}); "
+                         f"({sr.get('stop_reason') or 'loop interrupted'}); "
                          f"the answer is unsettled.")
-            best = best_round(sr.get("rounds", []))
             extra += [f"Unresolved self-identified flaw: {f.get('flaw')}"
-                      for f in (best["flaws"] if best else []) if f.get("flaw")]
+                      for f in best["flaws"] if f.get("flaw")]
         known = {q.strip().lower() for q in solution.open_questions}
         solution.open_questions += [q for q in extra if q.strip().lower() not in known]
         state.final_solution = solution
