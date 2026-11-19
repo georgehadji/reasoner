@@ -32,7 +32,12 @@ import time
 from typing import Any
 
 import reasoner.phases.self_refine as sr_phases
-from reasoner.application.flows.base import PhaseStep, WorkflowServices, WorkflowStrategy
+from reasoner.application.flows.base import (
+    PhaseStep,
+    WorkflowServices,
+    WorkflowStrategy,
+    next_round_fits,
+)
 from reasoner.application.flows.synthesis_phase import finalize_solution
 from reasoner.application.services.serializers import _ser_5, _ser_synthesis
 from reasoner.core.constants_limits import (
@@ -122,15 +127,6 @@ def best_round(rounds: list[dict]) -> dict | None:
     if real:
         return max(real, key=lambda r: (r["score"], r["round"]))
     return rounds[-1] if rounds else None
-
-
-def next_round_fits(durations: list[float], elapsed: float, budget: float) -> bool:
-    """Whether one more round, as slow as the slowest so far, fits the budget. Pure.
-
-    The slowest round, not the average: one slow round is enough for the phase
-    timeout to cancel the phase.
-    """
-    return not durations or elapsed + max(durations) <= budget
 
 
 class SelfRefineFlow(WorkflowStrategy):
