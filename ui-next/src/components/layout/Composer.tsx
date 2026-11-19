@@ -6,7 +6,7 @@ import { EXAMPLE_PROMPTS, LIMITS, TIMING, API } from '@/lib/config';
 import { cn } from '@/lib/utils';
 import { isEnabled } from '@/hooks/useFeatureFlags';
 import { ArrowUp, Sparkles, Plus, X, FileText, Image as ImageIcon, Upload, Lock, Square, ShieldCheck, ChevronDown } from 'lucide-react';
-import { METHOD_OPTIONS, type MethodSlug } from '@/lib/methods';
+import { methodsByCost, type MethodSlug } from '@/lib/methods';
 import { Tooltip } from '@/components/ui/Tooltip';
 
 interface ComposerProps {
@@ -315,9 +315,11 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
             )}
           >
             <option value="">Auto method</option>
-            {METHOD_OPTIONS.map((m) => (
-              <option key={m.slug} value={m.slug}>{m.label}</option>
-            ))}
+            <optgroup label="Cheapest first">
+              {methodsByCost(tier).map((m) => (
+                <option key={m.slug} value={m.slug}>{m.label}</option>
+              ))}
+            </optgroup>
           </select>
           <ChevronDown
             aria-hidden="true"
