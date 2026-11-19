@@ -277,7 +277,7 @@ class _RecordingClient:
         async def create(**kwargs):
             self.call_kwargs = kwargs
             return types.SimpleNamespace(
-                content=[types.SimpleNamespace(text="anthropic-ok")]
+                content=[types.SimpleNamespace(type="text", text="anthropic-ok")]
             )
         return types.SimpleNamespace(create=create)
 
