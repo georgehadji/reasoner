@@ -1322,6 +1322,7 @@ _REGISTRY: dict[str, dict] = {
         },
         "fallback_routing": {
             "primary": "glm-5.3",  # CN Zhipu -- cross-bloc from gpt-5
+            "expert_1": "mistral-medium-3-5",  # 🇪🇺 Mistral — cross-bloc from Qwen, premium tier
         },
         "tags": ["premium", "self-refine", "iterative"],
     },

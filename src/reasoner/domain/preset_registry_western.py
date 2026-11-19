@@ -848,7 +848,7 @@ WESTERN_PRESETS: dict[str, dict] = {
             'post_synthesis_verify': 'sonar',
         },
         'fallback_routing': {
-            'expert_1': 'mistral-small-2603',
+            'expert_1': 'gpt-4o-mini',
         },
         'tags': ['budget', 'self-refine', 'iterative', 'western-only'],
     },
@@ -862,6 +862,7 @@ WESTERN_PRESETS: dict[str, dict] = {
         },
         'fallback_routing': {
             'primary': 'codestral',
+            'expert_1': 'gpt-5',
         },
         'tags': ['premium', 'self-refine', 'iterative', 'western-only'],
     },

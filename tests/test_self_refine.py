@@ -19,7 +19,8 @@ from reasoner.application.flows.self_refine import (
 from reasoner.core.exceptions import AuthenticationError, PhaseError, ProviderError
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.hypergate.hyperagent import named_method
-from reasoner.presets import get_method_from_preset
+from reasoner.infrastructure.llm.registry import _vendor_of
+from reasoner.presets import PRESETS, get_method_from_preset
 from reasoner.quality.criteria import reset_phase_state
 
 
@@ -292,6 +293,53 @@ def test_next_round_is_budgeted_at_the_slowest_round():
     # the mean (90s) would fit, 70 + 90 <= 216; the slowest (150s) does not
     assert not next_round_fits([30.0, 150.0], 70.0, 216.0)
     assert next_round_fits([30.0, 50.0], 70.0, 216.0)
+
+
+class _FallsBack(_Scripted):
+    """_Scripted whose router answers from model "fb" from the given 1-based call on."""
+
+    def __init__(self, scores, from_call):
+        super().__init__(scores)
+        self.calls, self.from_call = 0, from_call
+
+    async def call_llm(self, *a, **k):
+        self.calls += 1
+        text, _ = await super().call_llm(*a, **k)
+        return text, {"model": "fb" if self.calls >= self.from_call else "m"}
+
+
+@pytest.mark.asyncio
+async def test_a_fallback_after_round_one_ends_the_loop_without_mixing_scores():
+    # calls: draft1 eval1 draft2 eval2 draft3(fb) eval3(fb)
+    services = _FallsBack([6, 7, 9.5], from_call=5)
+    state = PipelineState(problem="p")
+    await SelfRefineFlow()._run_loop(state, services)
+
+    sr = state.self_refine_state
+    assert sr["stop_reason"] == "model_changed" and sr["target_reached"] is False
+    assert [r["round"] for r in sr["rounds"]] == [1, 2]  # the fallback's 9.5 is dropped
+
+
+@pytest.mark.asyncio
+async def test_a_round_scored_by_another_model_is_not_a_self_score():
+    # draft1 on "m", eval1 on "fb": round 1's score is discarded, then the loop
+    # stops because round 2 runs on "fb", not round 1's "m".
+    services = _FallsBack([9.5, 9.5], from_call=2)
+    state = PipelineState(problem="p")
+    await SelfRefineFlow()._run_loop(state, services)
+
+    sr = state.self_refine_state
+    assert sr["rounds"][0]["degraded"] is True and sr["rounds"][0]["score"] is None
+    assert sr["stop_reason"] == "model_changed"
+
+
+@pytest.mark.parametrize("pid", [p for p in PRESETS if p.startswith("self-refine-")])
+def test_the_grader_falls_back_off_its_own_lab_and_off_synthesis(pid):
+    preset = PRESETS[pid]
+    fallback = preset.fallback_routing.get("expert_1")
+    assert fallback, f"{pid}: expert_1 has no fallback"
+    labs = {_vendor_of(preset.routing["expert_1"]), _vendor_of(preset.routing["synthesis"])}
+    assert _vendor_of(fallback) not in labs
 
 
 @pytest.mark.asyncio
