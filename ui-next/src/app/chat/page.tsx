@@ -213,6 +213,7 @@ export default function ChatPage() {
   const addRecentCommand = useAppStore((s) => s.addRecentCommand);
   const collapsed = useAppStore((s) => s.sidebarCollapsed);
   const autoMethodAlways = useAppStore((s) => s.autoMethodAlways);
+  const pickedMethod = useAppStore((s) => s.method);
   const toggleAutoMethodAlways = useAppStore((s) => s.toggleAutoMethodAlways);
 
   const { history, refresh: refreshHistory, remove: removeHistory } = useConversationHistory();
@@ -312,8 +313,9 @@ export default function ChatPage() {
     // confident, proceed silently (today's UX). If it's not, pause here and let
     // the user confirm or pick a runner-up — skipped for image mode, follow-ups
     // (which don't go through HyperGate at all), and once the user opts out via
-    // "always pick automatically".
-    if (!opts?.skipGate && !isImageMode && !autoMethodAlways) {
+    // "always pick automatically", or when the user picked a method in the
+    // composer (there is nothing left for the gate to choose).
+    if (!opts?.skipGate && !isImageMode && !autoMethodAlways && !pickedMethod) {
       const lastAssistantMsgForGate = findLastAssistant(messages);
       const isFollowupForGate = !!lastAssistantMsgForGate && messages.length > 0 && isContinuation(problem);
       if (!isFollowupForGate) {
@@ -911,9 +913,10 @@ export default function ChatPage() {
           attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
           file_ids: uploadedAttachments.length > 0 ? uploadedAttachments.map((a) => a.file_id) : undefined,
           client_run_id: clientRunId,
-          // The user already confirmed a specific method via the gate picker —
-          // skip re-running HyperGate so the chosen preset is locked in.
-          force_pipeline: !!opts?.presetOverride,
+          // The user already chose a method, via the gate picker or the
+          // composer's method menu: skip re-running HyperGate so the chosen
+          // preset is locked in.
+          force_pipeline: !!opts?.presetOverride || !!pickedMethod,
           facts: opts?.facts && Object.keys(opts.facts).length > 0 ? opts.facts : undefined,
         };
         await startRun(req, onEvent, ticket.abort.signal);
@@ -966,7 +969,7 @@ export default function ChatPage() {
       }
       clearAttachments();
     }
-  }, [run, attachments, isImageMode, isLocal, user, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setErrorPhases, setAutoSelectedMethod, setPhaseOpenMode, getAutoPreset, autoMethodAlways]);
+  }, [run, attachments, isImageMode, isLocal, user, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setErrorPhases, setAutoSelectedMethod, setPhaseOpenMode, getAutoPreset, autoMethodAlways, pickedMethod]);
 
   const handleSubmit = useCallback(async (
     providedText?: string,
