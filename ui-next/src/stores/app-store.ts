@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { Conversation } from '@/lib/types';
 import { STORAGE_KEYS, LIMITS } from '@/lib/config';
+import { presetFor, type MethodSlug } from '@/lib/methods';
 import { shallow } from 'zustand/shallow';
 import type { SubscriptionStatus } from '@/hooks/useSubscription';
 import { apiFetch } from '@/lib/api-client';
@@ -57,6 +58,9 @@ interface AppState {
   isImageMode: boolean;
   /** When true, skip the HyperGate method-confirmation picker and always auto-route. */
   autoMethodAlways: boolean;
+  /** Method picked in the composer; null lets HyperGate choose. Not persisted:
+      a forced method is a choice for this session's questions, not a default. */
+  method: MethodSlug | null;
   sidebarCollapsed: boolean;
   neuroPanelOpen: boolean;
   composerText: string;
@@ -78,6 +82,7 @@ interface AppState {
   toggleExpert: () => void;
   toggleImageMode: () => void;
   toggleAutoMethodAlways: () => void;
+  setMethod: (method: MethodSlug | null) => void;
   toggleSidebar: () => void;
   toggleNeuroPanel: () => void;
   setComposerText: (text: string) => void;
@@ -113,6 +118,7 @@ export const useAppStore = create<AppState>()(
       isExpert: false,
       isImageMode: false,
       autoMethodAlways: false,
+      method: null,
       sidebarCollapsed: false,
       neuroPanelOpen: false,
       composerText: '',
@@ -141,6 +147,7 @@ export const useAppStore = create<AppState>()(
       toggleExpert: () => set((state) => ({ isExpert: !state.isExpert })),
       toggleImageMode: () => set((state) => ({ isImageMode: !state.isImageMode })),
       toggleAutoMethodAlways: () => set((state) => ({ autoMethodAlways: !state.autoMethodAlways })),
+      setMethod: (method) => set({ method }),
       toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
       toggleNeuroPanel: () => set((state) => ({ neuroPanelOpen: !state.neuroPanelOpen })),
       setComposerText: (composerText) => set({ composerText }),
@@ -190,8 +197,9 @@ export const useAppStore = create<AppState>()(
       markSessionExpired: () =>
         set((s) => (s.user ? authPatch(s, { user: null, sessionExpired: true }) : s)),
 
-      /** The preset to send: "auto-<tier>", or "auto-western-<tier>" when Western-only is on. */
-      getAutoPreset: () => `auto-${get().westernOnly ? 'western-' : ''}${get().tier}`,
+      /** The preset to send: "auto-<tier>" (or "<method>-<tier>" when a method is
+          picked), with "-western" before the tier when Western-only is on. */
+      getAutoPreset: () => presetFor(get().method, get().westernOnly, get().tier),
 
       // ── Subscription (shared cache — single fetch across all components) ──
 
