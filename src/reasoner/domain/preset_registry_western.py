@@ -862,6 +862,7 @@ WESTERN_PRESETS: dict[str, dict] = {
         },
         'fallback_routing': {
             'primary': 'codestral',
+            'expert_1': 'grok-4.6',
         },
         'tags': ['premium', 'self-refine', 'iterative', 'western-only'],
     },
