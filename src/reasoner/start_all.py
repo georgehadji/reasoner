@@ -56,8 +56,11 @@ def run_preflight_checks() -> bool:
     """Run server_check.py and return True if all passed."""
     print("Running pre-flight checks...")
     result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "src" / "reasoner" / "server_check.py")],
+        # As a module: the old path ran a star-import shim whose __main__ guard
+        # never fired, so the check exited 0 having checked nothing.
+        [sys.executable, "-m", "reasoner.infrastructure.server_check"],
         cwd=REPO_ROOT,
+        env={**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")},
     )
     print()
     return result.returncode == 0
