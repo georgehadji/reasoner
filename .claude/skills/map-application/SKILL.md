@@ -41,6 +41,7 @@ Convention: `<method>.py` holds the strategy class (phase sequence); `<method>_p
 | `article.py` / `article_phases.py` | Article pipeline: retrieval, outline, draft, adversarial verify, structure. |
 | `article_adapters.py` (23KB) | Bridges the immutable article `Context` domain to the mutable `PipelineState` phases. |
 | `iterative_critique.py` / `iterative_critique_phases.py` | Generator/critic adversarial loop with `check_convergence`, `MAX_ROUNDS`, stalemate detection. |
+| `self_refine.py` | One model (`expert_1`) drafts, self-scores 0-10 and revises until `SR_TARGET_SCORE` (9); `stop_reason`, `effective_score` cap, time budget; state in `self_refine_state`. |
 | `augmentation.py` | Shared pre-processing: runs debate + iterative critique in parallel for deep/abstract questions, with caching. |
 | `search_phases.py` (25KB) | Context vetting, result vetting, deep read, evidence validation, YouTube enrichment. Vetting fails closed (`vetting_unverified`, quality `partial`); a deep-read page the injection guard rejects is dropped (`deep_read_rejected`). |
 | `synthesis_phase.py` | `run_synthesis_phase` — final synthesis. |

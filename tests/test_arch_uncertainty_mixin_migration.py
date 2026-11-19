@@ -44,6 +44,7 @@ def test_flow_factory_has_all_methods() -> None:
         "subagent",
         "cross_language",
         "iterative_critique",
+        "self_refine",
         "image_gen",
     }
 

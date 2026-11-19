@@ -399,6 +399,8 @@ _RESET: dict[str, Callable[[PipelineState], None]] = {
                                         s.brainstorming_state.pop("top_ideas", None),
                                         s.brainstorming_state.pop("deduplicated_count", None)],
     "Deep Development":      lambda s: s.brainstorming_state.pop("developments", None),
+    # Self-Refine: the loop continues from rounds in state, so a retry must empty it
+    "Self-Refine Loop":      lambda s: s.self_refine_state.clear(),
 }
 
 

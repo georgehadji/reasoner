@@ -127,6 +127,14 @@ IC_MAX_CONSECUTIVE_DEGRADED: int = 2
 # debate may plan to use. It stops before a round that, at its average pace,
 # would end past this; the rest is headroom for a round slower than average.
 IC_TIME_BUDGET_FRACTION: float = 0.9
+# Self-Refine: one model drafts, scores its own answer 0-10 and revises until
+# the score reaches SR_TARGET_SCORE. The score is the model's own claim, so the
+# loop is bounded: SR_MAX_ROUNDS rounds, SR_TIME_BUDGET_FRACTION of the phase
+# timeout, and SR_MAX_CONSECUTIVE_DEGRADED unusable self-evaluations in a row.
+SR_TARGET_SCORE: float = 9.0
+SR_MAX_ROUNDS: int = 5
+SR_TIME_BUDGET_FRACTION: float = 0.9
+SR_MAX_CONSECUTIVE_DEGRADED: int = 2
 # Multi-Perspective Phase 3: how many scored candidates go on to stress testing
 # and synthesis, and the hard ceiling on candidates kept in state.
 MP_TOP_K: int = 2
@@ -227,6 +235,10 @@ PHASE_TOKEN_BUDGETS: dict[str, int] = {
     # truncated live, and a truncated round has no answer to keep.
     "iterative_generate": 8192,
     "iterative_critique": 3072,
+    # Self-refine: the flow passes these explicitly (its calls run under
+    # expert_1, which has no entry here). Same sizing reasoning as above.
+    "self_refine_generate": 8192,
+    "self_refine_evaluate": 2048,
     "research": 4096,
     "verification": 1024,
     "deep_read": 2048,
@@ -528,6 +540,8 @@ PHASE_TIMEOUTS: dict[str, float] = {
     "Cluster & Score": 120.0,
     # Iterative Critique — adversarial debate runs sustained LLM back-and-forth
     "Adversarial Debate": 180.0,
+    # Self-Refine — up to SR_MAX_ROUNDS draft/score/revise rounds, two calls each
+    "Self-Refine Loop": 240.0,
     "Deep Development": 180.0,
     "default": 90.0,
 }
