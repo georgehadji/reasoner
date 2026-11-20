@@ -12,7 +12,7 @@ import logging
 import re
 import time
 from collections import OrderedDict
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -396,13 +396,18 @@ def require_key_scope(scope: str):
     """
 
     async def guard(request: Request, user: User = Depends(get_current_user)) -> User:
-        if getattr(request.state, "auth_method", None) in KEY_AUTH_METHODS and not key_allows(
-            user.scopes, scope
-        ):
-            raise HTTPException(status_code=403, detail=f"API key lacks the '{scope}' scope")
+        enforce_key_scope(request, user, scope)
         return user
 
     return guard
+
+
+def enforce_key_scope(request: Request, user: Any, scope: str) -> None:
+    """403 if *user* came in on an rsn_ key that lacks *scope*; anyone else passes."""
+    if getattr(request.state, "auth_method", None) in KEY_AUTH_METHODS and not key_allows(
+        user.scopes, scope
+    ):
+        raise HTTPException(status_code=403, detail=f"API key lacks the '{scope}' scope")
 
 
 async def require_admin_scope(user: User = Depends(get_current_user)) -> User:

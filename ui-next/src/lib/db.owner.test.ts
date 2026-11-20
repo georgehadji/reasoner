@@ -54,6 +54,19 @@ describe('per-user history', () => {
     expect(await loadAllConversations()).toHaveLength(1);
   });
 
+  it('deleteHistory gives up instead of hanging when the delete stays blocked', async () => {
+    vi.useFakeTimers();
+    try {
+      const { deleteDB } = await import('idb');
+      vi.mocked(deleteDB).mockImplementationOnce(() => new Promise<void>(() => {}));
+      const done = deleteHistory('user-d');
+      await vi.advanceTimersByTimeAsync(3000);
+      await expect(done).resolves.toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('clears the old shared database rather than migrating it (Q9)', async () => {
     dbs.set('ARA_Pipeline_v2', new Map([['old', {}]]));
     await clearLegacyHistory();

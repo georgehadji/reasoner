@@ -47,12 +47,9 @@ from reasoner.core.constants import DEFAULT_DB_COMMAND_TIMEOUT
 from reasoner.core.events.domain_events import (
     ALL_EVENT_TYPES,
     DomainEvent,
-    MemoryEventType,
-    PipelineEventType,
-    SaaSEventType,
-    WidgetEventType,
 )
 from reasoner.core.ports.crypto_port import EncryptionPort
+from reasoner.infrastructure.persistence.event_store import EventStore
 from reasoner.infrastructure.persistence.pg_pool import get_shared_pool
 from reasoner.security.encryption import get_encryption_service
 
@@ -380,30 +377,7 @@ class PostgreSQLEventStore:
             logger.error(f"Unexpected error saving events: {e}")
             raise
 
-    def _get_aggregate_type(self, event_type: PipelineEventType | WidgetEventType | MemoryEventType | SaaSEventType) -> str:
-        """Determine aggregate type from event."""
-        if event_type in (
-            PipelineEventType.PIPELINE_STARTED, PipelineEventType.PHASE_STARTED,
-            PipelineEventType.PHASE_COMPLETED, PipelineEventType.PHASE_FAILED,
-            PipelineEventType.PIPELINE_COMPLETED, PipelineEventType.PIPELINE_FAILED,
-            PipelineEventType.PIPELINE_CANCELLED,
-        ):
-            return "pipeline"
-        elif event_type in (
-            WidgetEventType.WIDGET_DETECTED, WidgetEventType.WIDGET_EXECUTED,
-            WidgetEventType.WIDGET_FAILED,
-        ):
-            return "widget"
-        elif event_type in (
-            MemoryEventType.MEMORY_STORED, MemoryEventType.MEMORY_RECALLED,
-        ):
-            return "memory"
-        elif event_type in (
-            SaaSEventType.USER_REGISTERED, SaaSEventType.USER_LOGGED_IN,
-        ):
-            return "saas"
-        else:
-            return "generic"
+    _get_aggregate_type = EventStore._get_aggregate_type  # identical copy, shared
 
     async def _update_aggregate(
         self,
