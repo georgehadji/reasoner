@@ -323,13 +323,12 @@ class LLMExecutor:
                         raise RuntimeError(f"Empty response from {model_id} for role={role}")
 
                     if role in ("fusion", "classification", "decomposition", "scoring", "meta_evaluator"):
-                        try:
-                            import json
-                            json.loads(raw)
-                        except json.JSONDecodeError as exc:
-                            raise RuntimeError(
-                                f"Malformed JSON from {model_id} for role={role}"
-                            ) from exc
+                        # extract_json_any, not json.loads: a fenced ```json reply
+                        # is good output, and this model has already been paid for.
+                        from reasoner.core.parsing import extract_json_any
+
+                        if extract_json_any(raw) is None:
+                            raise RuntimeError(f"Malformed JSON from {model_id} for role={role}")
 
                     # ── Quality gate (fail-fast heuristics) ─────────────────────
                     if self.cascading_quality_check:

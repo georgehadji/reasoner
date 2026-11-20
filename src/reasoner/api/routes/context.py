@@ -31,7 +31,7 @@ from reasoner.application.flows.perspective_phases import (
 )
 from reasoner.application.flows.services import PipelineWorkflowServices
 from reasoner.application.flows.synthesis_phase import run_synthesis_phase
-from reasoner.application.services.run_metering import metered
+from reasoner.application.services.run_metering import metered, track_run_spend
 from reasoner.application.services.spend_limit_service import (
     apply_spend_limits,
     check_run_allowed,
@@ -56,8 +56,15 @@ async def _cost_frames(
     These phases emit no SSE frames of their own, so without these
     ``metered()`` saw no cost at all, and a run that failed half way through
     would release its whole reservation instead of paying for what it spent.
+    ``track_run_spend`` covers a step that raises: metered() still settles
+    what was spent before it.
     """
+    track_run_spend(lambda: state.total_cost_usd or 0.0)
     for step in steps:
+        if getattr(state, "_spend_cap_exceeded", False):
+            # WorkflowRunner's check, which this hand-rolled sequence skips.
+            state.add_error(f"Run halted: {state.spend_cap_hit or 'spend'} spend cap reached")
+            break
         await step()
         yield _event({"type": "phase_complete", "total_cost_usd": state.total_cost_usd})
     yield _event({"type": "done", "total_cost_usd": state.total_cost_usd})

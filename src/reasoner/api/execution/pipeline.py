@@ -443,7 +443,12 @@ async def _settle_preflight(
         from reasoner.infrastructure.llm import spend_tracker
 
         await spend_tracker.refresh(user_id)  # see other workers' monthly spend
-    rejection = check_run_allowed(preflight.effective_preset_name, user_tier, user_id)
+    rejection = check_run_allowed(
+        preflight.effective_preset_name,
+        user_tier,
+        user_id,
+        agent_model=getattr(initial_state, "agent_model", None),
+    )
     if rejection is not None:
         logger.info(
             "Run %s refused: %s cap for tier %s (preset %s)",

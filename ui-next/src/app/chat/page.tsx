@@ -847,7 +847,7 @@ export default function ChatPage() {
             problem,
             phases: phases.map((p) => ({ phase: p.phase, name: p.name, data: p.data })),
             errors: finalErrors,
-            preset: getAutoPreset(),
+            preset: runPreset,
             method: runMethod,
             total_tokens: finalTokens,
             duration: totalDuration,
@@ -865,6 +865,9 @@ export default function ChatPage() {
     const clientRunId = 'run-' + (crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
     ticket.clientRunId = clientRunId;
 
+    // Resolved once: the request and the saved history record must name the same preset.
+    const runPreset = opts?.presetOverride || getAutoPreset();
+
     try {
       const state = useAppStore.getState();
       // Connect WebSocket for control (stop) and status only.
@@ -878,7 +881,7 @@ export default function ChatPage() {
         ticket.conversationId = followupConvId;
         const followupReq: RunFollowupRequest = {
           question: problem,
-          preset: getAutoPreset(),
+          preset: runPreset,
           top_k: 2,
           sequential: false,
           enhance_prompt: true,
@@ -903,7 +906,7 @@ export default function ChatPage() {
         setConversationId(newConvId);
         const req = {
           problem,
-          preset: opts?.presetOverride || getAutoPreset(),
+          preset: runPreset,
           top_k: 2,
           sequential: false,
           enhance_prompt: true,

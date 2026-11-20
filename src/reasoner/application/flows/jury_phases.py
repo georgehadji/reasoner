@@ -8,6 +8,7 @@ from typing import Any
 
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices, require_survivors
+from reasoner.application.flows.iterative_critique_phases import _safe_float
 from reasoner.domain.core_types import (
     CriticDimensionScore,
     CriticScore,
@@ -223,16 +224,6 @@ async def run_jury_weighted_ranking_phase(state: PipelineState, services: Workfl
     reliability: dict[str, float] = {}
     if state.meta_evaluation:
         reliability = state.meta_evaluation.critic_reliability or {}
-
-    def _safe_float(v) -> float:
-        if isinstance(v, (int, float)):
-            return float(v)
-        if isinstance(v, dict):
-            return 0.0
-        try:
-            return float(v or 0)
-        except (TypeError, ValueError):
-            return 0.0
 
     generator_scores: dict[str, float] = {}
     for cs in state.critic_scores:
