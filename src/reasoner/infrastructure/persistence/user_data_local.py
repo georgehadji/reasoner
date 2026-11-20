@@ -167,7 +167,10 @@ class TokenCacheStore:
 
 
 class ValkeyStore:
-    """Cache keys under ``user:<id>:*``."""
+    """The user's counters in Valkey: the monthly spend (``spend:<id>:<period>``) and
+    the cached quota (``quota:<id>``). The key builders are the writers' own, so the
+    eraser cannot drift from them. It matched ``user:<id>:*`` once, which nothing
+    writes, and so erased nothing (audit 7, finding 8)."""
 
     name = "valkey"
 
@@ -178,10 +181,14 @@ class ValkeyStore:
         return None  # a cache of derived values
 
     async def erase(self, user_id: str) -> None:
+        from reasoner.infrastructure.llm.spend_tracker import spend_key_pattern
+        from reasoner.infrastructure.persistence.cached_quota_repo import quota_key
+
         client = self._client()
-        keys = await client.keys(f"user:{user_id}:*")
-        if keys:
-            await client.delete(*keys)
+        keys = [k async for k in client.scan_iter(match=spend_key_pattern(user_id))]
+        keys.append(quota_key(user_id))
+        for start in range(0, len(keys), 500):
+            await client.unlink(*keys[start : start + 500])
 
 
 class UnsettledRunsStore:

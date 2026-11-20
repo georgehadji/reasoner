@@ -21,10 +21,15 @@ logger = logging.getLogger(__name__)
 CACHE_TTL_SECONDS = 60
 
 
+def quota_key(user_id: str) -> str:
+    """The Valkey key of one user's cached quota."""
+    return f"quota:{user_id}"
+
+
 async def invalidate_quota(user_id: str) -> None:
     """Drop a user's cached quota after a write that bypasses this wrapper."""
     try:
-        await get_guarded_valkey(get_valkey_pool()).delete(f"quota:{user_id}")
+        await get_guarded_valkey(get_valkey_pool()).delete(quota_key(user_id))
     except Exception as exc:
         logger.warning("Redis quota cache invalidate failed for %s: %s", user_id, exc)
 
@@ -39,7 +44,7 @@ class CachedQuotaRepository(QuotaRepository):
         self._redis = get_guarded_valkey(get_valkey_pool())
 
     def _cache_key(self, user_id: str) -> str:
-        return f"quota:{user_id}"
+        return quota_key(user_id)
 
     async def get_quota(self, user_id: str) -> UsageQuota:
         cache_key = self._cache_key(user_id)
