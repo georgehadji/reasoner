@@ -512,7 +512,7 @@ export default function ChatPage() {
                 : `Generated image using **${formattedImages[0]?.model || 'model'}**`,
             images: formattedImages,
             prompt_meta: { original: problem, enhanced: enhancedPrompt },
-          });
+          }, ticket.historyOwner);
           refreshHistory();
         } else {
           showImageResult(replyAdded, {
@@ -855,7 +855,7 @@ export default function ChatPage() {
             response_content: buildMarkdownFromPhases(phases),
             pipeline_id: ticket.clientRunId || undefined,
           };
-          saveConversation(conv).then(refreshHistory).catch(console.error);
+          saveConversation(conv, ticket.historyOwner).then(refreshHistory).catch(console.error);
           break;
         }
       }

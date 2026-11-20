@@ -70,13 +70,12 @@ async def test_unknown_pipeline_denied_for_non_admin(ownership_repo):
 
 
 @pytest.mark.asyncio
-async def test_anonymous_owner_allowed_for_anyone(ownership_repo):
-    """A pipeline explicitly recorded with no owner (anonymous run) is
-    accessible to any authenticated user -- distinct from no record
-    existing at all."""
+async def test_anonymous_owner_denied_to_signed_in_users(ownership_repo):
+    """An anonymous run is not open to every signed-in user who learns its id:
+    they could read the question and answer, resume it or delete it."""
     user = _user()
     await ownership_repo.set_owner("anon-pipeline", None, "anon-pipeline")
-    assert await _check_pipeline_ownership("anon-pipeline", user) is True
+    assert await _check_pipeline_ownership("anon-pipeline", user) is False
 
 
 @pytest.mark.asyncio

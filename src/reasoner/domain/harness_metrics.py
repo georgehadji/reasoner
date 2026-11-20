@@ -188,29 +188,3 @@ class HarnessMutation:
             "rollback": self.rollback,
             "risk_tier": self.risk_tier,
         }
-
-
-@dataclass
-class ReplayResult:
-    """Result of evaluating a HarnessMutation against held-out problems."""
-    mutation: HarnessMutation = field(default_factory=HarnessMutation)
-    passed: bool = False
-    delta_improvement: float = 0.0
-    max_regression: float = 0.0
-    total_cost_usd_before: float = 0.0
-    total_cost_usd_after: float = 0.0
-    problems_evaluated: int = 0
-    regressions: list[str] = field(default_factory=list)
-
-    def to_dict(self) -> dict:
-        return {
-            "passed": self.passed,
-            "delta_improvement": round(self.delta_improvement, 4),
-            "max_regression": round(self.max_regression, 4),
-            "cost_before": round(self.total_cost_usd_before, 6),
-            "cost_after": round(self.total_cost_usd_after, 6),
-            "problems_evaluated": self.problems_evaluated,
-            "regression_count": len(self.regressions),
-        }
-
-

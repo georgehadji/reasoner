@@ -149,18 +149,18 @@ class TestFallbackBehaviour:
         assert getattr(state, "_spend_cap_exceeded", False) is False
 
     @pytest.mark.asyncio
-    async def test_monthly_falls_back_to_conversation_without_a_subject(
-        self, executor, no_global_cap
-    ):
-        # An unauthenticated run has no user to bill, but must still be
-        # bounded rather than becoming unlimited.
+    async def test_monthly_skips_a_run_without_a_subject(self, executor, no_global_cap):
+        # Keyed on the conversation id, the monthly ledger capped nothing (each
+        # conversation starts at zero) and grew one entry per anonymous
+        # conversation. Anonymous spend is bounded by the per-run cap and the
+        # per-IP daily trial cap (anonymous_trial_policy) instead.
         state = _state(spend_cap_monthly_usd=0.50)
         state.total_cost_usd = 0.6
 
         await executor._enforce_spend_caps(state, 0.6)
 
-        assert state._spend_cap_exceeded is True
-        assert spend_tracker.get("conv-1") == pytest.approx(0.6)
+        assert not getattr(state, "_spend_cap_exceeded", False)
+        assert spend_tracker.get("conv-1") == 0
 
     @pytest.mark.asyncio
     async def test_already_halted_run_is_not_double_counted(self, executor, no_global_cap):

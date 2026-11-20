@@ -28,6 +28,11 @@ export function setHistoryOwner(userId: string | null): void {
   historyOwner = userId;
 }
 
+/** The user whose database getDB() opens right now. A run captures it at start (see useRunController). */
+export function getHistoryOwner(): string | null {
+  return historyOwner;
+}
+
 /** Delete one user's local history: on sign-out (anon) and on account deletion. */
 export async function deleteHistory(userId: string | null): Promise<void> {
   // Bounded: a delete stays pending while another tab holds a connection that
@@ -46,8 +51,8 @@ export async function clearLegacyHistory(): Promise<void> {
   await deleteDB(LEGACY_DB_NAME);
 }
 
-export async function getDB() {
-  return openDB<ARADB>(dbName(historyOwner), DB_VERSION, {
+export async function getDB(owner: string | null = historyOwner) {
+  return openDB<ARADB>(dbName(owner), DB_VERSION, {
     // Helpers never close their connection; yield to a pending deleteDB/upgrade.
     blocking(_current, _blocked, event) {
       (event.target as IDBDatabase).close();
@@ -70,8 +75,9 @@ export async function getDB() {
   });
 }
 
-export async function saveConversation(data: Conversation): Promise<string> {
-  const db = await getDB();
+// `owner` pins the write to a user's database; omitted, it follows the current owner.
+export async function saveConversation(data: Conversation, owner?: string | null): Promise<string> {
+  const db = await getDB(owner);
   const record: Conversation = {
     id: data.id || Date.now().toString(),
     conversation_id: data.conversation_id || data.id || Date.now().toString(),
