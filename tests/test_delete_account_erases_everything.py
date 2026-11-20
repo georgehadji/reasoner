@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from reasoner.api.user_data import ACCOUNT_STORE_NAMES
+from reasoner.api.user_data import ACCOUNT_STORE_NAMES, BILLING_STORE_NAMES
 
 pytestmark = pytest.mark.unit
 
@@ -94,14 +94,19 @@ async def test_the_deletion_log_is_written_before_any_store_is_erased(registry):
 
 
 @pytest.mark.asyncio
-async def test_the_data_route_reaches_the_same_stores_minus_the_account(registry, monkeypatch):
+async def test_the_data_route_reaches_the_same_stores_minus_account_and_billing(
+    registry, monkeypatch
+):
     from reasoner.api.routes import gdpr
 
     user = SimpleNamespace(id=uuid.uuid4())
     receipt = await gdpr.erase_user_data(user)
 
-    assert receipt["erased"] == [n for n in NAMES if n not in ACCOUNT_STORE_NAMES]
-    assert "profile" not in registry and "identity" not in registry
+    kept = ACCOUNT_STORE_NAMES | BILLING_STORE_NAMES
+    assert receipt["erased"] == [n for n in NAMES if n not in kept]
+    # Audit 7, finding 1: erasing the ledger lets the monthly grant be paid twice.
+    for name in ("profile", "identity", "credit_ledger", "quota", "subscriptions", "valkey"):
+        assert name not in registry
 
 
 @pytest.mark.asyncio
