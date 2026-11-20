@@ -14,6 +14,7 @@ from reasoner.phases.direct import (
     DIRECT_ANALYTICAL_SYSTEM,
     DIRECT_CREATIVE_SYSTEM,
     DIRECT_WEB_SEARCH_SYSTEM,
+    select_direct_profile,
 )
 
 
@@ -36,3 +37,10 @@ def test_direct_creative_scopes_compliance_to_form() -> None:
 def test_all_direct_profiles_include_humanization_rules() -> None:
     for prompt in (DIRECT_ANALYTICAL_SYSTEM, DIRECT_WEB_SEARCH_SYSTEM, DIRECT_CREATIVE_SYSTEM):
         assert HUMANIZATION_RULES in prompt
+
+
+def test_analytical_prompt_describes_reasoner_for_self_questions():
+    """HyperGate routes "what can you do?" here; the answer must describe Reasoner."""
+    profile = select_direct_profile("what can you do for me?", "")
+    assert profile.system_prompt == DIRECT_ANALYTICAL_SYSTEM
+    assert "You are answering inside Reasoner" in DIRECT_ANALYTICAL_SYSTEM
