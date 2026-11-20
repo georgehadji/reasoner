@@ -73,3 +73,16 @@ describe('per-user history', () => {
     expect(dbs.has('ARA_Pipeline_v2')).toBe(false);
   });
 });
+
+describe('pinned owner (sign-out mid-run)', () => {
+  it('saves into the owner captured at run start, not the current one', async () => {
+    setHistoryOwner('user-e');
+    const { getHistoryOwner } = await import('./db');
+    const owner = getHistoryOwner();
+    setHistoryOwner(null); // signed out while the run was streaming
+    await saveConversation(conversation, owner);
+    expect(await loadAllConversations()).toEqual([]); // anon DB untouched
+    setHistoryOwner('user-e');
+    expect(await loadAllConversations()).toHaveLength(1);
+  });
+});

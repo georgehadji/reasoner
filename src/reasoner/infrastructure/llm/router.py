@@ -77,6 +77,13 @@ async def _try_direct_fallback(
     """
     if not is_provider_fault(original_error):
         return None
+    if _asks_for_web_search(extra_body) or _asks_for_web_search(
+        getattr(assigned, "extra_body", None)
+    ):
+        # Direct vendors are called without extra_body, so the answer would
+        # come back ungrounded and still be treated as a normal success.
+        logger.warning("Role '%s' needs web search; skipping the direct fallback lane", role)
+        return None
     try:
         return await asyncio.wait_for(
             _walk_direct_fallback_chain(
@@ -91,6 +98,16 @@ async def _try_direct_fallback(
             role, DIRECT_FALLBACK_BUDGET_S,
         )
         return None
+
+
+def _asks_for_web_search(extra_body: Any) -> bool:
+    """Whether an OpenRouter request body asks for web grounding."""
+    if not isinstance(extra_body, dict):
+        return False
+    plugins = extra_body.get("plugins") or []
+    return "web_search_options" in extra_body or any(
+        isinstance(p, dict) and p.get("id") == "web" for p in plugins
+    )
 
 
 async def _walk_direct_fallback_chain(

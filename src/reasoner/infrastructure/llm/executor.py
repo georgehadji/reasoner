@@ -721,7 +721,10 @@ class LLMExecutor:
                 await self._halt_on_cap(state, "per_run", per_run, state.total_cost_usd, subject)
                 return
 
-            if monthly > 0:
+            # Monthly needs a real billing subject. Keyed on a conversation id it
+            # capped nothing (each conversation starts at zero) and left one
+            # ledger entry, plus a 40-day Valkey key, per anonymous conversation.
+            if monthly > 0 and getattr(state, "billing_subject", ""):
                 from reasoner.infrastructure.llm import spend_tracker
 
                 total = await spend_tracker.record_shared(subject, cost_usd)

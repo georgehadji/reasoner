@@ -62,23 +62,6 @@ if asyncpg is not None:
 
 logger = logging.getLogger(__name__)
 
-# Retained references to background publish tasks to prevent premature GC.
-_BG_PUBLISH_TASKS: set[asyncio.Task] = set()
-
-
-def _fire_and_forget(coro, *, label: str = "background task") -> asyncio.Task:
-    """Create a tracked asyncio task; log exceptions via done_callback."""
-    task = asyncio.create_task(coro)
-    _BG_PUBLISH_TASKS.add(task)
-    task.add_done_callback(_BG_PUBLISH_TASKS.discard)
-    task.add_done_callback(
-        lambda t: logger.warning("%s failed: %s", label, t.exception())
-        if not t.cancelled() and t.exception()
-        else None
-    )
-    return task
-
-
 class PostgreSQLEventStore:
     """
     PostgreSQL-based event store for production.
