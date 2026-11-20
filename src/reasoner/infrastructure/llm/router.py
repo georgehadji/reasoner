@@ -22,10 +22,9 @@ from reasoner.core.constants import (
     TIMEOUTS,
 )
 from reasoner.core.constants_limits import DIRECT_FALLBACK_BUDGET_S
-from reasoner.core.exceptions import ProviderError
+from reasoner.core.exceptions import ProviderError, ProviderUnavailableError
 from reasoner.infrastructure.llm.base import (
     BaseLLMProvider,
-    NoUsableAnswerError,
     is_provider_fault,
 )
 from reasoner.infrastructure.llm.ports import DegradedLLMResponse
@@ -204,7 +203,7 @@ async def _call_with_circuit(
 
     # Check circuit BEFORE acquiring the semaphore (lightweight check).
     if not await circuit.can_execute():
-        raise NoUsableAnswerError(f"Circuit open for {provider.model}")
+        raise ProviderUnavailableError(f"Circuit open for {provider.model}")
 
     semaphore = _get_llm_semaphore(provider.model)
     try:
@@ -265,7 +264,7 @@ async def _call_with_tools_circuit(
     circuit = get_circuit_breaker(f"llm:{provider.model}")
 
     if not await circuit.can_execute():
-        raise NoUsableAnswerError(f"Circuit open for {provider.model}")
+        raise ProviderUnavailableError(f"Circuit open for {provider.model}")
 
     semaphore = _get_llm_semaphore(provider.model)
     try:
@@ -713,7 +712,7 @@ class ProviderRouter:
                         value = spent.get(key, 0)
                         if isinstance(value, (int, float)):
                             discarded[key] += value
-                    raise NoUsableAnswerError(f"Empty response from {provider.model} for role={role}")
+                    raise ProviderUnavailableError(f"Empty response from {provider.model} for role={role}")
                 return response, _carry(self._build_metadata(actual_provider, response))
             except TimeoutError as exc:
                 if is_fallback:

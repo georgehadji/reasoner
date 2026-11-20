@@ -45,15 +45,6 @@ class LLMError(ProviderError):
     retryable = False
 
 
-class NoUsableAnswerError(LLMError):
-    """The provider gave no usable answer: its circuit is open, or it replied empty.
-
-    Raised as a bare ``LLMError`` before, which ``is_provider_fault`` reads as
-    "unclassified, judge by the cause" -- and there is no cause -- so the
-    direct-vendor lane was skipped in exactly the outage it exists for.
-    """
-
-
 def translate_http_status(status: int | None, detail: str, model: str) -> ProviderError | None:
     """Map an HTTP status onto the domain error tree, or None if unmapped.
 

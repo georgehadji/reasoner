@@ -125,10 +125,11 @@ def test_a_premium_agent_model_needs_the_premium_plan():
 
 
 def test_circuit_open_and_empty_replies_count_as_provider_faults():
-    from reasoner.infrastructure.llm.base import LLMError, NoUsableAnswerError, is_provider_fault
+    from reasoner.core.exceptions import ProviderUnavailableError
+    from reasoner.infrastructure.llm.base import LLMError, is_provider_fault
 
-    assert is_provider_fault(NoUsableAnswerError("Circuit open for m"))
-    assert isinstance(NoUsableAnswerError("x"), LLMError)  # existing handlers still catch it
+    # What router.py raises for an open circuit and an empty reply.
+    assert is_provider_fault(ProviderUnavailableError("Circuit open for m"))
     # The residual bare LLMError with no cause is unchanged.
     assert not is_provider_fault(LLMError("unclassified"))
 
