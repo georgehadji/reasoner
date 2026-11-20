@@ -3,15 +3,18 @@
 # Critical Enhancement 6.x: HSTS and security headers enforced
 # Caddy appends the client to X-Forwarded-For. Put Caddy's address (and any
 # load balancer or CDN in front of it) in TRUSTED_PROXIES; see DEPLOY.md.
+#
+# DOMAIN and ACME_EMAIL come from the caddy container's environment
+# (docker-compose.oracle.yml sets them from .env); the defaults are the old
+# placeholders, so a hand-edited copy still works.
+#
+# There is no separate HTTP->HTTPS redirect block: auto-HTTPS already redirects
+# port 80. A bare "yourdomain.com { redir ... }" block also binds :443 and,
+# adapted, runs before the proxy routes, so every HTTPS request 302'd to itself.
 
-yourdomain.com {
-    # Redirect HTTP to HTTPS
-    redir https://{host}{uri}
-}
-
-yourdomain.com:443 {
+{$DOMAIN:yourdomain.com} {
     # TLS with Let's Encrypt (automatic)
-    tls your-email@example.com
+    tls {$ACME_EMAIL:your-email@example.com}
 
     # Security headers
     header {
