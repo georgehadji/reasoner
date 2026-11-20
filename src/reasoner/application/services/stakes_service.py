@@ -16,6 +16,12 @@ def detect_stakes(problem: str) -> StakesProfile:
     return StakesProfile(domain=domain, confidence=1.0, source="regex")
 
 
+def active_profile(problem: str) -> StakesProfile | None:
+    """The profile when the run is high-stakes and the policy is active, else None."""
+    profile = detect_stakes(problem)
+    return profile if profile.is_high and stakes_mode() == "active" else None
+
+
 def stakes_mode() -> str:
     from reasoner.core.settings import settings
 
@@ -36,14 +42,14 @@ _COUNTRY_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
 )
 
 
-def _from_text(problem: str, _explicit: str | None) -> str | None:
+def _from_text(problem: str) -> str | None:
     """Country named in the question itself, only when exactly one is named."""
     folded = fold_text(problem)
     hits = [cc for cc, pat in _COUNTRY_PATTERNS if pat.search(folded)]
     return hits[0] if len(hits) == 1 else None
 
 
-def _explicit(_problem: str, explicit: str | None) -> str | None:
+def _explicit(explicit: str | None) -> str | None:
     code = (explicit or "").strip().upper()
     return code if code in KNOWN_COUNTRIES else None
 
@@ -51,23 +57,17 @@ def _explicit(_problem: str, explicit: str | None) -> str | None:
 _MARKER = re.compile(r"(?m)^Jurisdiction: ([A-Z]{2})$")
 
 
-def _marker(problem: str, _explicit: str | None) -> str | None:
+def _marker(problem: str) -> str | None:
     """The `Jurisdiction: XX` line RunRequest.jurisdiction appends to the problem."""
     found = _MARKER.findall(problem)
     return found[-1] if found and found[-1] in KNOWN_COUNTRIES else None
 
 
-# Chain of Responsibility: first non-None wins. A value the caller gave beats
-# the question's own text; no account default exists (decided 2026-11-14).
-_RESOLVERS = (_explicit, _marker, _from_text)
-
-
+# First hit wins. A value the caller gave beats the question's own text; no
+# account default exists (decided 2026-11-14).
 def resolve_jurisdiction(problem: str, explicit: str | None = None) -> str | None:
-    for resolve in _RESOLVERS:
-        country = resolve(problem or "", explicit)
-        if country is not None:
-            return country
-    return None
+    problem = problem or ""
+    return _explicit(explicit) or _marker(problem) or _from_text(problem)
 
 
 def scope_for(problem: str, explicit: str | None = None, today: date | None = None) -> dict:

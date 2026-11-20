@@ -19,7 +19,6 @@ def fold_text(text: str) -> str:
     return "".join(c for c in nfd if not unicodedata.combining(c)).casefold()
 
 
-_fold = fold_text
 
 
 # Near-miss guards ("health bar in a game", "law of large numbers") come first.
@@ -55,12 +54,12 @@ _RAW: dict[StakesDomain, re.Pattern[str]] = {
 
 
 # Fold the patterns like the text: casefold turns a final sigma into sigma.
-_PATTERNS = {d: re.compile(_fold(p.pattern)) for d, p in _RAW.items()}
+_PATTERNS = {d: re.compile(fold_text(p.pattern)) for d, p in _RAW.items()}
 
 
 def match_stakes(text: str) -> StakesDomain:
     """First matching high-stakes domain, or NONE. Pure; no I/O."""
-    folded = _fold(text)
+    folded = fold_text(text)
     if _NEAR_MISS.search(folded):
         return StakesDomain.NONE
     for domain, pattern in _PATTERNS.items():
