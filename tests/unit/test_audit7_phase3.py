@@ -69,12 +69,11 @@ def test_discarded_cost_is_added_to_the_estimate_not_hidden_by_it():
 
 
 def test_the_router_carries_discarded_cost_under_its_own_key():
-    import inspect
+    """Covered end to end by tests/test_audit9_llm.py::test_f3_empty_attempt_cost_carried_forward."""
+    from reasoner.infrastructure.llm.pricing_resolver import call_cost_usd
 
-    from reasoner.infrastructure.llm import router
-
-    src = inspect.getsource(router.ProviderRouter.call)
-    assert 'meta[f"discarded_{key}"]' in src
+    own_only = {"model": "gpt-4o-mini", "cost_usd": 0.25, "discarded_cost_usd": 0.5}
+    assert call_cost_usd(own_only) == pytest.approx(0.75)
 
 
 # ── finding 6 ───────────────────────────────────────────────────────────────
