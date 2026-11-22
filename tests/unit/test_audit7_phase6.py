@@ -66,3 +66,33 @@ async def test_prompts_are_encrypted_on_disk_and_survive_a_reload(tmp_path):
 
     reloaded = TokenAwareCache(cache_dir=tmp_path)
     assert await reloaded.get("the problem", "phase", "m", "a secret prompt") == "a secret answer"
+
+
+@pytest.mark.asyncio
+async def test_a_file_removed_by_another_worker_mid_load_is_skipped(tmp_path):
+    cache = TokenAwareCache(cache_dir=tmp_path)
+    await cache.set("kept", "phase", "m", "kept", "kept", 1)
+    (real,) = _files(tmp_path)
+    reloaded = TokenAwareCache(cache_dir=tmp_path)
+    reloaded._files_newest_first = lambda: [tmp_path / "gone.json", real]
+
+    await reloaded._ensure_loaded()
+
+    assert reloaded._loaded and len(reloaded._entries) == 1
+
+
+@pytest.mark.asyncio
+async def test_an_encryption_setup_error_deletes_no_files(tmp_path, monkeypatch):
+    import reasoner.security.encryption as encryption
+
+    cache = TokenAwareCache(cache_dir=tmp_path)
+    await cache.set("p", "phase", "m", "prompt", "answer", 1)
+
+    def _broken():
+        raise RuntimeError("no key configured")
+
+    monkeypatch.setattr(encryption, "get_encryption_service", _broken)
+    reloaded = TokenAwareCache(cache_dir=tmp_path)
+    await reloaded._ensure_loaded()
+
+    assert not reloaded._loaded and len(_files(tmp_path)) == 1

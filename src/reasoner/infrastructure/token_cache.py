@@ -417,29 +417,38 @@ class TokenAwareCache:
         files = await asyncio.to_thread(self._files_newest_first)
         loaded: list[CacheEntry] = []
         spare: list[Path] = []
+        encryption = None
         for i, f in enumerate(files):
             if len(loaded) >= cap:
                 spare = files[i:]
                 break
             try:
                 raw = json.loads(await asyncio.to_thread(f.read_text))
+            except FileNotFoundError:
+                continue  # another worker removed it between the listing and the read
+            except ValueError:  # not JSON, or not text
+                f.unlink(missing_ok=True)
+                continue
+            if isinstance(raw, dict) and "payload" in raw and encryption is None:
+                # Outside the try below: a key that will not load is a setup error, not a
+                # bad file, and must not delete the whole cache.
+                from reasoner.security.encryption import get_encryption_service
+
+                encryption = get_encryption_service()
+            try:
                 if "payload" in raw:  # older files hold the text in the clear
-                    from reasoner.security.encryption import get_encryption_service
-
-                    raw.update(json.loads(get_encryption_service().decrypt(raw.pop("payload"))))
+                    raw.update(json.loads(encryption.decrypt(raw.pop("payload"))))
                 entry = CacheEntry(**raw)
-
-                # Skip expired entries — use wall-clock time for cross-process TTL
-                if self._clock.time() - entry.created_at > entry.ttl_seconds:
-                    f.unlink(missing_ok=True)
-                    continue
-                loaded.append(entry)
-            except OSError:
-                raise
             except Exception:
                 # Corrupt, or encrypted under a key this process no longer has (the
                 # ephemeral dev key): either way it can never be served.
                 f.unlink(missing_ok=True)
+                continue
+            # Skip expired entries — use wall-clock time for cross-process TTL
+            if self._clock.time() - entry.created_at > entry.ttl_seconds:
+                f.unlink(missing_ok=True)
+                continue
+            loaded.append(entry)
         # Oldest first, so the front of the OrderedDict is the LRU end.
         for entry in reversed(loaded):
             self._entries[entry.key] = entry
