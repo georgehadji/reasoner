@@ -68,8 +68,28 @@ def test_discarded_cost_is_added_to_the_estimate_not_hidden_by_it():
     assert call_cost_usd(meta) == pytest.approx(own + 0.01)
 
 
+def test_discarded_tokens_with_no_reported_cost_are_still_priced():
+    from reasoner.infrastructure.llm.pricing_resolver import call_cost_usd, get_pricing
+
+    meta = {
+        "model": "gpt-4o-mini", "cost_usd": 0.0, "input_tokens": 1100, "output_tokens": 600,
+        "discarded_input_tokens": 100, "discarded_output_tokens": 100,
+    }
+    assert call_cost_usd(meta) == pytest.approx(
+        get_pricing("gpt-4o-mini").calculate_cost(1100, 600)
+    )
+
+
+def test_direct_extra_cost_does_not_count_discarded_spend_twice():
+    from reasoner.api.execution.direct import _with_extra_cost
+    from reasoner.infrastructure.llm.pricing_resolver import call_cost_usd
+
+    meta = {"model": "gpt-4o-mini", "cost_usd": 0.25, "discarded_cost_usd": 0.5}
+    assert call_cost_usd(_with_extra_cost(meta, 0.1)) == pytest.approx(0.85)
+
+
 def test_the_router_carries_discarded_cost_under_its_own_key():
-    """Covered end to end by tests/test_audit9_llm.py::test_f3_empty_attempt_cost_carried_forward."""
+    """End to end: tests/test_audit9_llm.py::test_f3_empty_attempt_cost_carried_forward."""
     from reasoner.infrastructure.llm.pricing_resolver import call_cost_usd
 
     own_only = {"model": "gpt-4o-mini", "cost_usd": 0.25, "discarded_cost_usd": 0.5}
@@ -115,3 +135,27 @@ async def test_the_judge_cost_lands_on_the_run(monkeypatch):
 
     assert out.passed and state.total_cost_usd == pytest.approx(0.004)
     assert state.phase_costs["quality_judge"] == pytest.approx(0.004)
+
+
+@pytest.mark.asyncio
+async def test_a_judge_that_reports_only_tokens_is_still_billed(monkeypatch):
+    from reasoner.infrastructure.llm.pricing_resolver import get_pricing
+    from reasoner.infrastructure.llm.router import ProviderRouter
+    from reasoner.quality.criteria import PhaseQualityResult
+    from reasoner.quality.monitor import PhaseMonitor
+
+    meta = {"model": "ministral-14b", "input_tokens": 2000, "output_tokens": 100}
+
+    class _Judge:
+        async def call(self, *a, **k):
+            return '{"score": 8, "passed": true}', dict(meta)
+
+    monkeypatch.setattr(ProviderRouter, "from_model_ids", staticmethod(lambda *_: _Judge()))
+    state = PipelineState(problem="p")
+    rule = PhaseQualityResult(passed=False, score=0.0, reason="r", suggestions=[])
+
+    monitor = PhaseMonitor(router=None, preset_name="debate-budget")
+    await monitor._llm_judge("Perspectives", state, rule)
+
+    expected = get_pricing("ministral-14b").calculate_cost(2000, 100)
+    assert expected > 0 and state.total_cost_usd == pytest.approx(expected)

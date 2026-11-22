@@ -929,6 +929,17 @@ class ProviderRouter:
         else:
             return await _execute_call(assigned)
 
+    @staticmethod
+    def call_cost_usd(metadata: dict[str, Any]) -> float:
+        """Cost of a call this router returned, including the replies it discarded.
+
+        For callers outside the executor (the quality judge, sub-agents) that may not
+        import pricing_resolver themselves.
+        """
+        from reasoner.infrastructure.llm.pricing_resolver import call_cost_usd
+
+        return call_cost_usd(metadata)
+
     def describe(self) -> dict[str, str]:
         result = {"[primary]": self.primary.model}
         for role, p in self.routing_table.items():

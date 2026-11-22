@@ -167,7 +167,9 @@ class PhaseSubAgent(ABC):
     def _track_usage(self, state: PipelineState, meta: dict[str, Any], out: PhaseSubAgentOutput) -> None:
         """Accumulate token usage and cost into PipelineState."""
         role = self.ROLE
-        cost = meta.get("cost_usd", 0.0) + meta.get("discarded_cost_usd", 0.0)
+        # Same pricing as the executor: estimated from tokens when no cost is
+        # reported, plus the replies the router discarded.
+        cost = ProviderRouter.call_cost_usd(meta)
         state.total_cost_usd += cost
 
         if role not in state.phase_costs:
