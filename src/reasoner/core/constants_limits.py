@@ -441,6 +441,12 @@ class Timeouts:
 # should be generously above the sum of phase timeouts.
 # Neuro tenant directories untouched this long are deleted by the maintenance cron.
 NEURO_TENANT_RETENTION_DAYS: int = 90
+# Rows older than this have no use beyond being records, which the payment provider keeps
+# (Stripe replays events for 30 days). Audit 7, decision D4.
+DEAD_LETTER_RETENTION_DAYS: int = 90
+FEEDBACK_RETENTION_DAYS: int = 90
+# How often the in-process maintenance loop runs (audit 7, decision D1).
+MAINTENANCE_INTERVAL_SECONDS: int = 900
 
 PIPELINE_ABSOLUTE_TIMEOUT_SECONDS: float = 600.0
 

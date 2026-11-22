@@ -233,9 +233,22 @@ async def lifespan(app: FastAPI):
     _token_cache = get_token_cache()
     _cache_cleanup_task = await _token_cache.start_background_cleanup(interval_seconds=300)
 
+    _maintenance_task = None
+    if settings.MAINTENANCE_LOOP_ENABLED:
+        from reasoner.api.maintenance import maintenance_loop
+
+        _maintenance_task = asyncio.create_task(maintenance_loop())
+
     yield
 
     # Cancel background tasks on shutdown (reverse order)
+    if _maintenance_task is not None:
+        _maintenance_task.cancel()
+        try:
+            await _maintenance_task
+        except asyncio.CancelledError:
+            pass
+
     _cache_cleanup_task.cancel()
     try:
         await _cache_cleanup_task

@@ -79,6 +79,10 @@ class BillingDeadLetterPort(Protocol):
         """
         ...
 
+    async def prune_older_than(self, days: int) -> int:
+        """Delete failures recorded more than ``days`` ago. Returns the row count."""
+        ...
+
     async def count_unreplayed(self) -> int:
         """Return the count of failures that haven't been replayed."""
         ...

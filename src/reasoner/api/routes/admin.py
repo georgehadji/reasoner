@@ -113,14 +113,9 @@ async def replay_unsettled_runs(request: Request, max_count: int = 50):
     Requires X-Admin-Key header.
     """
     _require_admin(request)
-    from reasoner.api.dependencies import _get_credit_service
-    from reasoner.application.services.unsettled_run_replay_service import (
-        UnsettledRunReplayService,
-    )
-    from reasoner.infrastructure.valkey.unsettled_runs import ValkeyUnsettledRunStore
+    from reasoner.api.cron import run_unsettled_replay
 
-    service = UnsettledRunReplayService(ValkeyUnsettledRunStore(), _get_credit_service())
-    return {"status": "ok", **await service.replay(limit=min(max_count, 200))}
+    return {"status": "ok", **await run_unsettled_replay(max_count)}
 
 
 # ── Neuro Lifecycle Maintenance (Phase 1.7) ───────────────────────────────────
