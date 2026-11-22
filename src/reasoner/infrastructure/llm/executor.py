@@ -17,11 +17,7 @@ import hashlib
 import logging
 import re
 import time  # Ensure time is imported once
-from collections.abc import AsyncIterator  # Add ClassVar for _LANG_TO_EXT
-from typing import TYPE_CHECKING, Any, ClassVar
-
-if TYPE_CHECKING:
-    from reasoner.infrastructure.llm.ports import DegradedLLMResponse
+from typing import Any, ClassVar
 
 from reasoner.core.constants import (
     TRUNCATION_RETRY_MAX_TOKENS,
@@ -117,9 +113,8 @@ class LLMExecutor:
         user_prompt: str,
         state: PipelineState,
         phase_key: str | None = None,
-        stream: bool = False,
         **kwargs: Any,
-    ) -> tuple[str, dict[str, Any]] | AsyncIterator[str | DegradedLLMResponse]:
+    ) -> tuple[str, dict[str, Any]]:
         """
         Call the LLM with token-aware caching and cost tracking.
 
@@ -185,14 +180,8 @@ class LLMExecutor:
                         kwargs["extra_body"] = {**existing, "reasoning": {"effort": effort}}
 
         # ── Cache lookup ──────────────────────────────────────────────────
-        # Caching for streaming is complex. For now, disable caching for streaming calls.
-        # A robust streaming cache would need to store/retrieve partial streams.
-        if stream and self._caching_enabled:
-            logger.warning("Caching is currently not supported for streaming LLM calls.")
-
         # Cache key body for this call. Computed unconditionally so the cascading
-        # store path below can reference it even when the lookup was skipped
-        # (e.g. streaming), which previously raised NameError.
+        # store path below can reference it even when the lookup was skipped.
         #
         # The full prompt, for every role. Keying on its first TRUNCATION.PROBLEM
         # chars made two prompts that differ only after char 500 (candidates,
@@ -215,7 +204,7 @@ class LLMExecutor:
         # Prometheus labels use `role`, not this, so metrics are unaffected.
         cache_phase = f"{role}#{hashlib.sha256(system_prompt.encode()).hexdigest()[:12]}"
 
-        if self._token_cache and self._caching_enabled and not stream and not bypass_cache_read:
+        if self._token_cache and self._caching_enabled and not bypass_cache_read:
             # For caching, we need a specific model_id. If cascading, we'll cache against the first model.
             # This is a simplification; a more robust cache would handle model cascades explicitly.
             model_id_for_cache = self.cascading_routing.get(role, [self.router.get(role).model])[0]

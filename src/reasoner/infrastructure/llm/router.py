@@ -9,7 +9,6 @@ import os
 import time
 import uuid
 from collections import OrderedDict
-from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -688,9 +687,8 @@ class ProviderRouter:
         max_tokens: int = DEFAULT_MAX_TOKENS,
         temperature: float = DEFAULT_TEMPERATURE,
         timeout_seconds: float | None = None,
-        stream: bool = False,
         extra_body: dict[str, Any] | None = None,
-    ) -> tuple[str | DegradedLLMResponse, dict[str, Any]] | AsyncIterator[str | DegradedLLMResponse]:
+    ) -> tuple[str | DegradedLLMResponse, dict[str, Any]]:
         """
         Call LLM for role. On ProviderError or timeout, tries a fallback provider:
           1. Explicit fallback from fallback_table (if defined and different)
@@ -698,8 +696,7 @@ class ProviderRouter:
           3. Re-raises original error if no fallback available
 
         Returns:
-            Tuple of (response_text, metadata_dict) if not streaming.
-            AsyncIterator of (response_chunk | DegradedLLMResponse) if streaming.
+            Tuple of (response_text | DegradedLLMResponse, metadata_dict).
         """
         assigned = self.get(role)
         effective_timeout = self._timeout_for_role(role, timeout_seconds)
@@ -805,129 +802,7 @@ class ProviderRouter:
                         metadata=_carry({"model": assigned.model}),
                     ), {}
 
-        async def _execute_stream(provider: BaseLLMProvider, is_fallback: bool = False):
-            provider = _per_call(provider)
-            from reasoner.circuit_breaker import get_circuit_breaker
-            circuit = get_circuit_breaker(f"llm:{provider.model}")
-            if not await circuit.can_execute():
-                yield DegradedLLMResponse(
-                    text="",
-                    error=f"Circuit open for {provider.model}",
-                    metadata={"model": provider.model},
-                )
-                return
-            # Whether the consumer has already received content from THIS
-            # provider. Once it has, switching to a fallback would replay that
-            # provider's full answer on top of the partial one, so the stream
-            # can only be closed out with a degraded frame.
-            delivered = False
-            timed_out = False
-            failure: Exception | None = None
-            try:
-                semaphore = _get_llm_semaphore(provider.model)
-                async with semaphore:
-                    # stream_complete() reads self.extra_body, so the call-level
-                    # dict (LLMExecutor's per-phase reasoning effort, web_search
-                    # injection) has to be merged in the same save/restore way
-                    # _call_with_circuit does it. Without this the streaming path
-                    # silently ran at the model's default reasoning effort.
-                    _saved = getattr(provider, "extra_body", None)
-                    if extra_body is not None and hasattr(provider, "extra_body"):
-                        provider.extra_body = {**(_saved or {}), **extra_body}
-                    try:
-                        async for chunk in provider.stream_complete_with_retry(
-                            system_prompt, user_prompt, max_tokens, temperature
-                        ):
-                            delivered = True
-                            yield chunk
-                    finally:
-                        if extra_body is not None and hasattr(provider, "extra_body"):
-                            provider.extra_body = _saved
-                await circuit.record_success()
-            except (asyncio.CancelledError, GeneratorExit):
-                # Cancelled, or the consumer closed the stream mid-yield:
-                # no outcome to record, but the half-open slot goes back (RUN-3).
-                await circuit.release()
-                raise
-            except TimeoutError as exc:
-                timed_out = True
-                failure = exc
-            except Exception as exc:
-                # Deliberately broad. A provider is only *contractually* bound
-                # to raise a ProviderError once its retry budget is exhausted;
-                # stream_complete_with_retry re-raises the raw transport error
-                # (httpx.ReadError, ConnectionError, ...) whenever it declines
-                # to retry — after a partial yield, or for a non-retryable
-                # failure. Catching ProviderError alone lets those escape the router
-                # entirely: no circuit.record_failure(), so a flapping provider
-                # never tripped the breaker; no fallback; and the consumer got
-                # a raw exception instead of a DegradedLLMResponse frame.
-                failure = exc
-                if not isinstance(exc, ProviderError):
-                    logger.error(
-                        "Role '%s' provider '%s' raised %s mid-stream",
-                        role, provider.model, type(exc).__name__, exc_info=True,
-                    )
-
-            if failure is None:
-                return
-
-            await circuit.record_failure()
-
-            if timed_out:
-                reason = f"{provider.model} timed out"
-                no_fallback_reason = f"{assigned.model} timed out — no fallback"
-            else:
-                reason = str(failure) or type(failure).__name__
-                no_fallback_reason = reason
-
-            if delivered:
-                # Partial content is already in the consumer's hands.
-                yield DegradedLLMResponse(
-                    text="",
-                    error=f"{reason} — stream truncated after partial output",
-                    metadata={"model": provider.model, "partial": True},
-                )
-                return
-
-            if is_fallback:
-                # Timeouts skip the direct-provider chain here, as before: the
-                # role has already spent two full timeout windows.
-                if not timed_out:
-                    direct = await _try_direct_fallback(
-                        role, system_prompt, user_prompt, original_error=failure,
-                        max_tokens=max_tokens, temperature=temperature, extra_body=extra_body,
-                        assigned=assigned,
-                    )
-                    if direct:
-                        # _try_direct_fallback returns (text, metadata); this
-                        # generator's contract is str | DegradedLLMResponse, so
-                        # yielding the tuple hands the consumer a Python tuple
-                        # where a chunk belongs (executor.execute_stream then
-                        # "".join()s it -> TypeError).
-                        yield direct[0]
-                        return
-                yield DegradedLLMResponse(
-                    text="",
-                    error=reason,
-                    metadata={"model": provider.model},
-                )
-                return
-
-            if fallback:
-                async for chunk in _execute_stream(fallback, is_fallback=True):
-                    yield chunk
-            else:
-                yield DegradedLLMResponse(
-                    text="",
-                    error=no_fallback_reason,
-                    metadata={"model": assigned.model},
-                )
-
-        if stream:
-            return _execute_stream(assigned)
-        else:
-            return await _execute_call(assigned)
+        return await _execute_call(assigned)
 
     def describe(self) -> dict[str, str]:
         result = {"[primary]": self.primary.model}

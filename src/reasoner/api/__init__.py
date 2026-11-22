@@ -65,6 +65,14 @@ from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
 _health_postgres_pool = None
 
 
+# query_log is the table every billed run writes (PostgresQuotaRepository); query_audit_logs
+# has no writer, so a gauge on it stayed at 0.
+ACTIVE_USERS_SQL = (
+    "SELECT COUNT(DISTINCT user_id) FROM query_log "
+    "WHERE created_at > NOW() - INTERVAL '24 hours'"
+)
+
+
 async def _update_active_users_loop() -> None:
     """Background task to update active users gauge every 60s (Critical Enhancement 7.3)."""
     from reasoner.metrics import REASONER_ACTIVE_USERS
@@ -73,7 +81,7 @@ async def _update_active_users_loop() -> None:
             await asyncio.sleep(60)
             if _health_postgres_pool is not None:
                 row = await _health_postgres_pool.fetchval(
-                    "SELECT COUNT(DISTINCT user_id) FROM query_audit_logs WHERE timestamp > NOW() - INTERVAL '24 hours'"
+                    ACTIVE_USERS_SQL
                 )
                 REASONER_ACTIVE_USERS.set(row or 0)
         except asyncio.CancelledError:

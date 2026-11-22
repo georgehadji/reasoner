@@ -127,7 +127,8 @@ jobs:
           # 2122: audit-6 fixes deleted dead subagent packages and helpers (net -23).
           # 2109: one widget stack deleted widgets_legacy.py and its shim (net -13).
           # 2052: audit 13-19 deleted the dead _fire_and_forget helper (-1).
-          python scripts/ruff_ratchet.py --max 2052
+          # 2050: audit 7 phase 8 deleted the router stream branch and require_tier (-2).
+          python scripts/ruff_ratchet.py --max 2050
 
       - name: Security scan (bandit)
         run: |

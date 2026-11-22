@@ -28,6 +28,51 @@ _DEFAULT_CHUNK_OVERLAP = 200
 _MAX_TOTAL_RETRIEVE_CHUNKS = 20
 
 
+def _write_sidecar(path: Path, sidecar: dict[str, Any]) -> None:
+    """Serialise, encrypt and write one sidecar. Blocking: call it from a worker thread."""
+    from reasoner.security.encryption import get_encryption_service
+
+    payload = get_encryption_service().encrypt(json.dumps(sidecar, default=str))
+    atomic_write_text(path, json.dumps({"encrypted": True, "payload": payload}))
+
+
+def _load_chunks(sidecars: list[tuple[str, Path]]) -> list[tuple[str, dict[str, Any]]]:
+    """Read, decrypt and parse the sidecars. Blocking: call it from a worker thread."""
+    all_chunks: list[tuple[str, dict[str, Any]]] = []
+    for fid, path in sidecars:
+        if not path.exists():
+            logger.debug("No vector sidecar for %s", fid)
+            continue
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            if raw.get("encrypted"):
+                from reasoner.security.encryption import get_encryption_service
+
+                sidecar = json.loads(get_encryption_service().decrypt(raw["payload"]))
+            else:
+                # Legacy plaintext sidecar (no "encrypted" flag) -- read
+                # unchanged, no migration required.
+                sidecar = raw
+            all_chunks.extend((fid, chunk) for chunk in sidecar.get("chunks", []))
+        except Exception as exc:
+            logger.warning("Failed to load sidecar for %s: %s", fid, exc)
+    return all_chunks
+
+
+def _rank(
+    query_embedding: list[float], all_chunks: list[tuple[str, dict[str, Any]]], top_k: int
+) -> list[tuple[float, str, str]]:
+    """Score every chunk against the query. Blocking: call it from a worker thread."""
+    scored = []
+    for fid, chunk in all_chunks:
+        emb = chunk.get("embedding")
+        if not emb:
+            continue
+        scored.append((_cosine_similarity(query_embedding, emb), fid, chunk["text"]))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return scored[: min(top_k, _MAX_TOTAL_RETRIEVE_CHUNKS)]
+
+
 @dataclass(frozen=True)
 class ChunkResult:
     chunks: list[str]
@@ -186,11 +231,7 @@ class DocumentVectorStore:
             return 0
         path = self._sidecar_path(file_id)
         try:
-            from reasoner.security.encryption import get_encryption_service
-
-            sidecar_json = json.dumps(sidecar, default=str)
-            payload = get_encryption_service().encrypt(sidecar_json)
-            atomic_write_text(path, json.dumps({"encrypted": True, "payload": payload}))
+            await asyncio.to_thread(_write_sidecar, path, sidecar)
         except Exception as exc:
             logger.error("Failed to write vector sidecar for %s: %s", file_id, exc)
             return 0
@@ -264,26 +305,10 @@ class DocumentVectorStore:
             logger.warning("No embedder available; cannot retrieve document chunks.")
             return []
 
-        # Load sidecars
-        all_chunks: list[tuple[str, dict[str, Any]]] = []
-        for fid in authorized_file_ids:
-            path = self._sidecar_path(fid)
-            if not path.exists():
-                logger.debug("No vector sidecar for %s", fid)
-                continue
-            try:
-                raw = json.loads(path.read_text(encoding="utf-8"))
-                if raw.get("encrypted"):
-                    from reasoner.security.encryption import get_encryption_service
-
-                    sidecar = json.loads(get_encryption_service().decrypt(raw["payload"]))
-                else:
-                    # Legacy plaintext sidecar (no "encrypted" flag) -- read
-                    # unchanged, no migration required.
-                    sidecar = raw
-                all_chunks.extend((fid, chunk) for chunk in sidecar.get("chunks", []))
-            except Exception as exc:
-                logger.warning("Failed to load sidecar for %s: %s", fid, exc)
+        # Read, decrypt and parse the sidecars in one worker-thread call.
+        all_chunks = await asyncio.to_thread(
+            _load_chunks, [(fid, self._sidecar_path(fid)) for fid in authorized_file_ids]
+        )
 
         if not all_chunks:
             return []
@@ -295,17 +320,7 @@ class DocumentVectorStore:
             logger.warning("Query embedding failed: %s", exc)
             return []
 
-        # Score all chunks
-        scored = []
-        for fid, chunk in all_chunks:
-            emb = chunk.get("embedding")
-            if not emb:
-                continue
-            score = _cosine_similarity(query_embedding, emb)
-            scored.append((score, fid, chunk["text"]))
-
-        scored.sort(key=lambda x: x[0], reverse=True)
-        return scored[: min(top_k, _MAX_TOTAL_RETRIEVE_CHUNKS)]
+        return await asyncio.to_thread(_rank, query_embedding, all_chunks, top_k)
 
     def delete_index(self, file_id: str) -> bool:
         """Delete a document's vector sidecar."""
