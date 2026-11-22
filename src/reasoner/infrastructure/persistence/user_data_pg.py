@@ -73,7 +73,9 @@ class WebhookDeadLetterStore:
                 UNION SELECT email FROM users WHERE id = $1
             ) i
             WHERE i.ident IS NOT NULL AND i.ident <> ''
-              AND strpos(f.payload::text, i.ident) > 0
+              -- The whole JSON string, quotes included: a bare substring match let
+              -- bob@x.com erase the events of jimbob@x.com.
+              AND strpos(f.payload::text, to_json(i.ident)::text) > 0
             """,
             user_id,
         )

@@ -183,8 +183,10 @@ async def test_erase_removes_the_users_dead_lettered_webhook_events_only():
                 sub = await conn.fetchval(
                     "SELECT stripe_sub_id FROM subscriptions WHERE user_id = $1", uid
                 )
+                email = await conn.fetchval("SELECT email FROM users WHERE id = $1", uid)
                 assert other
-                for ident in (sub, "sub_other_user"):
+                # The user's own email goes; one that merely contains it stays.
+                for ident in (sub, email, "sub_other_user", f"jim{email}"):
                     payload = {"id": f"evt_{uuid4().hex}", "data": {"object": {"id": ident}}}
                     await conn.execute(
                         "INSERT INTO failed_webhook_events (provider, event_type, payload, error) "
@@ -202,4 +204,6 @@ async def test_erase_removes_the_users_dead_lettered_webhook_events_only():
         finally:
             await pool.close()
 
-    assert [json.loads(r["payload"])["data"]["object"]["id"] for r in left] == ["sub_other_user"]
+    assert sorted(json.loads(r["payload"])["data"]["object"]["id"] for r in left) == sorted(
+        ["sub_other_user", f"jim{email}"]
+    )
