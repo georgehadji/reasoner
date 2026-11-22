@@ -710,7 +710,13 @@ class ProviderRouter:
 
         def _carry(meta: dict[str, Any]) -> dict[str, Any]:
             for key, spent in discarded.items():
-                if spent:
+                if not spent:
+                    continue
+                # Under its own key, never folded into cost_usd: a folded cost made
+                # a final call that reported none look priced, so it was never
+                # estimated (audit 7, finding 15). Tokens stay in the totals too.
+                meta[f"discarded_{key}"] = spent
+                if key != "cost_usd":
                     meta[key] = (meta.get(key, 0) or 0) + spent
             return meta
 
