@@ -225,9 +225,9 @@ class PhaseMonitor:
         )
         # The judge is billed by the provider but runs outside the executor, which
         # is where cost normally enters the run. Put it on the run here, or it is
-        # never charged (audit 7, finding 6). Reported cost only: a judge that
-        # reports none adds none, and the next executor call sees the total.
-        cost = float((meta or {}).get("cost_usd", 0.0) or 0.0)
+        # never charged (audit 7, finding 6). call_cost_usd, like the executor: it
+        # estimates from tokens when no cost is reported and adds discarded replies.
+        cost = ProviderRouter.call_cost_usd(meta or {})
         if cost > 0:
             state.total_cost_usd += cost
             state.phase_costs["quality_judge"] = state.phase_costs.get("quality_judge", 0.0) + cost
