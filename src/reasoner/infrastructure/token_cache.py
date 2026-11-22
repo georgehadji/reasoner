@@ -292,6 +292,7 @@ class TokenAwareCache:
                         pass
 
             self._entries[key] = entry
+            self._entries.move_to_end(key)  # an overwrite keeps its old slot otherwise
             self._problem_index.setdefault(entry.problem_hash, []).append(key)
             self._current_tokens += tokens_used
             self._stats.total_size_bytes += len(response.encode())
@@ -314,18 +315,17 @@ class TokenAwareCache:
             self._stats.total_size_bytes -= len(entry.response.encode())
             self._stats.evictions += 1
             del self._entries[key]
+            # The file goes with the entry, or the directory only ever grows.
+            if self.cache_dir:
+                await asyncio.to_thread(
+                    self._entry_path(key, entry.agent_id).unlink, missing_ok=True
+                )
 
     async def _evict_lru(self) -> None:
-        """Evict least recently used entry."""
-        if not self._entries:
-            return
-
-        # Find LRU entry
-        lru_key = min(
-            self._entries.keys(),
-            key=lambda k: self._entries[k].last_accessed
-        )
-        await self._evict(lru_key)
+        """Evict least recently used entry: the front of the OrderedDict, which get()
+        promotes on a hit."""
+        if self._entries:
+            await self._evict(next(iter(self._entries)))
 
     async def _cleanup_expired(self) -> int:
         """Evict all TTL-expired entries from memory and disk. Returns count removed."""
@@ -411,22 +411,51 @@ class TokenAwareCache:
         if not self.cache_dir:
             return
 
-        for f in self._disk_files():
+        # Newest first, at most the in-memory cap. Older files are deleted in the same pass,
+        # so a backlog left by earlier versions is cleared on the first restart.
+        cap = min(self.max_entries, self._lru_max_entries)
+        files = await asyncio.to_thread(self._files_newest_first)
+        loaded: list[CacheEntry] = []
+        spare: list[Path] = []
+        for i, f in enumerate(files):
+            if len(loaded) >= cap:
+                spare = files[i:]
+                break
             try:
-                data = json.loads(await asyncio.to_thread(f.read_text))
-                entry = CacheEntry(**data)
+                raw = json.loads(await asyncio.to_thread(f.read_text))
+                if "payload" in raw:  # older files hold the text in the clear
+                    from reasoner.security.encryption import get_encryption_service
+
+                    raw.update(json.loads(get_encryption_service().decrypt(raw.pop("payload"))))
+                entry = CacheEntry(**raw)
 
                 # Skip expired entries — use wall-clock time for cross-process TTL
                 if self._clock.time() - entry.created_at > entry.ttl_seconds:
-                    f.unlink()
+                    f.unlink(missing_ok=True)
                     continue
+                loaded.append(entry)
+            except OSError:
+                raise
+            except Exception:
+                # Corrupt, or encrypted under a key this process no longer has (the
+                # ephemeral dev key): either way it can never be served.
+                f.unlink(missing_ok=True)
+        # Oldest first, so the front of the OrderedDict is the LRU end.
+        for entry in reversed(loaded):
+            self._entries[entry.key] = entry
+            self._problem_index.setdefault(entry.problem_hash, []).append(entry.key)
+            self._current_tokens += entry.tokens_used
+        if spare:
+            await asyncio.to_thread(lambda: [f.unlink(missing_ok=True) for f in spare])
 
-                self._entries[entry.key] = entry
-                self._problem_index.setdefault(entry.problem_hash, []).append(entry.key)
-                self._current_tokens += entry.tokens_used
-            except (json.JSONDecodeError, KeyError, TypeError):
-                # Corrupted file, remove it
-                f.unlink()
+    def _files_newest_first(self) -> list[Path]:
+        def mtime(f: Path) -> float:
+            try:
+                return f.stat().st_mtime
+            except OSError:
+                return 0.0
+
+        return sorted(self._disk_files(), key=mtime, reverse=True)
 
     async def _save_to_disk(self, key: str, entry: CacheEntry) -> None:
         """Save entry to disk."""
@@ -452,9 +481,15 @@ class TokenAwareCache:
                 # in get() lets an anonymous caller reach this entry.
                 "agent_id": entry.agent_id,
             }
+            # Prompts and answers are user text: encrypted like the vector sidecars. The
+            # metadata (key, timestamps, TTL) stays readable.
+            from reasoner.security.encryption import get_encryption_service
+
+            text = {"raw_prompt": data.pop("raw_prompt"), "response": data.pop("response")}
+            data["payload"] = get_encryption_service().encrypt(json.dumps(text))
             await asyncio.to_thread(f.parent.mkdir, parents=True, exist_ok=True)
             await asyncio.to_thread(atomic_write_text, f, json.dumps(data))
-        except OSError as exc:
+        except Exception as exc:
             logger.warning("Failed to persist cache entry %s to disk: %s", key, exc)
 
 
