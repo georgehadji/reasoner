@@ -792,6 +792,13 @@ SEARCH_ESTIMATED_COST_USD: float = 0.007
 SMART_SEARCH_ESTIMATED_COST_USD: float = 0.022
 # Image preview: one Grok 4.3 prompt rewrite ($1.25/$2.50 per 1M), at most 512 output tokens.
 IMAGE_PREVIEW_ESTIMATED_COST_USD: float = 0.002
+# Widgets that spend on a paid search provider. Each call is charged
+# SEARCH_ESTIMATED_COST_USD, like /api/search; weather, stocks and the calculator are
+# free (audit 7, finding 9).
+PAID_WIDGET_NAMES: frozenset[str] = frozenset({"discover", "image_search", "video_search"})
+# Contact form: one inbox, so a strict per-address bucket on top of the global limiter
+# (audit 7, finding 20).
+CONTACT_RATE_LIMIT_PER_HOUR: int = 5
 
 # A billing webhook claim older than this, and never finished, belongs to a
 # worker that died; the provider's retry may take it over. Must exceed the
