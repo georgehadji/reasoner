@@ -124,23 +124,26 @@ async def execute_widget(
 
         sanitized_query, _ = sanitize_for_prompt(req.query)
 
+        widget_type, params = req.widget_type, req.params
         if req.auto_detect:
-            # auto_execute runs the best match only.
+            # Detect once here and run that widget by name: the handler's own
+            # auto-detect would detect again, and could run a widget other than the
+            # one charged for.
             detections = await get_widget_registry().detect_widgets(sanitized_query)
-            paid = detections[0].widget.name if detections else ""
-        else:
-            paid = req.widget_type
-        if paid in PAID_WIDGET_NAMES:
+            if not detections:
+                return {"detected": False, "widgets": []}
+            widget_type, params = detections[0].widget.name, detections[0].params
+        if widget_type in PAID_WIDGET_NAMES:
             charge = await admit_flat_charge(
-                request, user=user, cost_usd=SEARCH_ESTIMATED_COST_USD, kind=f"widget-{paid}"
+                request, user=user, cost_usd=SEARCH_ESTIMATED_COST_USD, kind=f"widget-{widget_type}"
             )
 
         command = ExecuteWidgetCommand(
             command_id=str(uuid.uuid4()),
             timestamp=time.time(),
-            widget_type=req.widget_type,
-            params=req.params,
-            auto_detect=req.auto_detect,
+            widget_type=widget_type,
+            params=params,
+            auto_detect=False,
             query=sanitized_query,
         )
         result = await handler_registry.handle_command(command)

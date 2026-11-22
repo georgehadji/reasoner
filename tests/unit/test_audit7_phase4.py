@@ -72,6 +72,66 @@ def test_a_failed_paid_widget_gives_the_hold_back(charges):
     assert charges["closed"] == [False]
 
 
+def test_auto_detect_detects_once_and_runs_the_widget_it_charged_for(charges, monkeypatch):
+    from types import SimpleNamespace
+
+    from reasoner.infrastructure import widgets as registry_module
+
+    detected = SimpleNamespace(widget=SimpleNamespace(name="discover"), params={"topic": "tech"})
+    calls: list[str] = []
+
+    class _Registry:
+        async def detect_widgets(self, query):
+            calls.append(query)
+            return [detected]
+
+    ran: list = []
+
+    class _Recording(_Handlers):
+        async def handle_command(self, command):
+            ran.append(command)
+            return await super().handle_command(command)
+
+    charges["handlers"] = _Recording()
+    monkeypatch.setattr(registry_module, "get_widget_registry", lambda: _Registry())
+    resp = TestClient(app).post(
+        "/api/widget/execute", json={"auto_detect": True, "query": "latest news"}
+    )
+
+    assert resp.status_code == 200 and len(calls) == 1
+    assert charges["admitted"] == [("widget-discover", SEARCH_ESTIMATED_COST_USD)]
+    (command,) = ran
+    assert (command.widget_type, command.params, command.auto_detect) == (
+        "discover", {"topic": "tech"}, False
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_discover_error_payload_gives_the_hold_back(monkeypatch):
+    from types import SimpleNamespace
+
+    from reasoner.api.routes import legacy_widgets as lw
+
+    closed: list[bool] = []
+
+    async def admit(request, *, user, cost_usd, kind):
+        return object()
+
+    async def close(charge, *, served):
+        closed.append(served)
+
+    async def run(name, params):
+        return {"error": "provider quota", "results": []}
+
+    lw._discover_cache.clear()
+    monkeypatch.setattr(lw, "admit_flat_charge", admit)
+    monkeypatch.setattr(lw, "close_flat_charge", close)
+    monkeypatch.setattr(lw, "_run", run)
+    await lw.discover(SimpleNamespace(), topic="tech", mode="normal")
+
+    assert closed == [False] and not lw._discover_cache
+
+
 def test_a_refused_charge_is_a_402_not_a_swallowed_error(charges):
     charges["refuse"] = True
     assert _post("video_search").status_code == 402

@@ -116,7 +116,7 @@ async def discover(
             request, user=user, cost_usd=SEARCH_ESTIMATED_COST_USD, kind="widget-discover"
         )
         data = await _run("discover", {"topic": key[0]})
-        served = True
+        served = not data.get("error")  # an error payload is not a search the caller got
         # Legacy shape: echoes the mode, no "sources".
         content = {k: v for k, v in data.items() if k != "sources"} | {"mode": key[1]}
         cacheable = isinstance(content, dict) and not content.get("error")
