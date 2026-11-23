@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
+      signal: req.signal,
     });
 
     const text = await upstream.text();
@@ -63,6 +64,6 @@ export async function POST(req: NextRequest) {
       headers: responseHeaders,
     });
   } catch (err) {
-    return proxyErrorResponse(err, 'Agent run/sync', upstreamUrl);
+    return proxyErrorResponse(err, 'Agent run/sync', upstreamUrl, req);
   }
 }

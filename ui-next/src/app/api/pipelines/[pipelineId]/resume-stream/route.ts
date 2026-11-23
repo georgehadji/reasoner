@@ -46,6 +46,8 @@ export async function POST(
     const upstream = await fetch(upstreamUrl, {
       method: 'POST',
       headers,
+      // Client disconnect aborts the backend stream so the run stops billing.
+      signal: req.signal,
     });
 
     return new Response(upstream.body, {
@@ -53,6 +55,6 @@ export async function POST(
       headers: sanitizeResponseHeaders(upstream),
     });
   } catch (err) {
-    return proxyErrorResponse(err, 'Resume stream', upstreamUrl);
+    return proxyErrorResponse(err, 'Resume stream', upstreamUrl, req);
   }
 }
