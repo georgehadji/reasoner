@@ -46,7 +46,8 @@ export async function fetchWithCsrf(url: string, options: RequestInit = {}): Pro
 
   // If CSRF validation failed (stale/invalid token), fetch a fresh one and retry once
   if (resp.status === 403) {
-    const data = await resp.json().catch(() => null);
+    // A clone: a 403 that is not a CSRF failure goes back to the caller with its body unread.
+    const data = await resp.clone().json().catch(() => null);
     const raw = (data && typeof data === 'object')
       ? (typeof data.error === 'string' ? data.error : typeof data.detail === 'string' ? data.detail : '')
       : '';

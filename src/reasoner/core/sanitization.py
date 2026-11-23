@@ -429,3 +429,15 @@ def sanitize_for_logging(text: str, max_length: int = 200) -> str:
         sanitized = sanitized[:max_length] + "..."
 
     return sanitized
+
+
+def scrub_strings(items: list) -> tuple[list[str], int]:
+    """Egress Layer A scrub over a list of prose items; returns (cleaned, suspicious_total)."""
+    cleaned: list[str] = []
+    changed = 0
+    for item in items:
+        text, report = clean_llm_artifacts_with_report(str(item))
+        cleaned.append(text)
+        if report is not None:
+            changed += report.suspicious_total
+    return cleaned, changed

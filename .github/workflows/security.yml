@@ -53,7 +53,45 @@ jobs:
       # shipped) fail at critical. braces GHSA-vfj7-8cjw-p6xm (high, dev-only
       # via eslint-config-next) has no patched release, so a single
       # --audit-level high gate could not go green.
-      - run: cd ui-next && npm audit --omit=dev --audit-level high && npm audit --audit-level critical
+      #
+      # Ignored: picomatch GHSA-fc5q-39xc-vjpf (high, ReDoS). It affects every
+      # picomatch version, so no patched release exists (4.0.7 is the latest as
+      # of 2026-11-18), and the only npm fix is a breaking @sentry/nextjs
+      # downgrade. Production reaches it only through @sentry/nextjs build
+      # tooling. Remove IGNORED_ADVISORIES once picomatch is patched; revisit
+      # no later than 2026-12-18.
+      # npm audit has no ignore flag, so the JSON report is filtered here. A
+      # report without auditReportVersion (npm failed) fails the step, and
+      # every other high or critical advisory still does.
+      - name: npm audit
+        working-directory: ui-next
+        run: |
+          npm audit --omit=dev --json > "$RUNNER_TEMP/audit-prod.json" || true
+          npm audit --json > "$RUNNER_TEMP/audit-all.json" || true
+          node - "$RUNNER_TEMP" <<'JS'
+          const fs = require("fs");
+          const IGNORED_ADVISORIES = new Set(["GHSA-fc5q-39xc-vjpf"]);
+          const gate = (file, levels) => {
+            const report = JSON.parse(fs.readFileSync(file, "utf8"));
+            if (!report.auditReportVersion) {
+              console.error(`${file}: no audit report (${JSON.stringify(report.error || report)})`);
+              return 1;
+            }
+            const bad = Object.values(report.vulnerabilities || {}).flatMap((v) =>
+              v.via
+                .filter((a) => typeof a === "object" && levels.includes(a.severity))
+                .filter((a) => !IGNORED_ADVISORIES.has(String(a.url).split("/").pop()))
+                .map((a) => `${v.name} [${a.severity}]: ${a.title} ${a.url}`),
+            );
+            bad.forEach((line) => console.error(line));
+            return bad.length ? 1 : 0;
+          };
+          const dir = process.argv[2];
+          const failed =
+            gate(`${dir}/audit-prod.json`, ["high", "critical"]) +
+            gate(`${dir}/audit-all.json`, ["critical"]);
+          process.exit(failed ? 1 : 0);
+          JS
 
   # SBOM + known-vulnerability scan of the dependency tree and Dockerfiles.
   # Fails the build on CRITICAL/HIGH findings (security-remediation-plan.md

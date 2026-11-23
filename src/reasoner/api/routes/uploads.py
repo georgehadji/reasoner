@@ -92,10 +92,7 @@ async def upload_file(
             )
 
         # Images are described by a billed vision call (force_ocr routes to local OCR).
-        n_described = 0 if force_ocr else sum(
-            os.path.splitext(getattr(f, "filename", "") or "")[1].lower() in IMAGE_EXTENSIONS
-            for f in raw_files
-        )
+        n_described = sum(_is_described(getattr(f, "filename", ""), force_ocr) for f in raw_files)
         if n_described:
             charge = await admit_flat_charge(
                 request, user=user, cost_usd=estimate_upload_cost(n_described), kind="upload"
@@ -127,11 +124,14 @@ async def upload_file(
             if consumed > reserved:
                 await _reserve_quota(usage, user_id, consumed - reserved)
                 reserved = consumed
+            filename = getattr(item, "filename", "unknown")
             results.append(
-                await save_uploaded_file(
-                    content, getattr(item, "filename", "unknown"), user_id=user_id, force_ocr=force_ocr
-                )
+                await save_uploaded_file(content, filename, user_id=user_id, force_ocr=force_ocr)
             )
+            # A billed vision call has now run: keep the charge even if a later
+            # file fails, or every failed upload refunds descriptions we paid for.
+            if charge is not None and _is_described(filename, force_ocr):
+                served = True
             stored += results[-1].get("stored_bytes", 0) if results[-1].get("success") else 0
             del content
         served = True
@@ -155,6 +155,11 @@ async def upload_file(
         if reserved:
             with anyio.CancelScope(shield=True), anyio.move_on_after(SETTLE_TIMEOUT_SECONDS):
                 await usage.adjust(user_id, stored - reserved)
+
+
+def _is_described(filename: str | None, force_ocr: bool) -> bool:
+    """Whether this file gets a billed vision call (force_ocr routes images to local OCR)."""
+    return not force_ocr and os.path.splitext(filename or "")[1].lower() in IMAGE_EXTENSIONS
 
 
 async def _reserve_quota(usage, user_id: str, nbytes: int) -> None:

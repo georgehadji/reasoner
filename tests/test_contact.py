@@ -38,7 +38,10 @@ def adapter():
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
+    # The per-IP contact limiter is module state: a fresh one per test, so the
+    # suite's many posts from one test client do not trip it.
+    monkeypatch.setattr("reasoner.api.routes.contact._contact_limiter", None)
     return TestClient(app)
 
 

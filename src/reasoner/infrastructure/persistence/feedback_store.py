@@ -15,7 +15,7 @@ import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -312,6 +312,21 @@ class FeedbackStore:
         ]
 
     # ── Public async API ──
+
+    def _prune_sync(self, days: int) -> int:
+        # Timestamps are ISO text in two shapes (datetime('now') and isoformat()); the date
+        # prefix compares correctly for both.
+        cutoff = (datetime.now(UTC) - timedelta(days=days)).date().isoformat()
+        conn = self._get_connection()
+        cursor = conn.execute(
+            "DELETE FROM feedback_entries WHERE substr(timestamp, 1, 10) < ?", (cutoff,)
+        )
+        conn.commit()
+        return cursor.rowcount
+
+    async def prune_older_than(self, days: int) -> int:
+        """Delete entries older than ``days``. Returns the row count."""
+        return await self._run_in_executor(self._prune_sync, days)
 
     async def insert(self, entry: FeedbackEntry) -> int:
         """Insert a feedback entry. Returns the new row id."""

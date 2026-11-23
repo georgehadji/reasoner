@@ -11,7 +11,12 @@ from __future__ import annotations
 
 import time
 
-from reasoner.application.flows.base import PhaseStep, WorkflowServices, WorkflowStrategy
+from reasoner.application.flows.base import (
+    PhaseStep,
+    WorkflowServices,
+    WorkflowStrategy,
+    next_round_fits,
+)
 from reasoner.application.flows.iterative_critique_phases import (
     MAX_ROUNDS,
     AdversarialRound,
@@ -51,26 +56,26 @@ class IterativeCritiqueFlow(WorkflowStrategy):
 
         round_num = 0
         # The phase timeout cancels the whole phase, rounds already finished
-        # included. Stop before a round that, at the pace so far, would not
-        # finish inside it, and keep the best answer reached.
+        # included. Stop before a round that, as slow as the slowest so far,
+        # would not finish inside it, and keep the best answer reached.
         started = _clock()
         budget = get_phase_timeout(_DEBATE_PHASE) * IC_TIME_BUDGET_FRACTION
+        durations: list[float] = []
 
         while round_num < MAX_ROUNDS:
-            if round_num:
-                elapsed = _clock() - started
-                if elapsed + elapsed / round_num > budget:
-                    state.adversarial_convergence_round = round_num
-                    state.adversarial_convergence_reason = "time_budget"
-                    state.adversarial_converged = False
-                    services.log(
-                        "IC",
-                        f"Debate stopped after round {round_num}: another round "
-                        f"would not finish inside the "
-                        f"{get_phase_timeout(_DEBATE_PHASE):.0f}s phase limit",
-                        state,
-                    )
-                    break
+            if not next_round_fits(durations, _clock() - started, budget):
+                state.adversarial_convergence_round = round_num
+                state.adversarial_convergence_reason = "time_budget"
+                state.adversarial_converged = False
+                services.log(
+                    "IC",
+                    f"Debate stopped after round {round_num}: another round "
+                    f"would not finish inside the "
+                    f"{get_phase_timeout(_DEBATE_PHASE):.0f}s phase limit",
+                    state,
+                )
+                break
+            round_start = _clock()
             round_num += 1
             services.log("IC", f"--- Round {round_num}/{MAX_ROUNDS} ---", state)
 
@@ -95,6 +100,7 @@ class IterativeCritiqueFlow(WorkflowStrategy):
             critic_round = await run_critic_phase(state, services, gen.answer, round_num)
             apply_generator_output(critic_round, gen)
             state.adversarial_rounds.append(critic_round)
+            durations.append(_clock() - round_start)
 
             # Check convergence
             converged, reason = check_convergence(state.adversarial_rounds)

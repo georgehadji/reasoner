@@ -21,7 +21,6 @@ class LLMPort(Protocol):
         max_tokens: int = ...,
         temperature: float = ...,
         timeout_seconds: float | None = ...,
-        stream: bool = False,
     ) -> tuple[str, dict[str, Any]]: ...
 
     async def call_with_tools(

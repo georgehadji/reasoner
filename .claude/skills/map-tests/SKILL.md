@@ -88,6 +88,8 @@ pytest tests/ --cov=src/reasoner --cov-report=html
 | `test_csrf_token_parity` | 1 | The backend accepts the CSRF token format the Next proxy mints; one golden vector is pinned here and in `ui-next/src/lib/security-server.edge-cases.test.ts`. |
 | `test_article_run_routing` | 1 | An auto run that becomes an article is routed by the article preset, not the writing preset whose unrouted article roles fell to a narrating primary. Orphan `</think>` stripping is in `test_parsing`. |
 | `test_explicit_method_request` | 1 | A method named in the prompt ("use the iterative-critique method") wins: HyperGate's named-method fast path, ahead of writing intent and the orchestrator's article override. |
+| `test_self_refine` | 1 | Self-Refine: score parsing, the cap on a 9+ beside a HIGH/MED flaw, stop rules, the loop reaching 9, round limit, unusable evaluator, time budget, registration. |
+| `unit/test_run_steps` | 1 | Audit A-01: unbilled run-level steps reach the web (SSE) path, not only the CLI. |
 | `test_ic_time_budget` | 1 | Iterative critique stops before a debate round that, at its average pace, would not finish inside the Adversarial Debate phase timeout (reason `time_budget`), instead of the timeout cancelling the phase. |
 | `test_anonymous_tier` | 1 | `ANONYMOUS_TIER` sets the plan a caller with no account gets (default free, unknown values fail closed); production refuses anything but free at startup. |
 | `test_audit3_followup_gaps` | 3 | Audit 3 follow-ups: `delete_aggregate` removes the `pipeline_owners` row (SQLite and Postgres stores); the history query handler without an event store returns nothing instead of globbing a stray directory. |

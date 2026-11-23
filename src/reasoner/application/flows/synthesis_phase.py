@@ -29,7 +29,7 @@ from reasoner.parsing import (
     parse_evidence_bundles,
     strip_json_fences,
 )
-from reasoner.sanitization import clean_llm_artifacts_with_report
+from reasoner.sanitization import clean_llm_artifacts_with_report, scrub_strings
 
 logger = logging.getLogger(__name__)
 
@@ -302,16 +302,6 @@ def finalize_solution(raw: str, state: PipelineState, services: WorkflowServices
 
     # Egress Layer A scrub on the remaining user-facing prose fields --
     # core_solution was already scrubbed above via clean_llm_artifacts_with_report.
-    def _scrub_strings(items: list) -> tuple[list[str], int]:
-        cleaned: list[str] = []
-        changed = 0
-        for item in items:
-            text, report = clean_llm_artifacts_with_report(str(item))
-            cleaned.append(text)
-            if report is not None:
-                changed += report.suspicious_total
-        return cleaned, changed
-
     def _scrub_blueprint_steps(items: list[dict]) -> tuple[list[dict], int]:
         changed = 0
         cleaned: list[dict] = []
@@ -326,10 +316,10 @@ def finalize_solution(raw: str, state: PipelineState, services: WorkflowServices
             cleaned.append(new_step)
         return cleaned, changed
 
-    critical_insights, insights_changed = _scrub_strings(
+    critical_insights, insights_changed = scrub_strings(
         coerce_list(json_data.get("critical_insights"))
     )
-    open_questions, questions_changed = _scrub_strings(coerce_list(json_data.get("open_questions")))
+    open_questions, questions_changed = scrub_strings(coerce_list(json_data.get("open_questions")))
     if scope and "Facts I am stating" not in (state.problem or ""):
         # A non-interactive caller never saw the gate's questions: surface them here.
         from reasoner.application.services.stakes_service import detect_stakes, missing_facts

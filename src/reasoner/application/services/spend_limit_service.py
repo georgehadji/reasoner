@@ -20,6 +20,7 @@ import time
 from dataclasses import dataclass
 
 from reasoner.core.degrade import degraded
+from reasoner.domain.preset_core import FOLLOWUP_AGENT_MODELS, FOLLOWUP_AGENT_MODELS_WESTERN
 from reasoner.domain.saas import SubscriptionStatus, SubscriptionTier
 from reasoner.domain.spend_limits import (
     UNLIMITED,
@@ -279,10 +280,17 @@ def _preset_routing(preset_id: str) -> dict[str, str]:
     return routing
 
 
+#: Follow-up agent models a budget run uses by default (any plan may pick them).
+_BUDGET_AGENT_MODELS = frozenset(
+    {FOLLOWUP_AGENT_MODELS["budget"], FOLLOWUP_AGENT_MODELS_WESTERN["budget"]}
+)
+
+
 def check_run_allowed(
     preset_id: str,
     tier: SubscriptionTier,
     billing_subject: str | None = None,
+    agent_model: str | None = None,
 ) -> SpendRejection | None:
     """Refuse a run the caller's plan cannot take, before spending on it.
 
@@ -291,13 +299,19 @@ def check_run_allowed(
 
       * the preset is locked to a higher plan — exact, from the preset's own
         `required_tier`, so a free user gets "upgrade" instead of a run that
-        dies half way through;
+        dies half way through. A follow-up's caller-chosen ``agent_model``
+        counts too: it is forced onto synthesis, so anything but a budget
+        default needs the premium plan, whatever the preset is;
       * the estimated cost already exceeds the per-run ceiling (only when
         real per-model pricing is loaded — see `pricing_data_available`);
       * the subject has already spent their month, so the next run has
         nowhere to go.
     """
     required = required_tier_for(preset_id)
+    if agent_model and agent_model not in _BUDGET_AGENT_MODELS:
+        premium = required_tier_for("auto-premium")
+        if not tier_satisfies(required, premium):
+            required = premium
     if not tier_satisfies(tier, required):
         return SpendRejection(
             reason=(

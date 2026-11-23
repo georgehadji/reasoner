@@ -40,6 +40,7 @@ _TAXONOMY: dict[str, tuple[str, str]] = {
     "S": ("pipeline", "coding"),
     "T": ("pipeline", "brainstorming"),
     "U": ("pipeline", "iterative_critique"),  # v3.1: LLM debate
+    "V": ("pipeline", "self_refine"),
 }
 
 # What each letter means, as the LLM reads it. Both this classifier and the
@@ -118,6 +119,10 @@ _DESCRIPTIONS: dict[str, str] = {
         "ONE answer must be hardened through repeated adversarial rounds — draft it, have a critic "
         "attack its weaknesses, revise, and repeat until the critique stops finding real flaws"
     ),
+    "V": (
+        "ONE answer where quality matters more than speed — the same writer drafts it, grades "
+        "its own work on a 0-10 scale, and keeps revising until it scores itself at least 9"
+    ),
 }
 
 CATEGORY_LIST = "\n".join(f"- {letter}: {_DESCRIPTIONS[letter]}" for letter in _TAXONOMY)
@@ -138,7 +143,10 @@ is ONE answer to strengthen through repeated rounds of critique and revision, wi
 side to defeat.
 - F vs U: Choose F when SEVERAL candidate solutions are generated and ranked against each \
 other. Choose U when a SINGLE solution is refined iteratively until the critique stops finding \
-flaws."""
+flaws.
+- U vs V: Choose U when an outside critic should attack ONE answer. Choose V when the problem asks \
+for a self-checked, self-scored answer that is revised until it rates itself highly (e.g. \
+"keep improving it until it is a 9 out of 10")."""
 
 _SYSTEM = f"""\
 You are a reasoning-method classifier. Read the user's problem and choose the single \

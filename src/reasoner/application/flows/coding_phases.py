@@ -190,8 +190,10 @@ async def run_coding_generate_phase(state: PipelineState, services: WorkflowServ
 
     generated: list[dict[str, Any]] = []
     failures: list[str] = []
+    causes: list[BaseException] = []
     for i, res in enumerate(results):
         if isinstance(res, Exception):
+            causes.append(res)
             # A failed file is reported, not stored: "# Error: ..." content was
             # reviewed and shipped as if it were code (FLOW-10).
             path = files_to_generate[i].get("path", f"file_{i}")
@@ -200,7 +202,9 @@ async def run_coding_generate_phase(state: PipelineState, services: WorkflowServ
             failures.append(msg)
         else:
             generated.append(res)
-    require_survivors(generated, failures, phase=3, phase_name="Code Generation")
+    require_survivors(
+        generated, failures, phase=3, phase_name="Code Generation", causes=causes
+    )
 
     state.coding_state["generated_files"] = generated
 

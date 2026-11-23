@@ -79,17 +79,23 @@ class AnthropicDirectProvider(BaseLLMProvider):
             # connection pool. Leaving it unclosed leaks a pool per call on
             # exactly the path that only runs during an upstream outage —
             # i.e. when call volume through it is highest.
+            # No `temperature`: anthropic SDK 2.x sends API version 2026-10-21,
+            # which removed sampling parameters (passing one is a TypeError
+            # before any request is made), and this lane's Claude models accept
+            # only the default anyway. The argument stays in the signature for
+            # the BaseLLMProvider interface.
             async with AsyncAnthropic(
                 api_key=self._api_key, timeout=TIMEOUTS.LLM_CALL, max_retries=0
             ) as client:
                 response = await client.messages.create(
                     model=self.model,
                     max_tokens=max_tokens,
-                    temperature=temperature,
                     system=system,
                     messages=[{"role": "user", "content": user_prompt}],
                 )
-            return response.content[0].text
+            # Current Claude models think by default, so content[0] can be a
+            # thinking block; the answer is the text blocks.
+            return "".join(b.text for b in response.content if b.type == "text")
         except ImportError as exc:
             raise LLMError("anthropic SDK not installed. pip install anthropic") from exc
         except Exception as e:
@@ -328,7 +334,9 @@ def build_fallback_provider(name: str) -> BaseLLMProvider:
         },
         "xai": {
             "base_url": "https://api.x.ai/v1",
-            "model": "grok-2-latest",
+            # grok-2-latest was retired (404). grok-4.3 is the cheapest current
+            # general Grok, and the registry prices it (x-ai/grok-4.3).
+            "model": "grok-4.3",
         },
         "perplexity": {
             "base_url": "https://api.perplexity.ai",

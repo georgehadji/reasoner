@@ -59,3 +59,21 @@ describe('fetchWithCsrf token refresh', () => {
     expect(call[1]?.method).toBe('POST');
   });
 });
+
+/** Audit 7, finding 11: the 403 check read the body, so the caller got an empty one. */
+describe('fetchWithCsrf 403 handling', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('hands a non-CSRF 403 back with its body still readable', async () => {
+    document.cookie = 'csrf_token=abc';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ detail: 'Confirm your email' }), { status: 403 })),
+    );
+
+    const resp = await fetchWithCsrf('/api/anything', { method: 'POST' });
+
+    expect(resp.status).toBe(403);
+    expect((await resp.json()).detail).toBe('Confirm your email');
+  });
+});

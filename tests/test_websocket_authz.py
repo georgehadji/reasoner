@@ -118,13 +118,13 @@ async def test_dynamic_subscribe_unknown_pipeline_denied(ownership_repo):
 
 @pytest.mark.asyncio
 async def test_dynamic_subscribe_anonymous_owner_allowed(ownership_repo):
-    """A pipeline explicitly recorded with no owner (anonymous run) is
-    accessible to anyone -- distinct from no record existing at all."""
+    """A pipeline explicitly recorded with no owner (anonymous run) is open to
+    anonymous connections -- distinct from no record existing at all."""
     await ownership_repo.set_owner("anon-pipeline", None, "anon-pipeline")
 
     manager = WebSocketManager()
     ws = FakeWebSocket()
-    await manager.connect(ws, "conn-4", metadata={"user_id": "user-anyone"})
+    await manager.connect(ws, "conn-4", metadata={"user_id": None})
 
     await handle_websocket_message(
         manager,

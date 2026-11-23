@@ -8,7 +8,12 @@ from __future__ import annotations
 
 import pytest
 
-from reasoner.api.user_data import ACCOUNT_STORE_NAMES, data_stores, user_data_stores
+from reasoner.api.user_data import (
+    ACCOUNT_STORE_NAMES,
+    BILLING_STORE_NAMES,
+    data_stores,
+    user_data_stores,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -42,6 +47,15 @@ def test_vectors_run_before_uploads_because_they_need_the_upload_ids():
     assert names.index("vectors") < names.index("uploads")
 
 
-def test_the_data_route_erases_everything_except_the_account_itself():
-    assert set(_names(data_stores())) == set(_names(user_data_stores())) - ACCOUNT_STORE_NAMES
+def test_the_data_route_erases_everything_except_the_account_and_its_billing_state():
+    kept = ACCOUNT_STORE_NAMES | BILLING_STORE_NAMES
+    assert set(_names(data_stores())) == set(_names(user_data_stores())) - kept
     assert ACCOUNT_STORE_NAMES == {"profile", "identity"}
+    assert BILLING_STORE_NAMES == {"credit_ledger", "quota", "subscriptions", "valkey"}
+    assert BILLING_STORE_NAMES <= set(_names(user_data_stores())), "account delete erases them"
+
+
+def test_the_dead_letter_store_runs_before_the_stores_it_reads():
+    names = _names(user_data_stores())
+    assert names.index("webhook_dead_letter") < names.index("subscriptions")
+    assert names.index("webhook_dead_letter") < names.index("profile")

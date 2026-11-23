@@ -317,10 +317,3 @@ def get_telemetry_store(db_path: str | Path | None = None) -> TelemetryStore:
     if _telemetry_store is None:
         _telemetry_store = TelemetryStore(db_path)
     return _telemetry_store
-
-
-def reset_telemetry_store() -> None:
-    global _telemetry_store
-    if _telemetry_store:
-        _telemetry_store.close()
-    _telemetry_store = None
