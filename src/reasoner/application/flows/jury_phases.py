@@ -86,8 +86,10 @@ async def run_jury_generate_phase(state: PipelineState, services: WorkflowServic
     tasks = [_get_generator(role) for role in gen_roles]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     failures: list[str] = []
+    causes: list[BaseException] = []
     for i, r in enumerate(results):
         if isinstance(r, Exception):
+            causes.append(r)
             role = gen_roles[i]
             msg = f"Jury generator '{role}' failed: {r}"
             services.log("JURY", msg, state)
@@ -95,7 +97,9 @@ async def run_jury_generate_phase(state: PipelineState, services: WorkflowServic
             failures.append(msg)
         else:
             state.generation_candidates.append(r)
-    require_survivors(state.generation_candidates, failures, phase=2, phase_name="Generation Pool")
+    require_survivors(
+        state.generation_candidates, failures, phase=2, phase_name="Generation Pool", causes=causes
+    )
 
 async def run_jury_critique_phase(state: PipelineState, services: WorkflowServices, critic_roles: list[str] | None = None, batch_critique: bool = False) -> None:
     services.log("JURY_CRITIQUE", "Jury critiquing candidates...", state)
@@ -139,7 +143,9 @@ async def run_jury_critique_phase(state: PipelineState, services: WorkflowServic
             msg = f"Batch jury critic failed: {exc}"
             services.log("JURY_CRITIQUE", msg, state)
             state.errors.append(msg)
-            require_survivors(state.critic_scores, [msg], phase=3, phase_name="Critic Pool")
+            require_survivors(
+                state.critic_scores, [msg], phase=3, phase_name="Critic Pool", causes=[exc]
+            )
     else:
         if not critic_roles:
             critic_roles = list(JURY_CRITIC_ROLES)
@@ -147,8 +153,10 @@ async def run_jury_critique_phase(state: PipelineState, services: WorkflowServic
         tasks = [_get_jury_critique(role) for role in critic_roles]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         failures: list[str] = []
+        causes: list[BaseException] = []
         for i, r in enumerate(results):
             if isinstance(r, Exception):
+                causes.append(r)
                 role = critic_roles[i]
                 msg = f"Jury critic '{role}' failed: {r}"
                 services.log("JURY_CRITIQUE", msg, state)
@@ -156,7 +164,9 @@ async def run_jury_critique_phase(state: PipelineState, services: WorkflowServic
                 failures.append(msg)
             else:
                 state.critic_scores.append(r)
-        require_survivors(state.critic_scores, failures, phase=3, phase_name="Critic Pool")
+        require_survivors(
+            state.critic_scores, failures, phase=3, phase_name="Critic Pool", causes=causes
+        )
 
 async def run_jury_verify_and_meta_eval_phase(state: PipelineState, services: WorkflowServices) -> None:
     services.log("JURY", "Verifying claims and meta-evaluating critics...", state)

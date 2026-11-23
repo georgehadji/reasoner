@@ -104,12 +104,21 @@ def call_cost_usd(metadata: dict) -> float:
     the DIRECT answer path, so neither bills $0 for a call that had tokens
     (docs/plans/audit-remediation-2026-10-20.md BIL-2).
     """
+    # Replies the router threw away (empty bodies) were billed too. Their cost and
+    # tokens ride on the final call under discarded_*. When they reported a cost, the
+    # call's own estimate must not price their tokens again; when they reported none,
+    # their tokens stay in the estimate, at the final model's rate.
+    discarded = metadata.get("discarded_cost_usd", 0.0) or 0.0
     cost = metadata.get("cost_usd", 0.0) or 0.0
     input_tokens = metadata.get("input_tokens", 0) or 0
-    if cost > 0 or input_tokens <= 0:
-        return cost
     output_tokens = metadata.get("output_tokens", 0) or 0
-    return get_pricing(metadata.get("model", "unknown")).calculate_cost(input_tokens, output_tokens)
+    if discarded > 0:
+        input_tokens -= metadata.get("discarded_input_tokens", 0) or 0
+        output_tokens -= metadata.get("discarded_output_tokens", 0) or 0
+    if cost > 0 or input_tokens <= 0:
+        return cost + discarded
+    own = get_pricing(metadata.get("model", "unknown")).calculate_cost(input_tokens, output_tokens)
+    return own + discarded
 
 
 __all__ = ["call_cost_usd", "get_pricing"]

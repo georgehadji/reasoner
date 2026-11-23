@@ -22,7 +22,6 @@ from reasoner.core.constants_models import (
     MODEL_GROK_IMAGINE_IMAGE_2,
     MODEL_MAI_IMAGE_25,
     MODEL_MAI_IMAGE_25_PRO,
-    MODEL_QWEN35_FLASH,
     MODEL_RECRAFT_V41,
     MODEL_RECRAFT_V41_PRO,
     MODEL_RIVERFLOW_V25_FAST,
@@ -319,10 +318,15 @@ def get_phase_retry_budget(phase_name: str) -> int:
 # PHASE QUALITY MONITOR — JUDGE MODELS & THRESHOLDS
 # ═════════════════════════════════════════════════════════════════════
 
+# One judge for every tier: the Western model gate_service already trusts for a JSON
+# verdict (its hypergate_method role), so it is allowed on a Western-only run and is
+# one row to price. The old budget judge, Qwen, was refused there, so the judge never
+# ran on those runs (audit 7, finding 6).
+QUALITY_JUDGE_MODEL: str = "ministral-14b"
 QUALITY_JUDGE_MODELS: dict[str, str] = {
-    "budget":  MODEL_QWEN35_FLASH,
-    "premium": MODEL_GROK_43,
-    "default": MODEL_QWEN35_FLASH,
+    "budget":  QUALITY_JUDGE_MODEL,
+    "premium": QUALITY_JUDGE_MODEL,
+    "default": QUALITY_JUDGE_MODEL,
 }
 
 QUALITY_JUDGE_THRESHOLDS: dict[str, float] = {

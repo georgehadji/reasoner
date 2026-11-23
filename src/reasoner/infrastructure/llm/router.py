@@ -710,7 +710,13 @@ class ProviderRouter:
 
         def _carry(meta: dict[str, Any]) -> dict[str, Any]:
             for key, spent in discarded.items():
-                if spent:
+                if not spent:
+                    continue
+                # Under its own key, never folded into cost_usd: a folded cost made
+                # a final call that reported none look priced, so it was never
+                # estimated (audit 7, finding 15). Tokens stay in the totals too.
+                meta[f"discarded_{key}"] = spent
+                if key != "cost_usd":
                     meta[key] = (meta.get(key, 0) or 0) + spent
             return meta
 
@@ -922,6 +928,17 @@ class ProviderRouter:
             return _execute_stream(assigned)
         else:
             return await _execute_call(assigned)
+
+    @staticmethod
+    def call_cost_usd(metadata: dict[str, Any]) -> float:
+        """Cost of a call this router returned, including the replies it discarded.
+
+        For callers outside the executor (the quality judge, sub-agents) that may not
+        import pricing_resolver themselves.
+        """
+        from reasoner.infrastructure.llm.pricing_resolver import call_cost_usd
+
+        return call_cost_usd(metadata)
 
     def describe(self) -> dict[str, str]:
         result = {"[primary]": self.primary.model}
