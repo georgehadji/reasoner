@@ -140,6 +140,10 @@ export const METHOD_PHASES: Record<string, MethodPhase[]> = {
     { id: 4, name: "Implement" },
     { id: 5, name: "Synthesis" },
   ],
+  "self-refine": [
+    { id: 3, name: "Self-Refine Loop" },
+    { id: 4, name: "Synthesis" },
+  ],
   "socratic": [
     { id: 2, name: "Questioning" },
     { id: 3, name: "Dialectic Answers" },

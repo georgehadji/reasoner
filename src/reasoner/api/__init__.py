@@ -65,6 +65,14 @@ from reasoner.rate_limiter import RateLimitConfig, get_rate_limiter
 _health_postgres_pool = None
 
 
+# query_log is the table every billed run writes (PostgresQuotaRepository); query_audit_logs
+# has no writer, so a gauge on it stayed at 0.
+ACTIVE_USERS_SQL = (
+    "SELECT COUNT(DISTINCT user_id) FROM query_log "
+    "WHERE created_at > NOW() - INTERVAL '24 hours'"
+)
+
+
 async def _update_active_users_loop() -> None:
     """Background task to update active users gauge every 60s (Critical Enhancement 7.3)."""
     from reasoner.metrics import REASONER_ACTIVE_USERS
@@ -73,7 +81,7 @@ async def _update_active_users_loop() -> None:
             await asyncio.sleep(60)
             if _health_postgres_pool is not None:
                 row = await _health_postgres_pool.fetchval(
-                    "SELECT COUNT(DISTINCT user_id) FROM query_audit_logs WHERE timestamp > NOW() - INTERVAL '24 hours'"
+                    ACTIVE_USERS_SQL
                 )
                 REASONER_ACTIVE_USERS.set(row or 0)
         except asyncio.CancelledError:
@@ -233,9 +241,22 @@ async def lifespan(app: FastAPI):
     _token_cache = get_token_cache()
     _cache_cleanup_task = await _token_cache.start_background_cleanup(interval_seconds=300)
 
+    _maintenance_task = None
+    if settings.MAINTENANCE_LOOP_ENABLED:
+        from reasoner.api.maintenance import maintenance_loop
+
+        _maintenance_task = asyncio.create_task(maintenance_loop())
+
     yield
 
     # Cancel background tasks on shutdown (reverse order)
+    if _maintenance_task is not None:
+        _maintenance_task.cancel()
+        try:
+            await _maintenance_task
+        except asyncio.CancelledError:
+            pass
+
     _cache_cleanup_task.cancel()
     try:
         await _cache_cleanup_task

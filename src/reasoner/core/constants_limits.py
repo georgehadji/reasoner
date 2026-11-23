@@ -22,7 +22,6 @@ from reasoner.core.constants_models import (
     MODEL_GROK_IMAGINE_IMAGE_2,
     MODEL_MAI_IMAGE_25,
     MODEL_MAI_IMAGE_25_PRO,
-    MODEL_QWEN35_FLASH,
     MODEL_RECRAFT_V41,
     MODEL_RECRAFT_V41_PRO,
     MODEL_RIVERFLOW_V25_FAST,
@@ -127,6 +126,14 @@ IC_MAX_CONSECUTIVE_DEGRADED: int = 2
 # debate may plan to use. It stops before a round that, at its average pace,
 # would end past this; the rest is headroom for a round slower than average.
 IC_TIME_BUDGET_FRACTION: float = 0.9
+# Self-Refine: one model drafts, scores its own answer 0-10 and revises until
+# the score reaches SR_TARGET_SCORE. The score is the model's own claim, so the
+# loop is bounded: SR_MAX_ROUNDS rounds, SR_TIME_BUDGET_FRACTION of the phase
+# timeout, and SR_MAX_CONSECUTIVE_DEGRADED unusable self-evaluations in a row.
+SR_TARGET_SCORE: float = 9.0
+SR_MAX_ROUNDS: int = 5
+SR_TIME_BUDGET_FRACTION: float = 0.9
+SR_MAX_CONSECUTIVE_DEGRADED: int = 2
 # Multi-Perspective Phase 3: how many scored candidates go on to stress testing
 # and synthesis, and the hard ceiling on candidates kept in state.
 MP_TOP_K: int = 2
@@ -227,6 +234,10 @@ PHASE_TOKEN_BUDGETS: dict[str, int] = {
     # truncated live, and a truncated round has no answer to keep.
     "iterative_generate": 8192,
     "iterative_critique": 3072,
+    # Self-refine: the flow passes these explicitly (its calls run under
+    # expert_1, which has no entry here). Same sizing reasoning as above.
+    "self_refine_generate": 8192,
+    "self_refine_evaluate": 2048,
     "research": 4096,
     "verification": 1024,
     "deep_read": 2048,
@@ -307,10 +318,15 @@ def get_phase_retry_budget(phase_name: str) -> int:
 # PHASE QUALITY MONITOR — JUDGE MODELS & THRESHOLDS
 # ═════════════════════════════════════════════════════════════════════
 
+# One judge for every tier: the Western model gate_service already trusts for a JSON
+# verdict (its hypergate_method role), so it is allowed on a Western-only run and is
+# one row to price. The old budget judge, Qwen, was refused there, so the judge never
+# ran on those runs (audit 7, finding 6).
+QUALITY_JUDGE_MODEL: str = "ministral-14b"
 QUALITY_JUDGE_MODELS: dict[str, str] = {
-    "budget":  MODEL_QWEN35_FLASH,
-    "premium": MODEL_GROK_43,
-    "default": MODEL_QWEN35_FLASH,
+    "budget":  QUALITY_JUDGE_MODEL,
+    "premium": QUALITY_JUDGE_MODEL,
+    "default": QUALITY_JUDGE_MODEL,
 }
 
 QUALITY_JUDGE_THRESHOLDS: dict[str, float] = {
@@ -429,6 +445,12 @@ class Timeouts:
 # should be generously above the sum of phase timeouts.
 # Neuro tenant directories untouched this long are deleted by the maintenance cron.
 NEURO_TENANT_RETENTION_DAYS: int = 90
+# Rows older than this have no use beyond being records, which the payment provider keeps
+# (Stripe replays events for 30 days). Audit 7, decision D4.
+DEAD_LETTER_RETENTION_DAYS: int = 90
+FEEDBACK_RETENTION_DAYS: int = 90
+# How often the in-process maintenance loop runs (audit 7, decision D1).
+MAINTENANCE_INTERVAL_SECONDS: int = 900
 
 PIPELINE_ABSOLUTE_TIMEOUT_SECONDS: float = 600.0
 
@@ -528,6 +550,8 @@ PHASE_TIMEOUTS: dict[str, float] = {
     "Cluster & Score": 120.0,
     # Iterative Critique — adversarial debate runs sustained LLM back-and-forth
     "Adversarial Debate": 180.0,
+    # Self-Refine — up to SR_MAX_ROUNDS draft/score/revise rounds, two calls each
+    "Self-Refine Loop": 240.0,
     "Deep Development": 180.0,
     "default": 90.0,
 }
@@ -778,6 +802,13 @@ SEARCH_ESTIMATED_COST_USD: float = 0.007
 SMART_SEARCH_ESTIMATED_COST_USD: float = 0.022
 # Image preview: one Grok 4.3 prompt rewrite ($1.25/$2.50 per 1M), at most 512 output tokens.
 IMAGE_PREVIEW_ESTIMATED_COST_USD: float = 0.002
+# Widgets that spend on a paid search provider. Each call is charged
+# SEARCH_ESTIMATED_COST_USD, like /api/search; weather, stocks and the calculator are
+# free (audit 7, finding 9).
+PAID_WIDGET_NAMES: frozenset[str] = frozenset({"discover", "image_search", "video_search"})
+# Contact form: one inbox, so a strict per-address bucket on top of the global limiter
+# (audit 7, finding 20).
+CONTACT_RATE_LIMIT_PER_HOUR: int = 5
 
 # A billing webhook claim older than this, and never finished, belongs to a
 # worker that died; the provider's retry may take it over. Must exceed the

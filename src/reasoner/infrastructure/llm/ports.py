@@ -22,6 +22,10 @@ class DegradedLLMResponse:
     metadata: dict[str, Any] = field(default_factory=dict)
     degraded: bool = True
     error: str = ""
+    # The provider error that ended the call, when there was one. The executor
+    # re-raises it so the runner's is_run_fatal / is_retryable see a 402 or a
+    # 429 as what it is, not as a RuntimeError built from ``error``.
+    cause: Exception | None = field(default=None, repr=False, compare=False)
 
     def __bool__(self) -> bool:
         """Always false: this object is a failure, and must not read as success.

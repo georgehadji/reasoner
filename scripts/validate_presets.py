@@ -107,7 +107,7 @@ _VALID_METHODS = {
     "socratic", "pre_mortem", "bayesian", "dialectical", "analogical",
     "delphi", "cove", "sot", "tot", "pot", "self_discover",
     "writing", "article", "coding", "brainstorming", "subagent",
-    "cross-language", "iterative-critique", "image-gen",
+    "cross-language", "iterative-critique", "self-refine", "image-gen",
 }
 
 

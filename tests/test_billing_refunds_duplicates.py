@@ -117,19 +117,23 @@ class _StatusRepo(_Repo):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("charge_sub", "expected"),
+    ("charge_sub", "expected", "clawed"),
     [
-        ("sub_dup", []),  # refunded duplicate: the live subscription is left alone
-        ("sub_live", [("sub_live", "past_due")]),  # genuine full refund of the live one
-        (None, [("sub_live", "past_due")]),  # unknown charge subscription: act as before
+        # Refunded duplicate: it bought no credits and the live one is left alone.
+        ("sub_dup", [], []),
+        ("sub_live", [("sub_live", "past_due")], [(20.0, "refund:ch_1")]),  # genuine refund
+        (None, [("sub_live", "past_due")], [(20.0, "refund:ch_1")]),  # unknown: as before
     ],
 )
-async def test_full_refund_flips_only_the_subscription_it_paid_for(charge_sub, expected):
+async def test_full_refund_flips_only_the_subscription_it_paid_for(
+    credits, charge_sub, expected, clawed
+):
     repo = _StatusRepo(_sub("sub_live"))
     event = SimpleNamespace(user_id=repo.existing.user_id, stripe_subscription_id=charge_sub)
     obj = {"id": "ch_1", "amount_refunded": 2000, "currency": "usd", "refunded": True}
     await BillingService(_Port())._apply_webhook("charge.refunded", event, repo, None, obj)
     assert repo.statuses == expected
+    assert [c[1:] for c in credits.charges] == clawed
 
 
 @pytest.mark.asyncio

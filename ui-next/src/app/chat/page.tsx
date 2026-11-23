@@ -213,6 +213,7 @@ export default function ChatPage() {
   const addRecentCommand = useAppStore((s) => s.addRecentCommand);
   const collapsed = useAppStore((s) => s.sidebarCollapsed);
   const autoMethodAlways = useAppStore((s) => s.autoMethodAlways);
+  const pickedMethod = useAppStore((s) => s.method);
   const toggleAutoMethodAlways = useAppStore((s) => s.toggleAutoMethodAlways);
 
   const { history, refresh: refreshHistory, remove: removeHistory } = useConversationHistory();
@@ -312,8 +313,9 @@ export default function ChatPage() {
     // confident, proceed silently (today's UX). If it's not, pause here and let
     // the user confirm or pick a runner-up — skipped for image mode, follow-ups
     // (which don't go through HyperGate at all), and once the user opts out via
-    // "always pick automatically".
-    if (!opts?.skipGate && !isImageMode && !autoMethodAlways) {
+    // "always pick automatically", or when the user picked a method in the
+    // composer (there is nothing left for the gate to choose).
+    if (!opts?.skipGate && !isImageMode && !autoMethodAlways && !pickedMethod) {
       const lastAssistantMsgForGate = findLastAssistant(messages);
       const isFollowupForGate = !!lastAssistantMsgForGate && messages.length > 0 && isContinuation(problem);
       if (!isFollowupForGate) {
@@ -510,7 +512,7 @@ export default function ChatPage() {
                 : `Generated image using **${formattedImages[0]?.model || 'model'}**`,
             images: formattedImages,
             prompt_meta: { original: problem, enhanced: enhancedPrompt },
-          });
+          }, ticket.historyOwner);
           refreshHistory();
         } else {
           showImageResult(replyAdded, {
@@ -540,6 +542,9 @@ export default function ChatPage() {
     const isFollowup = !!lastAssistantMsg && messages.length > 0 && isContinuation(problem);
 
     let phases: RenderedPhase[] = [];
+    // Local, like `phases`: `messages` is this render's snapshot and never sees the steps
+    // dispatched during the run.
+    let researchSteps: NonNullable<ChatFeedMessage['researchSteps']> = [];
     let finalErrors: string[] = [];
     // `done` lists every run error, including one an `error` frame already showed.
     const shownErrors = new Set<string>();
@@ -637,12 +642,13 @@ export default function ChatPage() {
             plan: String(ev.plan || ''),
             urls: Array.isArray(ev.urls) ? ev.urls : [],
           };
+          researchSteps = [...researchSteps, step];
           dispatchMessages({
             type: 'UPDATE_MESSAGE',
             payload: {
               messageId: assistantId,
               updates: {
-                researchSteps: [...(messages.find((m) => m.id === assistantId)?.researchSteps || []), step],
+                researchSteps,
               },
             },
           });
@@ -845,7 +851,7 @@ export default function ChatPage() {
             problem,
             phases: phases.map((p) => ({ phase: p.phase, name: p.name, data: p.data })),
             errors: finalErrors,
-            preset: getAutoPreset(),
+            preset: runPreset,
             method: runMethod,
             total_tokens: finalTokens,
             duration: totalDuration,
@@ -853,7 +859,7 @@ export default function ChatPage() {
             response_content: buildMarkdownFromPhases(phases),
             pipeline_id: ticket.clientRunId || undefined,
           };
-          saveConversation(conv).then(refreshHistory).catch(console.error);
+          saveConversation(conv, ticket.historyOwner).then(refreshHistory).catch(console.error);
           break;
         }
       }
@@ -862,6 +868,9 @@ export default function ChatPage() {
     // Generate a client-side run ID so WebSocket can subscribe to the same pipeline
     const clientRunId = 'run-' + (crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
     ticket.clientRunId = clientRunId;
+
+    // Resolved once: the request and the saved history record must name the same preset.
+    const runPreset = opts?.presetOverride || getAutoPreset();
 
     try {
       const state = useAppStore.getState();
@@ -876,7 +885,7 @@ export default function ChatPage() {
         ticket.conversationId = followupConvId;
         const followupReq: RunFollowupRequest = {
           question: problem,
-          preset: getAutoPreset(),
+          preset: runPreset,
           top_k: 2,
           sequential: false,
           enhance_prompt: true,
@@ -901,7 +910,7 @@ export default function ChatPage() {
         setConversationId(newConvId);
         const req = {
           problem,
-          preset: opts?.presetOverride || getAutoPreset(),
+          preset: runPreset,
           top_k: 2,
           sequential: false,
           enhance_prompt: true,
@@ -911,9 +920,10 @@ export default function ChatPage() {
           attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
           file_ids: uploadedAttachments.length > 0 ? uploadedAttachments.map((a) => a.file_id) : undefined,
           client_run_id: clientRunId,
-          // The user already confirmed a specific method via the gate picker —
-          // skip re-running HyperGate so the chosen preset is locked in.
-          force_pipeline: !!opts?.presetOverride,
+          // The user already chose a method, via the gate picker or the
+          // composer's method menu: skip re-running HyperGate so the chosen
+          // preset is locked in.
+          force_pipeline: !!opts?.presetOverride || !!pickedMethod,
           facts: opts?.facts && Object.keys(opts.facts).length > 0 ? opts.facts : undefined,
         };
         await startRun(req, onEvent, ticket.abort.signal);
@@ -966,7 +976,7 @@ export default function ChatPage() {
       }
       clearAttachments();
     }
-  }, [run, attachments, isImageMode, isLocal, user, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setErrorPhases, setAutoSelectedMethod, setPhaseOpenMode, getAutoPreset, autoMethodAlways]);
+  }, [run, attachments, isImageMode, isLocal, user, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setErrorPhases, setAutoSelectedMethod, setPhaseOpenMode, getAutoPreset, autoMethodAlways, pickedMethod]);
 
   const handleSubmit = useCallback(async (
     providedText?: string,

@@ -194,6 +194,7 @@ export function NeuroPanel({ conversationId, lastUserPrompt, lastAssistantRespon
                   if (e.key === 'Enter') handleRecall();
                 }}
                 placeholder="Search past reasoning..."
+                aria-label="Search past reasoning"
                 className="h-8 flex-1 rounded-md border border-[var(--border)] bg-[var(--bg)] px-2.5 text-[length:var(--text-xs)] text-[var(--text)] placeholder:text-[var(--text-muted)] focus:border-[var(--border-strong)] focus:outline-none"
               />
               <button

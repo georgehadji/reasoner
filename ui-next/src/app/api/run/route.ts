@@ -39,6 +39,8 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
+      // Client disconnect aborts the backend stream so the run stops billing.
+      signal: req.signal,
     });
 
     if (upstream.status === 422) {
@@ -52,6 +54,6 @@ export async function POST(req: NextRequest) {
       headers: sanitizeResponseHeaders(upstream),
     });
   } catch (err) {
-    return proxyErrorResponse(err, 'Run', upstreamUrl);
+    return proxyErrorResponse(err, 'Run', upstreamUrl, req);
   }
 }

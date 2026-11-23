@@ -63,3 +63,13 @@ describe('WebSocket side channel is signed-in only', () => {
     expect(src).not.toMatch(/^\s*wsConnect\(clientRunId/m);
   });
 });
+
+describe('chat/page.tsx research steps (audit 7, finding 12)', () => {
+  // `messages` is the render's snapshot: steps dispatched during the run never
+  // appear in it, so reading it kept only the last step.
+  it('accumulates steps in a local, not from the messages snapshot', () => {
+    expect(src).toContain('let researchSteps:');
+    expect(src).toContain('researchSteps = [...researchSteps, step]');
+    expect(src).not.toMatch(/messages\.find\([^)]*\)\?\.researchSteps/);
+  });
+});

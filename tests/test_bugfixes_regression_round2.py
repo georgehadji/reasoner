@@ -19,61 +19,6 @@ import pytest
 from fastapi import HTTPException
 
 # ──────────────────────────────────────────────────────────────────────────────
-# BUG-019: require_tier() completely bypasses subscription enforcement
-# ──────────────────────────────────────────────────────────────────────────────
-
-class TestRequireTierEnforcement:
-    """Verify that require_tier() actually enforces tier requirements."""
-
-    @pytest.fixture
-    def mock_user(self):
-        from reasoner.domain.saas import User
-        return User(
-            id=uuid4(),
-            email="test@example.com",
-            display_name="Test User",
-            scopes=["read"],
-        )
-
-    # The original stub 403'd every caller in production. require_tier now
-    # compares the caller's real tier, behind PRESET_TIER_ENFORCEMENT_ENABLED
-    # (full contract: tests/test_saas_preset_tier_enforcement.py).
-
-    @pytest.mark.asyncio
-    async def test_require_tier_blocks_a_lower_tier(self, mock_user, monkeypatch):
-        """With enforcement on, a FREE caller is refused a PRO route."""
-        from reasoner.api import dependencies
-        from reasoner.core.settings import settings
-        from reasoner.domain.saas import SubscriptionTier
-
-        monkeypatch.setattr(settings, "PRESET_TIER_ENFORCEMENT_ENABLED", True)
-
-        async def free(_user_id):
-            return SubscriptionTier.FREE
-
-        monkeypatch.setattr(dependencies, "_resolve_user_tier", free)
-
-        checker = dependencies.require_tier(SubscriptionTier.PRO)
-        with pytest.raises(HTTPException) as exc_info:
-            await checker(request=None, user=mock_user)
-
-        assert exc_info.value.status_code == 403
-
-    @pytest.mark.asyncio
-    async def test_require_tier_allows_when_enforcement_off(self, mock_user, monkeypatch):
-        """With enforcement off (the default), the user passes through."""
-        from reasoner.api.dependencies import require_tier
-        from reasoner.core.settings import settings
-        from reasoner.domain.saas import SubscriptionTier
-
-        monkeypatch.setattr(settings, "PRESET_TIER_ENFORCEMENT_ENABLED", False)
-
-        checker = require_tier(SubscriptionTier.PRO)
-        result = await checker(request=None, user=mock_user)
-        assert result == mock_user
-
-
-# ──────────────────────────────────────────────────────────────────────────────
 # BUG-017: Rate limiter fails open on any error
 # ──────────────────────────────────────────────────────────────────────────────
 

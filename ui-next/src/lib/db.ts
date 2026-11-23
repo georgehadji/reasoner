@@ -15,6 +15,7 @@ const LEGACY_DB_NAME = 'ARA_Pipeline_v2';
 const DB_VERSION = 3;
 const STORE_NAME = 'conversations';
 const PAGE_SIZE = 50;
+const DELETE_TIMEOUT_MS = 3000;
 
 let historyOwner: string | null = null;
 
@@ -27,9 +28,22 @@ export function setHistoryOwner(userId: string | null): void {
   historyOwner = userId;
 }
 
+/** The user whose database getDB() opens right now. A run captures it at start (see useRunController). */
+export function getHistoryOwner(): string | null {
+  return historyOwner;
+}
+
 /** Delete one user's local history: on sign-out (anon) and on account deletion. */
 export async function deleteHistory(userId: string | null): Promise<void> {
-  await deleteDB(dbName(userId));
+  // Bounded: a delete stays pending while another tab holds a connection that
+  // ignores versionchange, and account deletion must not wait on that forever.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<void>((resolve) => { timer = setTimeout(resolve, DELETE_TIMEOUT_MS); });
+  try {
+    await Promise.race([deleteDB(dbName(userId)), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Decision Q9: the pre-UI-5 shared database has no owner, so it is cleared, not migrated. */
@@ -37,8 +51,12 @@ export async function clearLegacyHistory(): Promise<void> {
   await deleteDB(LEGACY_DB_NAME);
 }
 
-export async function getDB() {
-  return openDB<ARADB>(dbName(historyOwner), DB_VERSION, {
+export async function getDB(owner: string | null = historyOwner) {
+  return openDB<ARADB>(dbName(owner), DB_VERSION, {
+    // Helpers never close their connection; yield to a pending deleteDB/upgrade.
+    blocking(_current, _blocked, event) {
+      (event.target as IDBDatabase).close();
+    },
     upgrade(db, oldVersion, _newVersion, transaction) {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
@@ -57,8 +75,9 @@ export async function getDB() {
   });
 }
 
-export async function saveConversation(data: Conversation): Promise<string> {
-  const db = await getDB();
+// `owner` pins the write to a user's database; omitted, it follows the current owner.
+export async function saveConversation(data: Conversation, owner?: string | null): Promise<string> {
+  const db = await getDB(owner);
   const record: Conversation = {
     id: data.id || Date.now().toString(),
     conversation_id: data.conversation_id || data.id || Date.now().toString(),

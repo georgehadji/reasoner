@@ -61,6 +61,7 @@ _METHOD_PURPOSES: dict[str, str] = {
     "pre_mortem": "Prospective hindsight failure analysis",
     "research": "Web-grounded deep research with iterative search",
     "scientific": "Hypothesis→falsification→evidence→synthesis",
+    "self-refine": "One model drafts, scores its own answer 0-10, and revises until it reaches 9/10",
     "self_discover": "Dynamic selection and composition of reasoning modules",
     "socratic": "Elenchus questioning to expose hidden assumptions",
     "sot": "Skeleton-of-Thought: skeleton→parallel solve→assemble",

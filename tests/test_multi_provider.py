@@ -38,6 +38,18 @@ async def test_build_fallback_provider_unknown():
         build_fallback_provider("nonexistent_provider")
 
 
+def test_xai_fallback_uses_a_current_priced_model(monkeypatch):
+    """grok-2-latest was retired: every xAI direct fallback returned 404."""
+    from reasoner.domain.pricing import PRICING_DB
+    from reasoner.infrastructure.llm.pricing_resolver import get_pricing
+    from reasoner.infrastructure.llm.providers.direct import build_fallback_provider
+
+    monkeypatch.setenv("XAI_API_KEY", "k")
+    model = build_fallback_provider("xai").model
+    assert model != "grok-2-latest"
+    assert get_pricing(model) is not PRICING_DB["_default"]
+
+
 @pytest.mark.asyncio
 async def test_build_fallback_provider_missing_key(monkeypatch):
     """Missing API key raises LLMError."""

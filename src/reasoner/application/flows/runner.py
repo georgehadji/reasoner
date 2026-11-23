@@ -142,11 +142,17 @@ class WorkflowRunner:
         phase_key = f"Phase {num}: {name}"
         state._current_phase_key = phase_key
 
-        # P1.9: Skip phase if spend cap was exceeded in a previous phase
+        # P1.9: Stop once a spend cap was crossed in an earlier phase. It is a
+        # failure, not a skip: returning True here finished the run with no
+        # synthesis and `errors: []`, so it was recorded as completed and its
+        # empty answer was cached and replayed.
         if getattr(state, "_spend_cap_exceeded", False):
-            logger.info("Spend cap exceeded — skipping phase %s", phase_key)
+            logger.info("Spend cap exceeded — stopping before phase %s", phase_key)
             state.phase_tokens[phase_key] = {"input": 0, "output": 0}
-            return True
+            cap = getattr(state, "spend_cap_hit", "") or "spend"
+            state.add_error(f"Run halted: {cap} spend cap reached before {phase_key}")
+            state._run_fatal = True
+            return False
 
         if obs is not None:
             await obs.on_phase_start(step, state)

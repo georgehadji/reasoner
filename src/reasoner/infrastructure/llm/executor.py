@@ -17,11 +17,7 @@ import hashlib
 import logging
 import re
 import time  # Ensure time is imported once
-from collections.abc import AsyncIterator  # Add ClassVar for _LANG_TO_EXT
-from typing import TYPE_CHECKING, Any, ClassVar
-
-if TYPE_CHECKING:
-    from reasoner.infrastructure.llm.ports import DegradedLLMResponse
+from typing import Any, ClassVar
 
 from reasoner.core.constants import (
     TRUNCATION_RETRY_MAX_TOKENS,
@@ -32,6 +28,7 @@ from reasoner.core.degrade import degraded
 # New imports for event emission
 from reasoner.core.events.domain_events import PipelineEventType, make_event
 from reasoner.core.events.ports import EventPublisher
+from reasoner.core.exceptions import ProviderError
 from reasoner.core.temperatures import PHASE_TEMPERATURES
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.infrastructure.llm.caching import user_cache_prefix
@@ -47,6 +44,17 @@ def _get_event_bus() -> EventPublisher:
     """Lazy import to avoid circular dependency with api/__init__.py."""
     from reasoner.application.event_bus.bus import get_event_bus
     return get_event_bus()
+
+
+def _raise_provider_cause(raw: Any) -> None:
+    """Re-raise the provider error behind a degraded response, if it has one.
+
+    A RuntimeError built from ``raw.error`` hides the type, so the runner's
+    is_run_fatal never saw a 402 and is_retryable never saw a 429: a run out
+    of credit ground through every phase and reported success.
+    """
+    if isinstance(getattr(raw, "cause", None), ProviderError):
+        raise raw.cause
 
 # Regex for fenced code blocks inside prompts
 _CODE_FENCE_RE = re.compile(r"```(\w+)?\n(.*?)\n```", re.DOTALL)
@@ -105,9 +113,8 @@ class LLMExecutor:
         user_prompt: str,
         state: PipelineState,
         phase_key: str | None = None,
-        stream: bool = False,
         **kwargs: Any,
-    ) -> tuple[str, dict[str, Any]] | AsyncIterator[str | DegradedLLMResponse]:
+    ) -> tuple[str, dict[str, Any]]:
         """
         Call the LLM with token-aware caching and cost tracking.
 
@@ -173,14 +180,8 @@ class LLMExecutor:
                         kwargs["extra_body"] = {**existing, "reasoning": {"effort": effort}}
 
         # ── Cache lookup ──────────────────────────────────────────────────
-        # Caching for streaming is complex. For now, disable caching for streaming calls.
-        # A robust streaming cache would need to store/retrieve partial streams.
-        if stream and self._caching_enabled:
-            logger.warning("Caching is currently not supported for streaming LLM calls.")
-
         # Cache key body for this call. Computed unconditionally so the cascading
-        # store path below can reference it even when the lookup was skipped
-        # (e.g. streaming), which previously raised NameError.
+        # store path below can reference it even when the lookup was skipped.
         #
         # The full prompt, for every role. Keying on its first TRUNCATION.PROBLEM
         # chars made two prompts that differ only after char 500 (candidates,
@@ -203,7 +204,7 @@ class LLMExecutor:
         # Prometheus labels use `role`, not this, so metrics are unaffected.
         cache_phase = f"{role}#{hashlib.sha256(system_prompt.encode()).hexdigest()[:12]}"
 
-        if self._token_cache and self._caching_enabled and not stream and not bypass_cache_read:
+        if self._token_cache and self._caching_enabled and not bypass_cache_read:
             # For caching, we need a specific model_id. If cascading, we'll cache against the first model.
             # This is a simplification; a more robust cache would handle model cascades explicitly.
             model_id_for_cache = self.cascading_routing.get(role, [self.router.get(role).model])[0]
@@ -304,19 +305,19 @@ class LLMExecutor:
                     from reasoner.infrastructure.llm.ports import DegradedLLMResponse
                     if isinstance(raw, DegradedLLMResponse):
                         await self._account_call_cost(state, role, raw.metadata or {})
+                        _raise_provider_cause(raw)
                         raise RuntimeError(f"Degraded response from {model_id}: {raw.error}")
 
                     if not raw or not raw.strip():
                         raise RuntimeError(f"Empty response from {model_id} for role={role}")
 
                     if role in ("fusion", "classification", "decomposition", "scoring", "meta_evaluator"):
-                        try:
-                            import json
-                            json.loads(raw)
-                        except json.JSONDecodeError as exc:
-                            raise RuntimeError(
-                                f"Malformed JSON from {model_id} for role={role}"
-                            ) from exc
+                        # extract_json_any, not json.loads: a fenced ```json reply
+                        # is good output, and this model has already been paid for.
+                        from reasoner.core.parsing import extract_json_any
+
+                        if extract_json_any(raw) is None:
+                            raise RuntimeError(f"Malformed JSON from {model_id} for role={role}")
 
                     # ── Quality gate (fail-fast heuristics) ─────────────────────
                     if self.cascading_quality_check:
@@ -391,6 +392,8 @@ class LLMExecutor:
                 )
                 await bus.publish(event)
 
+                if isinstance(last_error, ProviderError):
+                    raise last_error  # keeps a 402/429 visible to the runner
                 raise RuntimeError(f"All cascading models failed for role={role}: {last_error}") from last_error
             else:
                 logger.error(f"Unknown error in cascading for role={role}")
@@ -472,6 +475,7 @@ class LLMExecutor:
 
                 # Discarded attempts were billed even though the call failed.
                 await self._account_call_cost(state, role, raw.metadata or {})
+                _raise_provider_cause(raw)
                 raise RuntimeError(raw.error)
 
             if not raw or not raw.strip():
@@ -637,7 +641,9 @@ class LLMExecutor:
         # P1.9: If the provider didn't return a real cost, estimate from token counts.
         # pricing_resolver, not domain.pricing: it resolves registry aliases and
         # direct-provider ids that domain.pricing prices at the $1/$5 default.
-        if cost_usd <= 0:
+        # Always asked, not only when nothing was reported: call_cost_usd adds the cost
+        # of the replies the router discarded, which cost_usd no longer carries.
+        if cost_usd <= 0 or metadata.get("discarded_cost_usd"):
             try:
                 from reasoner.infrastructure.llm.pricing_resolver import call_cost_usd
                 cost_usd = call_cost_usd(metadata)
@@ -706,7 +712,10 @@ class LLMExecutor:
                 await self._halt_on_cap(state, "per_run", per_run, state.total_cost_usd, subject)
                 return
 
-            if monthly > 0:
+            # Monthly needs a real billing subject. Keyed on a conversation id it
+            # capped nothing (each conversation starts at zero) and left one
+            # ledger entry, plus a 40-day Valkey key, per anonymous conversation.
+            if monthly > 0 and getattr(state, "billing_subject", ""):
                 from reasoner.infrastructure.llm import spend_tracker
 
                 total = await spend_tracker.record_shared(subject, cost_usd)

@@ -27,6 +27,7 @@ from reasoner.application.flows.iterative_critique import IterativeCritiqueFlow
 from reasoner.application.flows.jury import JuryFlow
 from reasoner.application.flows.multi_perspective import MultiPerspectiveFlow
 from reasoner.application.flows.research import ResearchFlow
+from reasoner.application.flows.self_refine import SelfRefineFlow
 from reasoner.application.flows.writing import WritingFlow
 
 
@@ -55,6 +56,7 @@ class WorkflowFactory:
             "pot": PoTFlow,
             "self_discover": SelfDiscoverFlow,
             "iterative_critique": IterativeCritiqueFlow,
+            "self_refine": SelfRefineFlow,
             "article": ArticleFlow,
             "cross_language": MultiPerspectiveFlow,
             "subagent": MultiPerspectiveFlow,
