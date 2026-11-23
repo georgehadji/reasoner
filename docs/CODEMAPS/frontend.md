@@ -1,4 +1,4 @@
-<!-- Generated: 2026-11-13 | Files scanned: 532 | Token estimate: ~800 -->
+<!-- Generated: 2026-11-23 | Files scanned: 537 | Token estimate: ~800 -->
 
 # Frontend Structure — Reasoner (Next.js 16 / React 19 / TypeScript 5)
 
@@ -81,15 +81,12 @@ ui-next/src/
 │   │   ├── SiteHeader.tsx        # Top navigation bar
 │   │   ├── Sidebar.tsx           # Left sidebar (chat history)
 │   │   ├── Composer.tsx          # Input composer + preset selector
-│   │   ├── PhaseTimeline.tsx     # Visual phase progress (0-5)
 │   │   ├── CommandPalette.tsx    # Cmd+K global command palette
 │   │   ├── ShortcutModal.tsx     # Keyboard shortcuts help (?)
 │   │   ├── UserMenu.tsx          # User profile menu (dropdown)
 │   │   ├── UpgradeModal.tsx      # Subscription upgrade prompt
-│   │   ├── SecurityModal.tsx     # Security info modal
 │   │   ├── NeuroPanel.tsx        # Memory/Neuro management panel
 │   │   ├── UsageBadge.tsx        # Quota/usage indicator
-│   │   ├── SecurityBadge.tsx     # Security status indicator
 │   │   ├── BlobBackground.tsx    # Animated blob visual
 │   │   ├── NebulaBackground.tsx  # Nebula/starfield background
 │   │   ├── ThreeBackground.tsx   # 3D Three.js background
@@ -111,7 +108,6 @@ ui-next/src/
 │   │   ├── Button.tsx            # Styled button (primary, secondary, ghost, etc.)
 │   │   ├── Badge.tsx             # Status/method badges
 │   │   ├── Spinner.tsx           # Loading spinner
-│   │   ├── ThemeToggle.tsx       # Light/dark mode toggle
 │   │   ├── Tooltip.tsx           # Tooltip primitive (Radix UI)
 │   │   └── index.ts              # Export barrel
 │   │
@@ -192,7 +188,6 @@ ui-next/src/
   │  │  ├─ Settings link
   │  │  ├─ Logout button
   │  │  └─ [admin section]
-  │  └─ <ThemeToggle />
   │
   ├─ {page content}
   │
@@ -210,7 +205,7 @@ ui-next/src/
   │  │  │  │  └─ <WidgetRenderer> (for widgets)
   │  │  │  └─ Auto-scroll anchor
   │  │  │
-  │  │  ├─ <PhaseTimeline>
+  │  │  ├─ <RunProgress>
   │  │  │  └─ <PhaseIndicator>[] (0, 1, 2, 3, 4, 5)
   │  │  │
   │  │  └─ <Composer>
@@ -223,7 +218,6 @@ ui-next/src/
   │  └─ <Modals>
   │     ├─ <ShortcutModal> (? to open)
   │     ├─ <CommandPalette> (Cmd+K)
-  │     ├─ <SecurityModal>
   │     ├─ <UpgradeModal>
   │     └─ <NeuroPanel>
   │

@@ -7,20 +7,15 @@ import { docsBySection } from '@/lib/docs';
  */
 export function DocsSidebar({ activeSlug }: { activeSlug?: string }) {
   return (
-    <nav aria-label="Documentation" className="text-[length:var(--text-sm)]">
-      <Link
-        href="/docs"
-        className="mb-6 block text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
-      >
-        Documentation
+    <nav aria-label="Documentation" className="text-[length:var(--site-small)] leading-[var(--site-lh-body)]">
+      <Link href="/docs" className="site-link font-semibold text-current">
+        All guides
       </Link>
-      <div className="space-y-7">
+      <div className="mt-[var(--space-6)] space-y-[var(--space-6)]">
         {docsBySection().map(({ section, pages }) => (
           <div key={section}>
-            <p className="mb-2 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-              {section}
-            </p>
-            <ul className="space-y-0.5">
+            <p className="font-semibold">{section}</p>
+            <ul className="mt-[var(--space-2)] space-y-[var(--space-1)]">
               {pages.map((page) => {
                 const isActive = page.slug === activeSlug;
                 return (
@@ -28,12 +23,11 @@ export function DocsSidebar({ activeSlug }: { activeSlug?: string }) {
                     <Link
                       href={`/docs/${page.slug}`}
                       aria-current={isActive ? 'page' : undefined}
-                      className={[
-                        'block rounded-md px-3 py-1.5 -ml-3 transition-colors',
+                      className={
                         isActive
-                          ? 'bg-[var(--surface-2)] font-medium text-[var(--text)]'
-                          : 'text-[var(--text-muted)] hover:text-[var(--text)]',
-                      ].join(' ')}
+                          ? 'block border-l-2 border-[var(--site-accent)] pl-[var(--space-3)]'
+                          : 'block border-l-2 border-transparent pl-[var(--space-3)] text-[var(--site-muted)] hover:text-[var(--site-ink)]'
+                      }
                     >
                       {page.title}
                     </Link>

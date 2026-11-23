@@ -297,7 +297,7 @@ async def api_client(monkeypatch):
     # be read too late to change anything. Patch the resolved settings
     # object directly instead, matching the convention used elsewhere
     # (e.g. tests/test_metered_auth_policy.py).
-    monkeypatch.setattr(settings, "ENABLE_LEGACY_API_KEY", True)
+    monkeypatch.setattr(settings, "ALLOW_ANONYMOUS_RUNS", True)
     async with AsyncClient(
         transport=ASGITransport(app=api.app), base_url="http://test"
     ) as c:

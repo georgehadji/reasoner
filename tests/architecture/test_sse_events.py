@@ -22,7 +22,7 @@ SSE_EVENT_CATALOG: dict[str, dict[str, Any]] = {
     "start": {
         "phase": "pipeline",
         "required_keys": ["type", "preset"],
-        "optional_keys": ["auto_selected_method", "cached"],
+        "optional_keys": ["method", "auto_selected_method", "cached"],
         "description": "Emitted once at pipeline start. Carries the effective preset name.",
     },
     "recall_used": {
@@ -64,7 +64,7 @@ SSE_EVENT_CATALOG: dict[str, dict[str, Any]] = {
     "error": {
         "phase": "execution",
         "required_keys": ["type", "error_type", "message", "retryable", "phase", "phase_name"],
-        "optional_keys": ["retry_after"],
+        "optional_keys": ["retry_after", "fatal"],
         "description": "Structured error payload with classification (auth/timeout/rate_limit/unknown).",
     },
     "phase_warning": {

@@ -345,11 +345,6 @@ class RateLimiter:
             REASONER_VALKEY_FALLBACK_TOTAL.labels(subsystem="rate_limiter").inc()
             return await self._in_memory_is_allowed_for_user(client_id, multiplier, 1)
 
-    async def record_request(self, client_id: str) -> None:
-        # With Redis, the token is consumed by is_allowed, so this method is mostly redundant.
-        # However, for consistency with the in-memory fallback, we can keep a no-op or
-        # adjust it if specific logging/metrics are needed outside of the main check.
-        pass
 
     def _in_memory_stats_snapshot(self, client_id: str) -> dict:
         """Read-only view of a client's in-memory bucket.

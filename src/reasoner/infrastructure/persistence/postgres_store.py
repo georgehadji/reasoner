@@ -20,7 +20,12 @@ from datetime import datetime
 from typing import Any
 
 from aiocircuitbreaker import CircuitBreaker  # New import
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential  # New import
+from tenacity import (  # New import
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 try:
     import asyncpg
@@ -42,12 +47,10 @@ from reasoner.core.constants import DEFAULT_DB_COMMAND_TIMEOUT
 from reasoner.core.events.domain_events import (
     ALL_EVENT_TYPES,
     DomainEvent,
-    MemoryEventType,
-    PipelineEventType,
-    SaaSEventType,
-    WidgetEventType,
 )
 from reasoner.core.ports.crypto_port import EncryptionPort
+from reasoner.infrastructure.persistence.event_store import EventStore
+from reasoner.infrastructure.persistence.pg_pool import get_shared_pool
 from reasoner.security.encryption import get_encryption_service
 
 # Only transient connectivity failures are worth retrying. Anything else
@@ -58,23 +61,6 @@ if asyncpg is not None:
     _TRANSIENT_DB_ERRORS += (asyncpg.PostgresConnectionError, asyncpg.InterfaceError)
 
 logger = logging.getLogger(__name__)
-
-# Retained references to background publish tasks to prevent premature GC.
-_BG_PUBLISH_TASKS: set[asyncio.Task] = set()
-
-
-def _fire_and_forget(coro, *, label: str = "background task") -> asyncio.Task:
-    """Create a tracked asyncio task; log exceptions via done_callback."""
-    task = asyncio.create_task(coro)
-    _BG_PUBLISH_TASKS.add(task)
-    task.add_done_callback(_BG_PUBLISH_TASKS.discard)
-    task.add_done_callback(
-        lambda t: logger.warning("%s failed: %s", label, t.exception())
-        if not t.cancelled() and t.exception()
-        else None
-    )
-    return task
-
 
 class PostgreSQLEventStore:
     """
@@ -125,13 +111,10 @@ class PostgreSQLEventStore:
         if self._pool is not None:
             return
 
-        # Primary pool (read-write)
-        self._pool = await asyncpg.create_pool(
-            dsn=self.connection_string,
-            min_size=2,
-            max_size=self.pool_size,
-            command_timeout=DEFAULT_DB_COMMAND_TIMEOUT,
-        )
+        # Primary pool (read-write): the shared per-worker pool, sized by
+        # DB_POOL_SIZE (pool_size is kept for compatibility). It is closed by
+        # close_shared_pools(), not by close().
+        self._pool = await get_shared_pool(self.connection_string)
 
         # Read replica pool (optional)
         if self.use_read_replica and self.read_replica_url:
@@ -143,12 +126,8 @@ class PostgreSQLEventStore:
                     command_timeout=DEFAULT_DB_COMMAND_TIMEOUT,
                 )
             except Exception as exc:
-                # If read-replica setup fails, close the primary pool to avoid
-                # leaking connections, then re-raise so callers can retry.
-                try:
-                    await self._pool.close()
-                except Exception:
-                    pass  # Best-effort cleanup; preserve original exception
+                # Re-raise so callers can retry; the shared primary pool stays
+                # open for the other adapters.
                 self._pool = None
                 raise exc
 
@@ -381,30 +360,7 @@ class PostgreSQLEventStore:
             logger.error(f"Unexpected error saving events: {e}")
             raise
 
-    def _get_aggregate_type(self, event_type: PipelineEventType | WidgetEventType | MemoryEventType | SaaSEventType) -> str:
-        """Determine aggregate type from event."""
-        if event_type in (
-            PipelineEventType.PIPELINE_STARTED, PipelineEventType.PHASE_STARTED,
-            PipelineEventType.PHASE_COMPLETED, PipelineEventType.PHASE_FAILED,
-            PipelineEventType.PIPELINE_COMPLETED, PipelineEventType.PIPELINE_FAILED,
-            PipelineEventType.PIPELINE_CANCELLED,
-        ):
-            return "pipeline"
-        elif event_type in (
-            WidgetEventType.WIDGET_DETECTED, WidgetEventType.WIDGET_EXECUTED,
-            WidgetEventType.WIDGET_FAILED,
-        ):
-            return "widget"
-        elif event_type in (
-            MemoryEventType.MEMORY_STORED, MemoryEventType.MEMORY_RECALLED,
-        ):
-            return "memory"
-        elif event_type in (
-            SaaSEventType.USER_REGISTERED, SaaSEventType.USER_LOGGED_IN,
-        ):
-            return "saas"
-        else:
-            return "generic"
+    _get_aggregate_type = EventStore._get_aggregate_type  # identical copy, shared
 
     async def _update_aggregate(
         self,
@@ -1160,8 +1116,7 @@ class PostgreSQLEventStore:
 
     async def close(self) -> None:
         """Close connection pools."""
-        if self._pool:
-            await self._pool.close()
+        self._pool = None  # shared pool, closed by close_shared_pools()
         if self._read_pool:
             await self._read_pool.close()
 

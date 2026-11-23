@@ -50,14 +50,17 @@ def get_auth_adapter() -> AuthPort:
                 from .local_adapter import LocalAuthAdapter
                 _auth_adapter = LocalAuthAdapter()
 
-    # Security guard: prevent local HS256 auth in production
-    if settings.ENVIRONMENT == "production":
-        from .local_adapter import LocalAuthAdapter
-        if isinstance(_auth_adapter, LocalAuthAdapter):
-            raise RuntimeError(
-                "LocalAuthAdapter (HS256) is not allowed in production. "
-                "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY for production auth."
-            )
+        # Security guard: prevent local HS256 auth in production. It runs before the
+        # adapter is kept: assigned first, the early return above would hand the local
+        # adapter to every request after the first one that raised.
+        if settings.ENVIRONMENT == "production":
+            from .local_adapter import LocalAuthAdapter
+            if isinstance(_auth_adapter, LocalAuthAdapter):
+                _auth_adapter = None
+                raise RuntimeError(
+                    "LocalAuthAdapter (HS256) is not allowed in production. "
+                    "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY for production auth."
+                )
 
     return _auth_adapter
 

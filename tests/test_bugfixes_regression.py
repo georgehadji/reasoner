@@ -98,18 +98,6 @@ class TestCsrfSecretConsistency:
 class TestQuotaRepoPoolRaceCondition:
     """Verify that concurrent calls to _get_pool() create only ONE asyncpg pool."""
 
-    @pytest.fixture(autouse=True)
-    def _reset_pool_singleton(self):
-        """_pool/_pool_lock are class attributes (a deliberate process-wide
-        singleton pool), so they leak across tests in the same process unless
-        reset here."""
-        from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
-        PostgresQuotaRepository._pool = None
-        PostgresQuotaRepository._pool_lock = None
-        yield
-        PostgresQuotaRepository._pool = None
-        PostgresQuotaRepository._pool_lock = None
-
     @pytest.mark.asyncio
     async def test_concurrent_get_pool_creates_single_pool(self, monkeypatch):
         """Multiple concurrent _get_pool() calls must result in exactly one create_pool."""
@@ -126,7 +114,7 @@ class TestQuotaRepoPoolRaceCondition:
 
         monkeypatch.setattr("asyncpg.create_pool", mock_create_pool)
 
-        repo = PostgresQuotaRepository("postgresql://test", pool_size=2)
+        repo = PostgresQuotaRepository("postgresql://test")
 
         # Fire 10 concurrent _get_pool() calls
         await asyncio.gather(*[repo._get_pool() for _ in range(10)])
@@ -147,7 +135,7 @@ class TestQuotaRepoPoolRaceCondition:
 
         monkeypatch.setattr("asyncpg.create_pool", mock_create_pool)
 
-        repo = PostgresQuotaRepository("postgresql://test", pool_size=2)
+        repo = PostgresQuotaRepository("postgresql://test")
 
         await repo._get_pool()
         await repo._get_pool()
@@ -180,7 +168,7 @@ class TestSubscriptionRepoPoolRaceCondition:
 
         monkeypatch.setattr("asyncpg.create_pool", mock_create_pool)
 
-        repo = PostgresSubscriptionRepository("postgresql://test", pool_size=2)
+        repo = PostgresSubscriptionRepository("postgresql://test")
 
         await asyncio.gather(*[repo._get_pool() for _ in range(10)])
 

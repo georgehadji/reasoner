@@ -527,6 +527,15 @@ class PipelineState:
 
         self._ensure_fields_initialized()
     @property
+    def self_refine_state(self) -> dict[str, Any]:
+        return self.method_state.data.setdefault("self_refine", {})
+
+    @self_refine_state.setter
+    def self_refine_state(self, value: dict[str, Any]) -> None:
+        self.method_state.data["self_refine"] = value
+
+        self._ensure_fields_initialized()
+    @property
     def writing_state(self) -> dict[str, Any]:
         return self.method_state.data.setdefault("writing", {})
 

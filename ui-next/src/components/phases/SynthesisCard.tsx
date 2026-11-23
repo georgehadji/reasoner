@@ -179,7 +179,9 @@ export function SynthesisCard({
           style={{ gridTemplateRows: open ? '1fr' : '0fr' }}
           className="grid transition-[grid-template-rows] duration-[var(--dur-component)] ease-[var(--ease-standard)]"
         >
-          <div className={cn('min-h-0', !open && 'overflow-hidden')} inert={!open}>
+          {/* min-w-0: the sources strip is a nowrap row; without it its width
+              becomes the grid column's minimum and the open card overflows a phone. */}
+          <div className={cn('min-h-0 min-w-0', !open && 'overflow-hidden')} inert={!open}>
             <div className="flow [--flow-space:var(--space-3)] px-[var(--space-4)] pb-[var(--space-4)] pt-[var(--space-1)]">
               {/* As the run's answer the bottom line leads and the sections follow
                   it directly, so the highlight counts and jump links (a map of a
@@ -188,7 +190,7 @@ export function SynthesisCard({
                 <>
                 {highlights && highlights.length > 0 && (
                   <section className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--chip-bg,var(--surface-2))] p-[var(--space-3)]">
-                    <h3 className={cn(MICRO_LABEL, 'mb-[var(--space-2)]')}>Synthesis Highlights</h3>
+                    <h3 className={cn(MICRO_LABEL, 'mb-[var(--space-2)]')}>Synthesis highlights</h3>
                     <div className="flex flex-wrap gap-[var(--space-2)]">
                       {highlights.map((highlight) => (
                         <div

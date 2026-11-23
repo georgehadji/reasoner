@@ -73,6 +73,16 @@ class PostgresBillingDeadLetterRepo(BillingDeadLetterPort):
         await self._ensure_table()
         failure_id = str(uuid.uuid4())
         async with self._pool.acquire(timeout=10.0) as conn:
+            # An unresolved-owner event is released, not completed, so a manual
+            # resend would otherwise add a row per delivery.
+            if payload.get("id"):
+                existing = await conn.fetchval(
+                    "SELECT id FROM failed_webhook_events WHERE provider = $1 "
+                    "AND payload->>'id' = $2 AND replayed_at IS NULL LIMIT 1",
+                    provider, str(payload["id"]),
+                )
+                if existing:
+                    return str(existing)
             await conn.execute(
                 """
                 INSERT INTO failed_webhook_events (id, provider, event_type, payload, error)
@@ -137,6 +147,17 @@ class PostgresBillingDeadLetterRepo(BillingDeadLetterPort):
             )
             for row in rows
         ]
+
+    async def prune_older_than(self, days: int) -> int:
+        """Delete failures recorded more than ``days`` ago. Returns the row count."""
+        await self._ensure_table()
+        async with self._pool.acquire(timeout=10.0) as conn:
+            result = await conn.execute(
+                "DELETE FROM failed_webhook_events"
+                " WHERE created_at < NOW() - make_interval(days => $1)",
+                days,
+            )
+        return int(result.rsplit(" ", 1)[-1])
 
     async def mark_replayed(self, failure_id: str) -> bool:
         """Mark a recorded failure as successfully replayed."""

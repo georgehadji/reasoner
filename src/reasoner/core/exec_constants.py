@@ -31,11 +31,6 @@ EXEC_IMPORT_ALLOWLIST: frozenset[str] = frozenset({
     "inspect",
 })
 
-# ── AST safety tiers ──
-EXEC_SAFETY_DANGEROUS_KEYWORDS: frozenset[str] = frozenset({
-    "import", "__import__", "exec", "eval", "compile",
-    "open", "__builtins__",
-})
 
 # Tier constants
 SAFETY_SAFE = "SAFE"

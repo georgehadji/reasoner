@@ -13,6 +13,8 @@ import time
 from collections.abc import Callable
 from typing import Any, TypeVar
 
+from reasoner.application.services.run_steps import drain_fallback_events, record_answerability
+
 T = TypeVar("T")
 
 def timed(func: Callable[..., T]) -> Callable[..., T]:
@@ -407,6 +409,10 @@ class ReasonerPipeline:
 
         # ── Optional: Post-Synthesis Verification ──
         await self._phase_post_synthesis_verify(state)
+        # Re-run: synthesis already recorded it, but verification_audit (an
+        # input) only exists after the verify phase above.
+        record_answerability(state)
+        drain_fallback_events(state, self.router)
 
         # ── Optional: B2-B4 Cross-Lingual Probe ─────────────────────────
         if state.language_sensitive and state.pivot_active:

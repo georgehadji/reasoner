@@ -3,7 +3,7 @@
 Follows the same shape as ``model_registry_port.py``: the core layer defines the
 contract, ``security.encryption.EncryptionService`` implements it. Unlike the
 registry port, this one is NOT injected via a setter yet — every current
-consumer (``auth_store.py``, ``postgres_store.py``, the migration script) reads
+consumer (``postgres_store.py``, the uploader, the migration script) reads
 the module-level singleton via ``get_encryption_service()`` directly, and none
 of them need to swap implementations independently. Add ``set_encryption_port()``
 DI when a real second caller needs it (e.g. the P4 ``EncryptedStore`` decorator

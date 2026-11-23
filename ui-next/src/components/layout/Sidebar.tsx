@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { NeuroPanel } from './NeuroPanel';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { API, LIMITS, PIPELINE_DEFAULTS } from '@/lib/config';
+import { API, LIMITS } from '@/lib/config';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {
@@ -166,15 +166,34 @@ function SidebarComponent({
      restore was a no-op on the one path it existed for. Here the toggle has
      been re-mounted by the time this runs, so there is something to focus. */
   const wasOpen = useRef(!collapsed);
+  const autoClosed = useRef(false);
   useEffect(() => {
     // Its own ref, not `wasCollapsed`: the trap effect above already writes
     // that one and runs first, so reading it here would always compare equal.
     const justClosed = wasOpen.current && collapsed;
     wasOpen.current = !collapsed;
     if (!justClosed) return;
+    if (autoClosed.current) {
+      autoClosed.current = false;
+      return;
+    }
     if (!window.matchMedia('(max-width: 639px)').matches) return;
     floatingRef.current?.focus();
   }, [collapsed]);
+
+  /* A phone opens on the conversation, never on the drawer: the persisted
+     "open" state is a desktop panel, and below `sm` it would cover the page
+     on every load. Mount only. `autoClosed` tells the restore above this close
+     was not the user's, so it does not pull focus onto the toggle on load.
+     A flag, not a reset of `wasOpen`: StrictMode re-runs that effect and
+     would set it back. */
+  useEffect(() => {
+    if (!window.matchMedia('(max-width: 639px)').matches) return;
+    if (useAppStore.getState().sidebarCollapsed) return;
+    autoClosed.current = true;
+    toggleSidebar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const methodTags = useMemo(
     () => Array.from(new Set(conversations.map((c) => c.method).filter(Boolean))),
@@ -349,14 +368,13 @@ function SidebarComponent({
 
               {/* Empty state */}
               {filtered.length === 0 && (
-                <div className="flex flex-col items-center gap-2 py-12 text-center">
-                  <History className="h-8 w-8 text-[var(--text-subtle)]" aria-hidden="true" />
-                  <p className="text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-muted)]">No conversations yet</p>
-                  {/* --text-subtle measures 4.29:1 on --sidebar-bg (it clears
-                      4.7:1 only on the lighter --bg), so this rail steps up
-                      one level rather than reusing the page's quietest tone. */}
-                  <p className="text-[length:var(--text-xs)] leading-[var(--lh-ui)] text-[var(--text-muted)]">Start reasoning to see history here</p>
-                </div>
+                /* One plain line at the list's own edge, not a centred icon
+                   and two captions. A search with no hits says so, rather
+                   than claiming there is no history at all. --text-muted, not
+                   --text-subtle: subtle measures 4.29:1 on --sidebar-bg. */
+                <p className="px-[var(--space-2)] py-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-muted)]">
+                  {query.trim() || activeTag ? 'Nothing matches this search.' : 'Problems you run are listed here.'}
+                </p>
               )}
 
               {/* Grouped list */}
@@ -479,9 +497,10 @@ function SidebarComponent({
           aria-controls="app-sidebar"
           title="Open sidebar"
           /* Was `hidden sm:flex`, which left phone users with no way to
-             reopen the drawer once closed. Mid-edge on mobile so it clears
-             the chat header and the composer; back to top-left at sm+. */
-          className="fixed left-3 top-1/2 z-50 flex h-11 w-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] shadow-[var(--shadow)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] sm:top-3 sm:translate-y-0"
+             reopen the drawer once closed. Top-left at every width: the chat
+             header makes room for it (`ml-14`). Mid-edge sat on top of the
+             centred composer on a phone. */
+          className="fixed left-3 top-[var(--space-2)] z-50 flex h-11 w-11 cursor-pointer items-center justify-center rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
         >
           <PanelLeft className="h-4 w-4" aria-hidden="true" />
         </button>

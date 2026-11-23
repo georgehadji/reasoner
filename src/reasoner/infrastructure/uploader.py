@@ -87,7 +87,7 @@ logger = logging.getLogger(__name__)
 
 def _encrypt_bytes(content: bytes) -> bytes:
     """Encrypt file content for storage, using the same at-rest encryption
-    port already used by ``auth_store.py``/``postgres_store.py``
+    port already used by ``postgres_store.py``
     (``core.ports.crypto_port.EncryptionPort``).
 
     Returns the encrypted token encoded as UTF-8 bytes -- ``encrypt()``

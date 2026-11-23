@@ -51,7 +51,7 @@ class CapabilityPolicy:
 
 CAPABILITY_POLICY: dict[Capability, CapabilityPolicy] = {
     Capability.PIPELINE_RUN: CapabilityPolicy(
-        requires_auth=False,  # anonymous allowed via ENABLE_LEGACY_API_KEY,
+        requires_auth=False,  # anonymous allowed via ALLOW_ANONYMOUS_RUNS,
         # capped by application.services.anonymous_trial_policy instead of
         # the per-user credit ledger.
         credit_reason=CreditReason.PIPELINE_RUN,

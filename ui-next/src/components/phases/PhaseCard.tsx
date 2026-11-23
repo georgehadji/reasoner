@@ -55,8 +55,7 @@ export const CHIP =
   'px-[var(--space-2)] py-[var(--space-1)]';
 
 export const MICRO_LABEL =
-  'text-[length:var(--text-2xs)] font-semibold uppercase leading-[var(--lh-tight)] ' +
-  'tracking-[var(--tracking-label)] text-[var(--text-muted)]';
+  'text-[length:var(--text-xs)] font-semibold leading-[var(--lh-tight)] text-[var(--text-muted)]';
 
 export const ICON_SM = 'h-[var(--space-3)] w-[var(--space-3)] shrink-0';
 
@@ -335,7 +334,8 @@ export const PhaseCard = memo(function PhaseCard({
             <StatusMark status={status} />
             {collapsed ? (
               <>
-                <span className="truncate text-[length:var(--text-sm)] font-medium leading-[var(--lh-ui)] tracking-[var(--tracking-base)] text-[var(--text)]">
+                {/* The name outranks the summary: on a phone the summary gives way first. */}
+                <span className="max-w-full shrink-0 truncate text-[length:var(--text-sm)] font-medium leading-[var(--lh-ui)] tracking-[var(--tracking-base)] text-[var(--text)]">
                   {name}
                 </span>
                 {summary ? (
@@ -398,7 +398,7 @@ export const PhaseCard = memo(function PhaseCard({
         style={{ gridTemplateRows: open ? '1fr' : '0fr' }}
         className="grid transition-[grid-template-rows] duration-[var(--dur-component)] ease-[var(--ease-standard)]"
       >
-        <div className={cn('min-h-0', !open && 'overflow-hidden')} inert={!open}>
+        <div className={cn('min-h-0 min-w-0', !open && 'overflow-hidden')} inert={!open}>
           <div className="flow [--flow-space:var(--space-3)] px-[var(--space-4)] pb-[var(--space-4)] pt-[var(--space-1)]">
             {subagents && subagents.length > 0 ? <SubagentStrip subagents={subagents} /> : null}
             {children}

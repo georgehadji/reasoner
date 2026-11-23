@@ -51,7 +51,7 @@ Every folder has a **map skill** in `.claude/skills/` listing what the folder co
 | Endpoints, SSE streaming, auth deps, middleware, CSRF, billing routes, MCP tools | `src/reasoner/api/` | `map-api` |
 | Pipeline behavior, reasoning flows and phase logic, CQRS handlers, event bus, services (routing, billing, metering, serializers, renderers) | `src/reasoner/application/` | `map-application` |
 | Constants, token budgets, settings/env, hexagonal ports, domain events, aggregates, JSON parsing, sanitization | `src/reasoner/core/` | `map-core` |
-| `PipelineState` fields, the <!-- gen:presets -->98<!-- /gen --> presets, pricing, credits, SaaS entities, ACR value objects, watermark domain | `src/reasoner/domain/` | `map-domain` |
+| `PipelineState` fields, the <!-- gen:presets -->102<!-- /gen --> presets, pricing, credits, SaaS entities, ACR value objects, watermark domain | `src/reasoner/domain/` | `map-domain` |
 | Adding a model or provider, routing and fallback, event stores and repos, Valkey/Redis, search adapters, code sandbox, widgets, websocket | `src/reasoner/infrastructure/` | `map-infrastructure` |
 | Routing decision (DIRECT / WEB_SEARCH / PIPELINE), method classification, fast-path regexes | `src/reasoner/hypergate/` | `map-hypergate` |
 | Writing or editing any prompt; per-method prompt modules; Verbalized Sampling stages | `src/reasoner/phases/` | `map-phases` |
@@ -101,11 +101,11 @@ src/reasoner/
 │   ├── settings.py         # Settings (pydantic-settings), dotenv load, CSRF/auth config
 │   ├── ports/              # Hexagonal ports: LLMPort, SearchServicePort, FileSearchPort
 │   ├── events/             # DomainEvent hierarchy + make_event() factory
-│   └── aggregates/         # PipelineAggregate (event-sourced), WidgetAggregate
+│   └── aggregates/         # PipelineAggregate (event-sourced)
 ├── domain/                 # Business entities and declarative routing configs
 │   ├── pipeline_state.py   # PipelineState (~60 fields) — canonical state model
 │   ├── preset_core.py      # PipelinePreset, build_auto_preset(), _KNOWN_ROUTING_ROLES
-│   └── preset_registry.py  # <!-- gen:presets -->98<!-- /gen --> preset configs with model routing and fallbacks
+│   └── preset_registry.py  # <!-- gen:presets -->102<!-- /gen --> preset configs with model routing and fallbacks
 ├── infrastructure/         # Adapters implementing Core ports
 │   ├── llm/
 │   │   ├── registry.py     # _MODEL_WHITELIST (<!-- gen:models -->203<!-- /gen --> aliases), _REGISTRY, build_provider()
@@ -131,7 +131,7 @@ ui-next/src/
 ├── lib/                    # api-client, db (IndexedDB), types, utils, security, markdown
 └── stores/                 # app-store.ts (Zustand global state with persistence)
 
-tests/                      # pytest suite (<!-- gen:test_files -->457<!-- /gen --> test_*.py files, recursive)
+tests/                      # pytest suite (<!-- gen:test_files -->488<!-- /gen --> test_*.py files, recursive)
 scripts/
 └── update_mindmap_meta.py  # Patches live counts into ARCHITECTURE_MINDMAP.md (run manually — see §10)
 ```
@@ -221,7 +221,7 @@ HyperGate → Phase 0: Classification (task type, language)
           → Phase 5: Synthesis (VERIFIED/HYPOTHESIS/UNKNOWN + Action Blueprint)
 ```
 
-### Reasoning Methods (<!-- gen:methods -->24<!-- /gen --> distinct, + Verbalized Sampling sub-phases)
+### Reasoning Methods (<!-- gen:methods -->25<!-- /gen --> distinct, + Verbalized Sampling sub-phases)
 
 | Method | Description |
 |--------|-------------|
@@ -384,7 +384,7 @@ Semantic landmarks. Real alt text. WCAG 2.2 AA.
 LCP <= 2.0s and CLS <= 0.05 lab; field targets LCP <= 2.5s / INP <= 200ms / CLS <= 0.1 at p75.
 Max 2 text families (display + body) plus 1 monospace for code and data, 4 weights,
 self-hosted woff2. Only the text families preload; the mono loads below the fold. This
-matches `spec/art-direction.md` §4 (Piazzolla, Public Sans, Inconsolata).
+matches `spec/art-direction.md` §4 (Archivo, Atkinson Hyperlegible Next, Inconsolata).
 
 ## Hook wiring is not in git
 

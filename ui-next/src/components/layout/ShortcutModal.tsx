@@ -1,7 +1,7 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface ShortcutModalProps {
   isOpen: boolean;
@@ -21,54 +21,60 @@ export function ShortcutModal({ isOpen, onClose }: ShortcutModalProps) {
     { keys: ['?'], label: 'Show this panel' },
   ];
 
+  /* A modal <dialog> traps Tab, closes on Escape and returns focus to whatever
+     opened it. Same pattern as SiteHeader's drawer and ChatFeed's lightbox. */
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const el = dialogRef.current;
+    if (!el) return;
+    if (isOpen && !el.open) el.showModal();
+    if (!isOpen && el.open) el.close();
+  }, [isOpen]);
+
   return (
-    <div
-      className={cn(
-        'fixed inset-0 z-[300] flex items-center justify-center p-4 transition-all duration-[var(--dur-component)]',
-        isOpen ? 'bg-[var(--scrim)] opacity-100' : 'bg-transparent opacity-0 pointer-events-none',
-      )}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Keyboard shortcuts"
-      // Kept mounted for the exit transition; inert removes it from tab order and the a11y tree.
-      inert={!isOpen}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+    // No `display` utility on the <dialog>: it would override the UA's display:none while closed.
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="shortcuts-title"
+      onClose={onClose}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="m-0 h-full max-h-none w-full max-w-none border-0 bg-[var(--scrim)] p-0 text-[var(--text)]"
     >
       <div
-        className={cn(
-          'w-full max-w-[var(--width-form)] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-lg)] transition-all duration-[var(--dur-component)]',
-          isOpen ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95',
-        )}
+        className="flex h-full items-center justify-center p-[var(--space-4)]"
+        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <span className="text-[length:var(--text-base)] font-semibold text-[var(--text)]">Keyboard Shortcuts</span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
-            aria-label="Close shortcuts"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="space-y-3 text-[length:var(--text-sm)]">
-          {shortcuts.map((shortcut) => (
-            <div key={shortcut.label} className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                {shortcut.keys.map((key, i) => (
-                  <span key={key + i} className="flex items-center gap-1">
-                    <kbd className="rounded bg-[var(--surface-2)] px-2 py-1 font-mono text-[var(--text-2)]">{key}</kbd>
-                    {i < shortcut.keys.length - 1 && <span className="text-[var(--text-subtle)]">+</span>}
-                  </span>
-                ))}
+        <div className="animate-phase-reveal w-full max-w-[var(--width-form)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-[var(--space-6)] shadow-[var(--shadow-lg)]">
+          <div className="mb-[var(--space-4)] flex items-center justify-between">
+            <h2 id="shortcuts-title" className="text-[length:var(--text-base)] font-semibold text-[var(--text)]">
+              Keyboard Shortcuts
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="-mr-[var(--space-3)] flex h-11 w-11 items-center justify-center rounded-[var(--radius)] text-[var(--text-muted)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
+              aria-label="Close shortcuts"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+          <dl className="space-y-[var(--space-3)] text-[length:var(--text-sm)]">
+            {shortcuts.map((shortcut) => (
+              <div key={shortcut.label} className="flex items-center justify-between gap-[var(--space-4)]">
+                <dt className="flex items-center gap-[var(--space-1)]">
+                  {shortcut.keys.map((key, i) => (
+                    <span key={key + i} className="flex items-center gap-[var(--space-1)]">
+                      <kbd className="rounded-[var(--radius-sm)] bg-[var(--surface-2)] px-[var(--space-2)] py-[var(--space-1)] font-mono text-[var(--text-2)]">{key}</kbd>
+                      {i < shortcut.keys.length - 1 && <span className="text-[var(--text-subtle)]" aria-hidden="true">+</span>}
+                    </span>
+                  ))}
+                </dt>
+                <dd className="text-right text-[var(--text-muted)]">{shortcut.label}</dd>
               </div>
-              <span className="text-[var(--text-muted)]">{shortcut.label}</span>
-            </div>
-          ))}
+            ))}
+          </dl>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

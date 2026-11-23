@@ -41,11 +41,6 @@ def is_allowed(bloc: str) -> bool:
     return allowed is None or bloc in allowed
 
 
-def is_western(tags: object = None, *, requested: bool = False) -> bool:
-    """True when a preset's tags or the request ask for a Western-only run."""
-    return requested or (isinstance(tags, (list, tuple, set, frozenset)) and WESTERN_TAG in tags)
-
-
 def run_blocs(preset_id: str | None) -> frozenset[str] | None:
     """Model blocs a run of this preset may call; None means unrestricted.
 
@@ -55,16 +50,20 @@ def run_blocs(preset_id: str | None) -> frozenset[str] | None:
     return WESTERN_BLOCS if preset_id and "-western-" in preset_id else None
 
 
-def memory_agent_id(agent_id: str | None) -> str | None:
+def memory_agent_id(agent_id: str | None, owner: str | None = None) -> str | None:
     """The Neuro agent id a run reads and writes memory under.
 
     Western runs use their own store: it is embedded by a different model, and
-    vectors from two embedding models cannot be compared. No id stays no id,
-    so an anonymous run still gets no tenant.
+    vectors from two embedding models cannot be compared. No id and no owner
+    stays no id, so an anonymous run still gets no tenant. A signed-in run with
+    no id would land in the owner's shared ``default`` tenant, which is embedded
+    by the non-Western model, so it gets ``default-western`` (audit 7, finding 3).
     """
-    if agent_id and ALLOWED_BLOCS.get() is not None:
+    if ALLOWED_BLOCS.get() is None:
+        return agent_id
+    if agent_id:
         return f"{agent_id}{WESTERN_MEMORY_SUFFIX}"
-    return agent_id
+    return f"default{WESTERN_MEMORY_SUFFIX}" if owner else None
 
 
 def is_western_memory(agent_id: str | None) -> bool:

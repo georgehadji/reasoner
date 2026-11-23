@@ -78,7 +78,8 @@ async def PhaseSpan(
     model_hint = ""
     if router and hasattr(router, 'describe'):
         try:
-            model_hint = router.describe()[:100]
+            # describe() maps role -> model; the primary is the phase's model.
+            model_hint = str(router.describe().get("[primary]", ""))[:100]
         except Exception as exc:
             # An empty model_hint is not "no model" -- it is written into both
             # the span input and the span output, where it is indistinguishable

@@ -1,6 +1,6 @@
 'use client';
 
-import { createPortal } from 'react-dom';
+import { useEffect, useId, useRef } from 'react';
 import { Eraser, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SynthesisProvenanceReport } from '@/lib/types';
@@ -19,19 +19,37 @@ interface ProvenanceReportProps {
  * "proves human-written", never "bypasses AI detection".
  */
 export function ProvenanceReport({ isOpen, onClose, report }: ProvenanceReportProps) {
-  if (!isOpen) return null;
-  if (typeof document === 'undefined') return null;
+  /* A modal <dialog> traps Tab, closes on Escape and returns focus to the
+     badge that opened it. Same pattern as ShortcutModal. */
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  useEffect(() => {
+    const el = dialogRef.current;
+    if (!el) return;
+    if (isOpen && !el.open) el.showModal();
+    if (!isOpen && el.open) el.close();
+  }, [isOpen]);
 
   const total = totalRemoved(report);
   const hits = report.core_solution?.hits ?? [];
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-[var(--scrim)] p-4"
+  return (
+    // No `display` utility on the <dialog>: it would override the UA's display:none while closed.
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      onClose={onClose}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
+      className="m-0 h-full max-h-none w-full max-w-none border-0 bg-[var(--scrim)] p-0 text-[var(--text)]"
     >
+      <div
+        className="flex h-full items-center justify-center p-4"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
       <div className="w-full max-w-[var(--width-content,32rem)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-lg)]">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -39,7 +57,7 @@ export function ProvenanceReport({ isOpen, onClose, report }: ProvenanceReportPr
               <Eraser className="h-5 w-5" aria-hidden="true" />
             </div>
             <div>
-              <h3 className="text-[length:var(--text-sm)] font-bold text-[var(--text)]">Provenance scrub report</h3>
+              <h3 id={titleId} className="text-[length:var(--text-sm)] font-bold text-[var(--text)]">Provenance scrub report</h3>
               <p className="text-[length:var(--text-xs)] text-[var(--text-2)]">
                 {total > 0
                   ? `${total} invisible character${total === 1 ? '' : 's'} removed from this response`
@@ -108,7 +126,7 @@ export function ProvenanceReport({ isOpen, onClose, report }: ProvenanceReportPr
           cover statistical token-sampling patterns or image pixel-domain marks.
         </p>
       </div>
-    </div>,
-    document.body
+      </div>
+    </dialog>
   );
 }

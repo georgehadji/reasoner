@@ -67,6 +67,7 @@ folders:
 | `plans/ensemble-diversity-measurement.md` | Its build plan (D0–D8). D0 (fix Delphi expert routing) is independently shippable; the rest builds measured pairwise divergence behind `RoutingConstraintPort`, shipped soft as observability. |
 | `AUDIT_REPORT.md`, `architecture-audit-2026-06-02.md`, `architecture-audit-finale-2026-06-02.md` | Earlier audits. |
 | `bug_hunt_report.md` | Precision bug hunt. |
+| `plans/high-stakes-reliability.md` | Plan for health/law/finance reliability: stakes detection, authority-gated VERIFIED, jurisdiction, missing facts, abstain-and-refer, eval. Owner decisions recorded 2026-11-14. |
 
 `audits/` also holds the one-off root reports moved there on 2026-11-13 (`ARCH_SCORE_9.5_PLAN.md`, `CI_FIX_PLAN.md`, `SSOT_FIX_PLAN.md`, `bug_hunt_report.md`, the two `ARCH*AUDIT*V2*` reports, and others). `research/` holds third-party design notes (`DESIGN-CURSOR.md`, `DESIGN-EXPO.md`, `DESIGN-HASHICORP.md`, `BACKGROUND-FX.md`, `HUMANIZER.md`); `spec/` and `tokens.css` are binding, these are not.
 

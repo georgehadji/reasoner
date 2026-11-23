@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useRef, useState, useEffect, useCallback, useMemo, useSyncExternalStore } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '@/stores/app-store';
 import { EXAMPLE_PROMPTS, LIMITS, TIMING, API } from '@/lib/config';
 import { cn } from '@/lib/utils';
 import { isEnabled } from '@/hooks/useFeatureFlags';
-import { useSubscription } from '@/hooks/useSubscription';
-import { ArrowUp, Sparkles, Plus, X, FileText, Image as ImageIcon, Upload, Lock, Square, ShieldCheck } from 'lucide-react';
+import { ArrowUp, Sparkles, Plus, X, FileText, Image as ImageIcon, Upload, Lock, Square, ShieldCheck, ChevronDown } from 'lucide-react';
+import { methodsByCost, type MethodSlug } from '@/lib/methods';
 import { Tooltip } from '@/components/ui/Tooltip';
 
 interface ComposerProps {
@@ -17,7 +17,6 @@ interface ComposerProps {
   isFollowup?: boolean;
 }
 
-const MAX_FILE_SIZE = LIMITS.maxFileSizeBytes;
 const ALLOWED_TYPES = [
   'application/pdf',
   'text/plain',
@@ -56,6 +55,7 @@ function AttachmentChip({ att, onRemove }: AttachmentChipProps) {
   return (
     <div className="group inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] px-[var(--space-3)] py-[var(--space-1)] text-[length:var(--text-xs)] leading-[var(--lh-ui)] text-[var(--text-muted)] transition-colors duration-[var(--dur-micro)] hover:border-[var(--border-strong)]">
       {isImage && att.previewUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element -- blob: object URL; next/image cannot optimise it
         <img src={att.previewUrl} alt="" className="h-5 w-5 rounded-[var(--radius-sm)] object-cover" />
       ) : (
         <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -92,35 +92,10 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
   const toggleWesternOnly = useAppStore((s) => s.toggleWesternOnly);
   const isImageMode = useAppStore((s) => s.isImageMode);
   const toggleImageMode = useAppStore((s) => s.toggleImageMode);
+  const method = useAppStore((s) => s.method);
+  const setMethod = useAppStore((s) => s.setMethod);
+  const getAutoPreset = useAppStore((s) => s.getAutoPreset);
   const hasContent = composerText.trim().length > 0 || attachments.length > 0;
-
-  const user = useAppStore((s) => s.user);
-
-  /* The greeting depends on the client's clock, so the server cannot render it.
-     Two wrong ways to handle that, both previously tried here:
-       - compute it during render behind `typeof window` + suppressHydrationWarning
-         -> React then *accepts the server text as correct and never patches it*,
-            so the greeting stays stuck on the fallback for the whole
-            pre-interaction session (nothing else re-renders this component for a
-            logged-out visitor -- `user` is not persisted by the store);
-       - setState inside an effect -> works, but is what react-hooks/set-state-in-effect
-         correctly flags, since an effect is not where derived state belongs.
-     useSyncExternalStore is React's actual primitive for a client-only value:
-     it hands back the server snapshot during SSR and hydration (so the markup
-     matches with nothing suppressed), then re-renders once with the client
-     snapshot. The store never emits, so this subscribes to nothing. */
-  const isClient = useSyncExternalStore(
-    useCallback(() => () => {}, []),
-    () => true,
-    () => false,
-  );
-  const greeting = useMemo(() => {
-    if (!isClient) return 'Ready when you are';
-    const hour = new Date().getHours();
-    const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-    const name = user?.email?.split('@')[0];
-    return name ? `${part}, ${name}` : part;
-  }, [isClient, user]);
 
   const [estimate, setEstimate] = useState<{ tokens: number; cost: string; duration: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -159,10 +134,10 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
 
   useEffect(() => {
     if (!isEnabled('cost-transparency')) return;
-    const preset = `auto-${westernOnly ? 'western-' : ''}${tier === 'premium' ? 'premium' : 'budget'}`;
+    const preset = getAutoPreset();
     const timer = setTimeout(() => fetchEstimate(composerText, preset), TIMING.estimateDebounceMs);
     return () => clearTimeout(timer);
-  }, [composerText, tier, westernOnly, fetchEstimate]);
+  }, [composerText, tier, westernOnly, method, getAutoPreset, fetchEstimate]);
 
   function autoResize() {
     const el = textareaRef.current;
@@ -278,7 +253,6 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
   }
 
   function TierToggle() {
-    const { subscription } = useSubscription();
     const isPremium = tier === 'premium';
     const isLocked = false;
     const costNum = estimate ? parseFloat(estimate.cost) : NaN;
@@ -315,6 +289,43 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
           {isLocked && !isPremium ? <Lock className="h-3 w-3" aria-hidden="true" /> : <Sparkles className="h-3 w-3" aria-hidden="true" />}
           Premium
         </button>
+      </Tooltip>
+    );
+  }
+
+  /* Native <select>: keyboard, screen-reader and mobile pickers come free.
+     Empty value = "Auto", HyperGate picks the method. */
+  function MethodSelect() {
+    return (
+      <Tooltip text={method ? 'Method fixed for this question' : 'Reasoner picks the method'}>
+        <div className="relative flex items-center">
+          {method && (
+            <span className="pointer-events-none absolute left-[var(--space-3)] flex">
+              <ActiveDot />
+            </span>
+          )}
+          <select
+            value={method ?? ''}
+            onChange={(e) => setMethod((e.target.value || null) as MethodSlug | null)}
+            aria-label="Reasoning method"
+            className={cn(
+              TOGGLE_BASE,
+              'appearance-none bg-transparent pr-[var(--space-8)]',
+              method ? cn(TOGGLE_ON, 'pl-[var(--space-6)]') : TOGGLE_OFF,
+            )}
+          >
+            <option value="">Auto method</option>
+            <optgroup label="Cheapest first">
+              {methodsByCost(tier).map((m) => (
+                <option key={m.slug} value={m.slug}>{m.label}</option>
+              ))}
+            </optgroup>
+          </select>
+          <ChevronDown
+            aria-hidden="true"
+            className={cn('pointer-events-none absolute right-[var(--space-3)] top-1/2 h-3 w-3 -translate-y-1/2', method ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]')}
+          />
+        </div>
       </Tooltip>
     );
   }
@@ -370,13 +381,13 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
 
   /* ── Input box ────────────────────────────────────────── */
   /* State ladder, weakest to strongest: rest → hover (border only) →
-     focus-within (accent border + 3px accent ring + lifted shadow). Focus
+     focus-within (accent border + 3px accent ring). Focus
      must never be quieter than hover, or keyboard users lose the caret. */
   const inputBox = (minH: number, placeholder: string) => (
     <div
       aria-busy={running}
       className={cn(
-        'relative rounded-[var(--radius-xl)] border bg-[var(--surface)] shadow-[var(--shadow)] transition-[border-color,box-shadow,background-color] duration-[var(--dur-state)] ease-[var(--ease-standard)]',
+        'relative rounded-[var(--radius-xl)] border bg-[var(--surface)] transition-[border-color,box-shadow,background-color] duration-[var(--dur-state)] ease-[var(--ease-standard)]',
         isDragging
           ? 'border-[var(--accent)]'
           : running
@@ -390,7 +401,7 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
         // a run produced zero visual change (WCAG 2.4.7) — the textarea also
         // sets focus:outline-none, so nothing else drew a ring.
         !isDragging &&
-          'focus-within:border-[var(--accent)] focus-within:shadow-[0_0_0_3px_var(--accent-dim),var(--shadow-lg)]',
+          'focus-within:border-[var(--accent)] focus-within:shadow-[0_0_0_3px_var(--accent-dim)]',
       )}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -421,7 +432,7 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         rows={1}
-        aria-label={isImageMode ? 'Describe the image to generate' : 'Ask anything'}
+        aria-label={isImageMode ? 'Describe the image to generate' : 'Problem'}
         className="w-full resize-none bg-transparent px-[var(--space-5)] pt-[var(--space-4)] text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text)] transition-[height] duration-[var(--dur-micro)] ease-[var(--ease-standard)] placeholder:text-[var(--text-muted)] placeholder:transition-colors placeholder:duration-[var(--dur-micro)] focus:outline-none"
         style={{ minHeight: minH }}
       />
@@ -440,7 +451,8 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
         <div className="flex items-center gap-[var(--space-1)]">
           <AttachButton />
         </div>
-        <div className="flex items-center gap-[var(--space-1)]">
+        <div className="flex flex-wrap items-center justify-end gap-[var(--space-1)]">
+          {!isImageMode && <MethodSelect />}
           <TierToggle />
           <WesternToggle />
           <ImageModeToggle />
@@ -467,37 +479,40 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
     return (
       <div className="flex h-full w-full flex-col items-center justify-center px-[var(--gutter)] py-[var(--space-8)]">
         <div className="w-full max-w-[var(--width-chat)]">
-          {/* Serif, and the only display-scale type in the app shell. The
-              greeting is the one moment the product speaks before it works.
-              No suppressHydrationWarning: `greeting` starts at the neutral
-              server value and is replaced post-mount by the effect above, so
-              there is no mismatch to suppress -- and suppressing one here
-              would silence genuine future mismatches in this element. */}
-          <h1 className="mb-[var(--space-8)] text-center font-serif text-[length:var(--text-4xl)] font-normal leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
-            {isImageMode ? 'What should we picture?' : greeting}
+          {/* Says what the product does instead of greeting: a clock-based
+              "Good morning" and "How can I help you today?" made this the
+              same empty state as every chat assistant, which Reasoner is not. */}
+          <h1 className="font-display text-[length:var(--text-2xl)] leading-[var(--lh-display)] tracking-[var(--tracking-tight)] text-[var(--text)]">
+            {isImageMode ? 'What should we picture?' : 'Name one problem.'}
           </h1>
+          <p className="mb-[var(--space-6)] mt-[var(--space-2)] max-w-[60ch] text-[length:var(--text-base)] leading-[var(--lh-body)] text-[var(--text-2)]">
+            {isImageMode
+              ? 'Describe what you want to see, and it is drawn by an image model.'
+              : 'A hard one goes to rival labs at once. A critic from another lab scores the answers, and each claim comes back labelled verified, hypothesis or unknown.'}
+          </p>
 
-          {inputBox(96, isImageMode ? 'Describe the image you want to generate…' : 'How can I help you today?')}
+          {inputBox(96, isImageMode ? 'Describe the image you want to generate…' : 'A decision, a plan to test, a claim to check…')}
 
           {!isImageMode && (
-            <div className="mt-[var(--space-6)] flex flex-wrap justify-center gap-[var(--space-2)]">
+            <ul className="-ml-[var(--space-2)] mt-[var(--space-6)] flex list-none flex-col items-start gap-[var(--space-1)]" aria-label="Example problems">
               {EXAMPLE_PROMPTS.slice(0, 4).map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => {
-                    setComposerText(prompt);
-                    textareaRef.current?.focus();
-                  }}
-                  className="flex h-10 max-w-full cursor-pointer items-center rounded-[var(--radius-pill)] border border-[var(--border)] px-[var(--space-4)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-2)] transition-colors duration-[var(--dur-micro)] hover:border-[var(--border-strong)] hover:bg-[var(--surface)] hover:text-[var(--text)]"
-                >
-                  <span className="truncate">{prompt}</span>
-                </button>
+                <li key={prompt} className="max-w-full">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setComposerText(prompt);
+                      textareaRef.current?.focus();
+                    }}
+                    className="min-h-[var(--space-10)] max-w-full cursor-pointer rounded-[var(--radius)] px-[var(--space-2)] text-left text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text-2)] underline decoration-[var(--border-strong)] underline-offset-4 transition-colors duration-[var(--dur-micro)] hover:text-[var(--text)] hover:decoration-[var(--text)]"
+                  >
+                    {prompt}
+                  </button>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
 
-          <div className="mt-[var(--space-6)] text-center text-[length:var(--text-xs)] leading-[var(--lh-ui)] text-[var(--text-subtle)]">
+          <div className="mt-[var(--space-6)] text-[length:var(--text-xs)] leading-[var(--lh-ui)] text-[var(--text-subtle)]">
             {isImageMode
               ? 'Enter to generate · Shift+Enter for newline'
               : `Enter to send · Shift+Enter for newline · Esc to stop`}

@@ -184,7 +184,7 @@ Reasoner is designed to be called by autonomous AI agents (Cursor, LangChain, Cr
 
 ### Option 1 — Agent API (HTTP, Bearer auth)
 
-Agent endpoints authenticate with `Authorization: Bearer <API_KEY>` and are exempt from CSRF requirements — a Reasoner account key (`rsn_live_...`), a JWT, or (self-hosted, `ENABLE_LEGACY_API_KEY=true`) a legacy admin key all resolve to the same authenticated caller. Every run is idempotency-guarded and metered identically to a web run: same credit ledger, same ownership record. This is true both self-hosted and on the SaaS deployment — there is no separate unmetered surface. The full agent guide — tool definitions, retry semantics, preset selection — lives at `/docs/agent-integration` (source: `ui-next/src/lib/docs.ts`).
+Agent endpoints authenticate with `Authorization: Bearer <API_KEY>` and are exempt from CSRF requirements — a Reasoner account key (`rsn_live_...`) or a JWT resolves to the same authenticated caller. Every run is idempotency-guarded and metered identically to a web run: same credit ledger, same ownership record. This is true both self-hosted and on the SaaS deployment — there is no separate unmetered surface. The full agent guide — tool definitions, retry semantics, preset selection — lives at `/docs/agent-integration` (source: `ui-next/src/lib/docs.ts`).
 
 | Endpoint | Method | Format | Description |
 | :--- | :--- | :--- | :--- |
@@ -323,7 +323,6 @@ Reasoner records structured runtime telemetry to optimize pricing, route around 
 | E2 | Phase telemetry store | App-level `TelemetryStore` (SQLite/PostgreSQL) recording model, cost, and duration per phase. |
 | E3 | Context compression | `smart_compress` applied at pipeline handoffs to minimize token cost. |
 | E4 | Fallback surfacing | `ProviderRouter` detects model failures and fires `on_fallback()` callbacks to route around dead endpoints. |
-| E5 | Healing exporter | `healing/telemetry_exporter.py` connects runtime context to static analysis tooling in CI. |
 
 Querying telemetry programmatically:
 

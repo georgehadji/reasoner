@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { Check, Loader2, X } from 'lucide-react';
 import { GateResponse } from '@/lib/types';
 
@@ -33,6 +34,13 @@ export function MethodChoicePrompt({
     ...decision.alternatives,
   ].filter((c) => c.method && c.preset);
 
+  /* Focus the suggested method: the user just pressed Enter in the composer,
+     so a second Enter confirms it instead of resubmitting the problem. */
+  const firstRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    firstRef.current?.focus({ preventScroll: true });
+  }, []);
+
   return (
     <div className="flex w-full justify-center px-4">
       <div className="w-full max-w-3xl rounded-[10px] border border-[var(--border)] bg-[var(--surface-2)] p-4">
@@ -54,6 +62,7 @@ export function MethodChoicePrompt({
           {candidates.map((c, i) => (
             <button
               key={c.method}
+              ref={i === 0 ? firstRef : undefined}
               type="button"
               onClick={() => onChoose(c.preset!)}
               className="group flex w-full items-start gap-3 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-left transition-colors hover:border-[var(--accent)] hover:bg-[var(--surface-3)]"
@@ -69,9 +78,13 @@ export function MethodChoicePrompt({
                       Suggested
                     </span>
                   )}
-                  <span className="text-[length:var(--text-2xs)] text-[var(--text-subtle)]">{Math.round(c.confidence * 100)}% confidence</span>
+                  {/* Zero means the gate could not classify at all; its
+                      rationale is then an internal fallback note, not a reason. */}
+                  {c.confidence > 0 && (
+                    <span className="text-[length:var(--text-2xs)] text-[var(--text-subtle)]">{Math.round(c.confidence * 100)}% confidence</span>
+                  )}
                 </div>
-                {c.rationale && (
+                {c.rationale && c.confidence > 0 && (
                   <div className="mt-0.5 text-[length:var(--text-xs)] text-[var(--text-muted)]">{c.rationale}</div>
                 )}
               </div>

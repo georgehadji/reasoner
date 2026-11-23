@@ -30,7 +30,6 @@ folders:
 
 | File | Points at |
 |------|-----------|
-| `auth.py` | `infrastructure/auth_legacy.py` |
 | `circuit_breaker.py` | `infrastructure/circuit_breaker.py` |
 | `clients.py` | `infrastructure/clients.py` |
 | `exceptions.py` | `core/exceptions.py` |
@@ -45,7 +44,6 @@ folders:
 | `renderer.py` | `infrastructure/renderer.py`, itself a shim to `application/services/renderers` |
 | `sanitization.py` | `core/sanitization.py` |
 | `scraper.py` | `infrastructure/scraper.py` |
-| `server_check.py` | `infrastructure/server_check.py` |
 | `suggestions.py` | `application/services/suggestions.py` |
 | `token_cache.py` | `infrastructure/token_cache.py` |
 | `uploader.py` | `infrastructure/uploader.py` |

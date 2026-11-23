@@ -115,13 +115,10 @@ class PreflightDecision:
 class PipelineOrchestrator:
     """Single entry point for pipeline execution.
 
-    Three-phase lifecycle:
+    Lifecycle:
       1. preflight(req, initial_state) → PreflightDecision
-      2. execute(decision, initial_state) → PipelineState
+      2. the caller runs the phases (SSE: WorkflowRunner; CLI: ReasonerPipeline.run)
       3. postflight(state, req, user_id) → None
-
-    Callers can interleave custom phases (SSE streaming) between
-    preflight and postflight.
     """
 
     def __init__(
@@ -239,7 +236,7 @@ class PipelineOrchestrator:
             degraded("orchestrator.spend_cap_preflight", None, exc=exc)
 
         # E4: Attach a fallback-event buffer to the router at construction time.
-        # Even if execute() is not called (streaming/main paths), events are captured.
+        # Drivers drain it onto state via services/run_steps.drain_fallback_events.
         _fallback_buffer: list[dict] = []
         import time as _time
         def _record_fallback(role: str, intended: str, actual: str, reason: str) -> None:
@@ -445,7 +442,7 @@ class PipelineOrchestrator:
             wanted = settings.NEURO_CONTEXT_MAX_CHUNKS
             chunks = await port.recall(
                 problem,
-                agent_id=model_policy.memory_agent_id(agent_id),
+                agent_id=model_policy.memory_agent_id(agent_id, owner),
                 max_results=min(wanted * 2, 20),
                 owner=owner,
             )
@@ -509,29 +506,6 @@ class PipelineOrchestrator:
             **pipeline_kwargs,
         )
 
-    async def execute(
-        self,
-        decision: PreflightDecision,
-        initial_state: PipelineState | None = None,
-        **pipeline_kwargs: Any,
-    ) -> PipelineState:
-        """Run the pipeline with the given decision. Returns final state."""
-        state = initial_state or PipelineState(
-            problem=decision.problem,
-            preset_name=decision.effective_preset_name,
-        )
-        if decision.recalled_chunks:
-            state.neuro_context = decision.recalled_chunks
-
-        # E4: Replay fallback events captured during preflight into state
-        _fallback_buffer = getattr(decision.router, "_fallback_buffer", [])
-        if _fallback_buffer:
-            state.meta.fallback_events.extend(_fallback_buffer)
-            _fallback_buffer.clear()
-
-        pipeline = self.create_pipeline(decision, initial_state=state, **pipeline_kwargs)
-        return await pipeline.run(decision.problem)
-
     async def postflight(
         self,
         state: PipelineState,
@@ -558,13 +532,18 @@ class PipelineOrchestrator:
             if state.final_solution:
                 synthesis_text = getattr(state.final_solution, "core_solution", "") or ""
 
+            from reasoner.application.services.stakes_service import keep_out_of_memory
+
+            if synthesis_text and keep_out_of_memory(getattr(req, "problem", "")):
+                synthesis_text = ""  # health run: never persisted (plan section 7)
+
             if port is not None and synthesis_text:
                 _observe_propagation_shape(synthesis_text, run_id)
                 await port.learn(
                     prompt=getattr(req, "problem", ""),
                     response=synthesis_text,
                     agent_id=model_policy.memory_agent_id(
-                        getattr(state, "conversation_id", None)
+                        getattr(state, "conversation_id", None), user_id
                     ),
                     owner=user_id,
                     metadata={

@@ -16,7 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 # Ensure legacy API keys are enabled for compat tests
-os.environ.setdefault("ENABLE_LEGACY_API_KEY", "true")
+os.environ.setdefault("ALLOW_ANONYMOUS_RUNS", "true")
 os.environ.setdefault("ENVIRONMENT", "testing")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-do-not-use-in-production")
 
@@ -131,9 +131,9 @@ def test_run_pipeline_with_auth_token(client, auth_token):
 
 
 def test_run_pipeline_without_auth_still_works_in_legacy_mode(client, monkeypatch):
-    # When ENABLE_LEGACY_API_KEY=true, anonymous requests are allowed.
+    # When ALLOW_ANONYMOUS_RUNS=true, anonymous requests are allowed.
     #
-    # The module-level os.environ.setdefault("ENABLE_LEGACY_API_KEY", "true")
+    # The module-level os.environ.setdefault("ALLOW_ANONYMOUS_RUNS", "true")
     # above (line 18) can't actually reach this: Settings reads os.getenv()
     # once at class-body-execution time when reasoner.core.settings is first
     # imported, and by the time this test module is collected, conftest.py's
@@ -142,7 +142,7 @@ def test_run_pipeline_without_auth_still_works_in_legacy_mode(client, monkeypatc
     # monkeypatch.setattr on the settings singleton is the pattern that
     # actually reaches a fresh read (as test_run_pipeline_without_auth_
     # rejected_when_legacy_disabled below already does for the False case).
-    monkeypatch.setattr(settings, "ENABLE_LEGACY_API_KEY", True)
+    monkeypatch.setattr(settings, "ALLOW_ANONYMOUS_RUNS", True)
     response = client.post(
         "/api/run",
         json={"problem": "What is 2+2?", "preset": "multi-perspective-budget"},
@@ -152,7 +152,7 @@ def test_run_pipeline_without_auth_still_works_in_legacy_mode(client, monkeypatc
 
 def test_run_pipeline_without_auth_rejected_when_legacy_disabled(client, monkeypatch):
     """SEC-005: Anonymous requests to /api/run are rejected when legacy API keys are disabled."""
-    monkeypatch.setattr(settings, "ENABLE_LEGACY_API_KEY", False)
+    monkeypatch.setattr(settings, "ALLOW_ANONYMOUS_RUNS", False)
     response = client.post(
         "/api/run",
         json={"problem": "What is 2+2?", "preset": "multi-perspective-budget"},
@@ -160,28 +160,13 @@ def test_run_pipeline_without_auth_rejected_when_legacy_disabled(client, monkeyp
     assert response.status_code == 401
 
 
-def test_legacy_api_key_still_works(client, monkeypatch):
-    # Set a known admin key for this test. A plain os.environ[...] assignment
-    # doesn't reach settings.ADMIN_API_KEY for the same class-body-execution-
-    # time reason as ENABLE_LEGACY_API_KEY above, so use monkeypatch on the
-    # settings singleton instead (matches TestBug001AdminEndpointHardening's
-    # working pattern in test_security_regression.py).
-    monkeypatch.setattr(settings, "ADMIN_API_KEY", "test-admin-key-12345")
-    monkeypatch.setattr(settings, "ENABLE_LEGACY_API_KEY", True)
-
-    # AuthManager (infrastructure/auth_legacy.py) is itself a process-wide
-    # singleton that snapshots settings.ADMIN_API_KEY into self._admin_keys
-    # once, at first construction -- so even with the settings singleton
-    # patched above, a previously-constructed AuthManager (e.g. from an
-    # earlier test) would still be checking against whatever ADMIN_API_KEY
-    # was configured back then. Clearing the cached instance forces
-    # get_auth_manager() to build a fresh one that picks up the patched key.
-    import reasoner.infrastructure.auth_legacy as auth_legacy_module
-    monkeypatch.setattr(auth_legacy_module, "_auth_manager", None)
-
+def test_opaque_bearer_token_is_401_even_when_anonymous_runs_allowed(client, monkeypatch):
+    # Legacy admin-key auth is gone: a bearer that is neither a JWT nor an rsn_
+    # key is a bad credential, not an anonymous caller.
+    monkeypatch.setattr(settings, "ALLOW_ANONYMOUS_RUNS", True)
     response = client.post(
         "/api/run",
         json={"problem": "What is 2+2?", "preset": "multi-perspective-budget"},
         headers={"Authorization": "Bearer test-admin-key-12345"},
     )
-    assert response.status_code == 200
+    assert response.status_code == 401

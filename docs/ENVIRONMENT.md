@@ -29,6 +29,7 @@ sub-processor. Log lines carry a hash of the problem, never its text.
 | Variable | Default | Description |
 |---|---|---|
 | `JEV_MODE` | `active` | `active`: jev routes; HyperGate's LLM sub-agents run only when jev fails, times out, or answers below the confidence gate (`JEV_ACCEPT_*` in `core/constants_limits.py`). Each decision is logged as `jev_route {...}`. `shadow`: the LLM sub-agents route and jev is logged beside them as `jev_shadow {...}`. `off`: jev is never called — **the kill switch**. Anything else reads as `off`. Needs `OPENROUTER_API_KEY`; without it jev stays off and startup logs a warning |
+| `STAKES_POLICY_MODE` | `off` | High-stakes (health, law, finance) policy, English and Greek regex detection in HyperGate, plus a model detector (`stakes_detector`, a sixth parallel Phase-1 call; it only adds what the regex missed, at confidence >= `STAKES_MODEL_MIN_CONFIDENCE`). `off`: nothing. `shadow`: detect and log `HyperGate stakes ...`, decision unchanged except `stakes` is recorded. `active`: `direct`/`web_search` become a `pipeline` run on a grounded method (`research`, or the classifier's pick if `cove`/`research`). Never changes the user's tier. A method the user named is left alone. Anything else reads as `off`. Also in `active`: VERIFIED in a high-stakes run needs a reviewed PRIMARY authority source (`domain/authority_sources.py`, seed rows unreviewed, so none count until reviewed). Health runs are never saved to Neuro in any mode. Metrics: `reasoner_stakes_detected_total{domain,source}`, `reasoner_stakes_policy_rerouted_total{from_action}`. In `active`, retrieved sources are re-ordered primary-first before synthesis |
 | `JEV_MODEL` | `typesafe/jev-1.13` | Pinned model id. The served id is a dated snapshot and is logged per call |
 
 The confidence gate's thresholds are initial values, not measured ones. Tune
@@ -68,7 +69,7 @@ user's problem, to TypeSafe.
 | Variable | Default | Description |
 |---|---|---|
 | `DATABASE_URL` | — | PostgreSQL connection string |
-| `DB_POOL_SIZE` | `10` | `asyncpg` connection pool max size |
+| `DB_POOL_SIZE` | `8` | Max size of the single shared `asyncpg` pool each worker process holds (`infrastructure/persistence/pg_pool.py`); credits, quota, subscriptions, upload usage, webhooks, user provisioning, advisory locks and the event store all draw from it. Ceiling = workers × (`DB_POOL_SIZE` + 2 for the health probe pool): 8 gunicorn workers × (8 + 2) = 80, under Postgres `max_connections` (default 100, minus superuser-reserved and migration/admin sessions). Raise it only together with `max_connections` or a PgBouncer. Minimum effective value is 2 |
 | `EVENT_STORE_DB_PATH` | — (in-package default) | SQLite events.db path — event store + pipeline ownership records. Point this at a mounted volume in production; the installed package dir is replaced on every redeploy |
 | `FEEDBACK_DB_PATH` | — (in-package default) | SQLite feedback.db path. Same rationale as `EVENT_STORE_DB_PATH` |
 
@@ -81,8 +82,6 @@ user's problem, to TypeSafe.
 | `RATE_LIMIT_BURST` | `10` | Burst allowance |
 | `ADMIN_API_KEY` | — | Admin endpoint key |
 | `ADMIN_USER_IDS` | — | Comma-separated user ids whose interactive (JWT) login carries the `admin` scope. Production admin routes need it plus `X-Admin-Key`. API keys can never hold admin. |
-| `AUTH_PERSISTENCE_ENABLED` | `false` | Persist auth keys to DB |
-| `AUTH_DB_PATH` | `src/reasoner/auth_keys.db` | SQLite auth DB path. `docker-compose.yml` sets `/app/history/auth_keys.db` (a mounted volume); the in-package default is lost on redeploy |
 | `PRESET_TIER_ENFORCEMENT_ENABLED` | `false` | Return an early HTTP 403 (before credit reservation) when a caller's tier is below the preset's required tier. Premium presets are already refused at runtime either way, as an SSE `PRESET_TIER_REQUIRED` frame after reservation; this flag only changes when and how the refusal surfaces |
 | `EMAIL_VERIFICATION_MODE` | `observe` | Gate on the FREE monthly credit grant and API key creation for accounts whose email is not verified. `observe` counts them in `reasoner_unverified_access_total` and allows; `enforce` withholds the grant and refuses key creation with 403 `email_unverified`. See `docs/plans/email-verification-2026-11-12.md` |
 | `EMAIL_VERIFICATION_CUTOFF` | — | ISO-8601 UTC time. Accounts created before it skip the gate (grandfathered). Set it in the deploy that switches to `enforce`. A value that does not parse grandfathers nobody and logs an error |
@@ -95,6 +94,7 @@ user's problem, to TypeSafe.
 | `CSRF_ENFORCE_BACKEND` | `true` | Require CSRF on state-changing ops |
 | `TRUSTED_PROXIES` | — | Comma-separated proxy IPs/CIDRs whose `X-Forwarded-For` is believed. Required when `ENVIRONMENT=production`: startup is refused when empty, because every client behind the proxy would share one rate-limit and anonymous-trial bucket |
 | `ALLOW_NO_TRUSTED_PROXIES` | — | `true` lets production start with `TRUSTED_PROXIES` empty. Only for a deployment with no proxy in front |
+| `ALLOW_ANONYMOUS_RUNS` | `false` | `true` lets callers run pipelines without an account, capped per client IP. Falls back to the retired `ENABLE_LEGACY_API_KEY` when unset |
 
 ## VS (Verbalized Sampling)
 

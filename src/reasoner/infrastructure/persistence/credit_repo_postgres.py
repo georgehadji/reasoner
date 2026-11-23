@@ -9,11 +9,9 @@ index on ``(user_id, reference_id)``.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import os
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import asyncpg
@@ -27,12 +25,14 @@ from reasoner.domain.credits import (
     LedgerWrite,
     can_afford,
 )
+from reasoner.infrastructure.persistence.pg_pool import get_shared_pool
 
 logger = logging.getLogger(__name__)
 
 _LEDGER_COLUMNS = (
     "id, user_id, delta, balance_after, reason, reference_id, description, created_at"
 )
+_ORPHAN_LOOKBACK = timedelta(days=7)
 _SELECT_BY_REFERENCE = (
     f"SELECT {_LEDGER_COLUMNS} FROM credit_ledger WHERE user_id = $1 AND reference_id = $2"
 )
@@ -54,32 +54,11 @@ def _to_entry(row: asyncpg.Record) -> CreditLedgerEntry:
 class PostgresCreditRepository(CreditRepository):
     """Atomic credit ledger storage in PostgreSQL."""
 
-    _pool: asyncpg.Pool | None = None
-    _pool_lock: asyncio.Lock | None = None
-
-    def __init__(self, dsn: str, pool_size: int | None = None):
+    def __init__(self, dsn: str):
         self._dsn = dsn
-        self._pool_size = (
-            pool_size
-            if pool_size is not None
-            else int(os.environ.get("DB_POOL_SIZE", "10"))
-        )
 
     async def _get_pool(self) -> asyncpg.Pool:
-        if PostgresCreditRepository._pool_lock is None:
-            PostgresCreditRepository._pool_lock = asyncio.Lock()
-
-        if PostgresCreditRepository._pool is not None:
-            return PostgresCreditRepository._pool
-
-        async with PostgresCreditRepository._pool_lock:
-            if PostgresCreditRepository._pool is None:
-                PostgresCreditRepository._pool = await asyncpg.create_pool(
-                    self._dsn,
-                    min_size=1,
-                    max_size=self._pool_size,
-                )
-            return PostgresCreditRepository._pool
+        return await get_shared_pool(self._dsn)
 
     # ── Reads ──────────────────────────────────────────────────────────
 
@@ -132,13 +111,17 @@ class PostgresCreditRepository(CreditRepository):
         rows = await pool.fetch(
             "SELECT r.id, r.user_id, r.delta, r.balance_after, r.reason, r.reference_id, "
             "r.description, r.created_at FROM credit_ledger r "
+            # Lower bound keeps the partial index scan (migration 20261114_000800)
+            # off ancient rows; a reserve older than this is past recovery.
             "WHERE r.reference_id LIKE '%:reserve' AND r.created_at < $1 "
+            "AND r.created_at > $3 "
             "AND NOT EXISTS (SELECT 1 FROM credit_ledger s WHERE s.user_id = r.user_id "
             "AND s.reference_id IN (left(r.reference_id, -8), "
             "left(r.reference_id, -8) || ':release')) "
             "ORDER BY r.created_at LIMIT $2",
             older_than,
             max(1, min(limit, 500)),
+            datetime.now(UTC) - _ORPHAN_LOOKBACK,
         )
         return [_to_entry(r) for r in rows]
 

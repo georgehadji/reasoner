@@ -87,8 +87,8 @@ Trust boundaries:
 | Threat | Asset | Risk | Mitigation | Status |
 |--------|-------|------|------------|--------|
 | Admin endpoint access without key | System control | High | Dual auth: JWT admin scope + `X-Admin-Key`; `secrets.compare_digest()` | ✅ Implemented |
-| Tier bypass via force_pipeline flag | Premium features | Medium | Preset tier enforcement in `require_tier` dependency | ⚠️ Placeholder (fails closed in prod) |
-| Legacy API key abuse | Auth bypass | Low | `ENABLE_LEGACY_API_KEY` disabled by default; migration path documented | ✅ Implemented |
+| Tier bypass via force_pipeline flag | Premium features | Medium | Preset tier enforcement in `check_preset_access` (behind `PRESET_TIER_ENFORCEMENT_ENABLED`) | ⚠️ Flag-gated |
+| Legacy API key abuse | Auth bypass | Low | Legacy key auth removed; only `rsn_` keys and JWTs authenticate | ✅ Implemented |
 | Path traversal in save/load | File system | Low | `Path(path).parts` traversal check in `PipelineState.save()` and `.load()` | ✅ Implemented |
 | Dependency vulnerability | Supply chain | Medium | `pip-audit` in CI; scheduled nightly scans | ✅ Implemented (Phase 4.4) |
 
@@ -105,7 +105,7 @@ Trust boundaries:
 
 ## Open Items
 
-1. **Tier enforcement** (Medium): `require_tier()` fails closed in production. Needs actual subscription DB integration (tracked as #501).
+1. **Tier enforcement** (Medium): `check_preset_access` resolves the caller's tier from their subscription and falls back to FREE when it cannot, but only runs when `PRESET_TIER_ENFORCEMENT_ENABLED` is set (tracked as #501).
 2. **Quota enforcement** (Medium): `check_quota()` uses conservative defaults. Needs tier-per-user DB (tracked as #502).
 3. **PostgreSQL RLS** (Medium): Row-level security not configured. Mitigated by connection-string auth, but defense-in-depth recommended.
 4. **Provider response authenticity** (Low): No cryptographic verification of LLM responses. Circuit breaker mitigates via fallback chain.

@@ -11,6 +11,7 @@ from reasoner.core.ports.metrics_port import (
     set_degradation_counter,
     set_illegal_transition_counter,
     set_quota_exceeded_counter,
+    set_stakes_counter,
     set_unverified_access_counter,
 )
 
@@ -41,6 +42,28 @@ except Exception:  # pragma: no cover
         return b""
 
     CONTENT_TYPE_LATEST = "text/plain; charset=utf-8"
+
+# High-stakes (health, law, finance) detection and policy (docs/plans/high-stakes-reliability.md).
+STAKES_DETECTED_TOTAL = Counter(
+    "reasoner_stakes_detected_total",
+    "Questions detected as high-stakes",
+    ["domain", "source"],
+)
+STAKES_POLICY_REROUTED_TOTAL = Counter(
+    "reasoner_stakes_policy_rerouted_total",
+    "Gate decisions the stakes policy rerouted to a grounded pipeline",
+    ["from_action"],
+)
+
+
+def _count_stakes(kind: str, a: str, b: str) -> None:
+    if kind == "detected":
+        STAKES_DETECTED_TOTAL.labels(domain=a, source=b).inc()
+    elif kind == "rerouted":
+        STAKES_POLICY_REROUTED_TOTAL.labels(from_action=a).inc()
+
+
+set_stakes_counter(_count_stakes)
 
 # Request counters
 REASONER_QUERIES_TOTAL = Counter(

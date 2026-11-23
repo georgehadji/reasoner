@@ -139,3 +139,25 @@ def test_application_layer_holds_no_pricing_shim():
         f"{stale} is back; alias-aware pricing belongs in "
         f"infrastructure/llm/pricing_resolver.py, which needs no injected port"
     )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("cls_name", ["AnthropicDirectProvider", "OpenAIDirectProvider",
+                                      "GoogleDirectProvider"])
+def test_direct_lane_model_names_price_at_their_real_rate(no_registry_port, caplog, cls_name):
+    # A direct lane reports the vendor's bare name ("claude-sonnet-5"), not the
+    # catalogue's "anthropic/claude-sonnet-5"; it used to cost the $1/$5 default.
+    import reasoner.infrastructure.llm.providers.direct as direct
+
+    name = getattr(direct, cls_name)().model
+    with caplog.at_level(logging.WARNING):
+        pricing = get_pricing(name)
+    assert pricing is not PRICING_DB["_default"]
+    assert [k for k, v in PRICING_DB.items() if k.endswith("/" + name)] and not caplog.records
+
+
+@pytest.mark.parametrize("model_id", ["ollama-qwen2", "qwen2"])
+def test_local_model_is_free(no_registry_port, model_id):
+    # Call metadata carries the served id ("qwen2"); it used to fall through to
+    # the paid default, so a run on the user's own Ollama showed a dollar cost.
+    assert get_pricing(model_id).calculate_cost(10_000, 10_000) == 0.0

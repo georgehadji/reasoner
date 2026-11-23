@@ -238,6 +238,40 @@ class StripeBillingAdapter(BillingPort):
                 return
             raise
 
+    async def refund_latest_charge(self, subscription_id: str) -> None:
+        """Refund what the subscription's latest invoice collected.
+
+        The idempotency key makes a retried or replayed webhook refund once.
+        """
+        current = to_plain(
+            await asyncio.to_thread(stripe.Subscription.retrieve, subscription_id)
+        )
+        invoice_id = current.get("latest_invoice")
+        if isinstance(invoice_id, dict):
+            invoice_id = invoice_id.get("id")
+        if not invoice_id:
+            logger.warning("No invoice to refund for subscription %s", subscription_id)
+            return
+        payments = to_plain(
+            await asyncio.to_thread(stripe.InvoicePayment.list, invoice=invoice_id, status="paid")
+        )
+        intent = next(
+            (
+                (p.get("payment") or {}).get("payment_intent")
+                for p in payments.get("data", [])
+                if (p.get("payment") or {}).get("payment_intent")
+            ),
+            None,
+        )
+        if not intent:
+            logger.warning("No paid payment found to refund for subscription %s", subscription_id)
+            return
+        await asyncio.to_thread(
+            stripe.Refund.create,
+            payment_intent=intent,
+            idempotency_key=f"duplicate-subscription-refund:{subscription_id}",
+        )
+
     async def _handle_payment_failed(self, invoice: dict) -> Subscription:
         # API 2025-03-31 moved the invoice's subscription under
         # parent.subscription_details; older endpoint versions send it top-level.
@@ -278,8 +312,39 @@ class StripeBillingAdapter(BillingPort):
             user_id=await self._resolve_user_id({"customer": customer_id}),
             tier=SubscriptionTier.FREE,
             status=SubscriptionStatus.PAST_DUE,
+            stripe_subscription_id=await self._charge_subscription_id(obj),
             stripe_customer_id=customer_id,
         )
+
+    async def _charge_subscription_id(self, obj: dict) -> str | None:
+        """The subscription the refunded or disputed charge paid for, else None.
+
+        BillingService uses it to leave a different live subscription alone
+        (a refunded duplicate checkout). None means unknown, and the caller then
+        acts as before. Lookup failures are logged, never raised: a chargeback
+        must still be applied.
+        """
+        intent = obj.get("payment_intent")
+        if not intent:
+            return None
+        try:
+            payments = to_plain(
+                await asyncio.to_thread(
+                    stripe.InvoicePayment.list,
+                    payment={"type": "payment_intent", "payment_intent": intent},
+                )
+            )
+            invoice_id = next(
+                (p.get("invoice") for p in payments.get("data", []) if p.get("invoice")), None
+            )
+            if not invoice_id:
+                return None
+            invoice = to_plain(await asyncio.to_thread(stripe.Invoice.retrieve, invoice_id))
+            details = (invoice.get("parent") or {}).get("subscription_details") or {}
+            return details.get("subscription") or invoice.get("subscription")
+        except Exception:  # noqa: BLE001 - best effort, see docstring
+            logger.warning("Could not resolve the subscription of charge %s", obj.get("id"))
+            return None
 
     def _timestamp_to_datetime(self, ts: int | None):
         from datetime import datetime
@@ -295,4 +360,4 @@ def _subscription_repo():
     )
 
     dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-    return PostgresSubscriptionRepository(dsn, pool_size=10)
+    return PostgresSubscriptionRepository(dsn)

@@ -53,76 +53,6 @@ ARTICLE_COVE_REVISE_SYSTEM = (
 )
 
 
-def article_cove_draft_prompt(state, sources_json: str) -> str:
-    return (
-        f'{get_language_instruction(state)}\n\n'
-        f'Topic: {_wrap_user_input(state.problem)}\n\n'
-        f'Sources:\n{sources_json}\n\n'
-        f'Draft atomic claims from the sources. Rules:\n'
-        f'- One factual statement per claim\n'
-        f'- No interpretation or speculation\n'
-        f'- Must be directly supported by source text\n'
-        f'- Assign a confidence score (0.0-1.0) per claim\n\n'
-        f'Output JSON: {{"claims": [{{'
-        f'"id": "C1", "text": "...", "source_url": "...", "confidence": 0.85'
-        f'}}]}}'
-    )
-
-
-def article_cove_verify_prompt(state, claims_json: str, sources_json: str) -> str:
-    return (
-        f'{get_language_instruction(state)}\n\n'
-        f'Draft Claims:\n{claims_json}\n\n'
-        f'Sources:\n{sources_json}\n\n'
-        f'For EACH claim above, generate 1-2 specific verification questions that would '
-        f'independently test whether the claim is true. The questions must be answerable '
-        f'from the sources without referring to the claims.\n\n'
-        f'Output JSON: {{"verification_questions": [{{'
-        f'"question": "...", "target_claim_id": "C1", "expected_evidence_type": "fact|statistic|authority"'
-        f'}}]}}'
-    )
-
-
-def article_cove_answer_prompt(state, questions_json: str, sources_json: str) -> str:
-    return (
-        f'{get_language_instruction(state)}\n\n'
-        f'Sources:\n{sources_json}\n\n'
-        f'Answer these verification questions INDEPENDENTLY using ONLY the sources above. '
-        f'CRITICAL: Be skeptical. If a source mentions the topic but does NOT directly support the specific claim, '
-        f'state "insufficient evidence" rather than "supports". '
-        f'Flag any claim that generalizes beyond what the source explicitly states. '
-        f'Do not refer to any draft claims. For each question, explicitly state whether '
-        f'the evidence supports, contradicts, or is insufficient.\n\n'
-        f'VERDICT RULES:\n'
-        f'- SUPPORTS: The source contains an EXACT or unambiguous paraphrase of the claim. You must quote the supporting passage.\n'
-        f'- CONTRADICTS: The source explicitly says the opposite. You must quote the contradicting passage.\n'
-        f'- INSUFFICIENT: The source mentions the topic but does not directly confirm or deny the specific claim.\n'
-        f'When in doubt, choose INSUFFICIENT. Do not give benefit of the doubt.\n\n'
-        f'Questions:\n{questions_json}\n\n'
-        f'Output JSON: {{"answers": [{{'
-        f'"question": "...", "answer": "...", "verdict": "supports|contradicts|insufficient", '
-        f'"confidence": 0.8, "reasoning": "...", '
-        f'"supporting_quote": "exact passage from source that supports this (empty if insufficient or contradicts)"'
-        f'}}]}}'
-    )
-
-
-def article_cove_revise_prompt(state, claims_json: str, answers_json: str) -> str:
-    return (
-        f'{get_language_instruction(state)}\n\n'
-        f'Draft Claims:\n{claims_json}\n\n'
-        f'Independent Verification Results:\n{answers_json}\n\n'
-        f'Revise the claim list. Keep ONLY claims where verification explicitly SUPPORTS them with direct evidence. '
-        f'Downgrade claims where verification states "insufficient evidence" to "weak" (not "verified"). '
-        f'Remove contradicted claims. Add caveats for insufficient evidence. Document what changed.\n\n'
-        f'Output JSON: {{"claims": [{{'
-        f'"id": "C1", "text": "...", "source_url": "...", "confidence": 0.85, "status": "verified|weak|rejected"'
-        f'}}], '
-        f'"changes_made": ["..."], '
-        f'"remaining_uncertainties": ["..."]}}'
-    )
-
-
 # ── Pre-Mortem for Articles ──────────────────────────────────────────────────
 
 ARTICLE_PRE_MORTEM_SYSTEM = (
@@ -132,26 +62,6 @@ ARTICLE_PRE_MORTEM_SYSTEM = (
     "Keep 'failure_narrative' to ONE sentence (max 30 words). "
     + JSON_ONLY_FOOTER
 )
-
-
-def article_pre_mortem_prompt(state, article: str, claims_json: str) -> str:
-    return (
-        f'{get_language_instruction(state)}\n\n'
-        f'Article Draft:\n{article}\n\n'
-        f'Claims:\n{claims_json}\n\n'
-        f'Imagine this article was submitted to a top-tier journal and was REJECTED. '
-        f'Work backwards: what went wrong?\n\n'
-        f'Return ONLY this JSON object (no markdown fences, no extra text):\n'
-        f'{{\n'
-        f'  "failure_narrative": "<ONE sentence, max 30 words, plain text, no quotes inside>",\n'
-        f'  "root_causes": ["<short phrase>", "..."],\n'
-        f'  "weak_sections": ["<section name>", "..."],\n'
-        f'  "challenged_claims": ["<short phrase>", "..."],\n'
-        f'  "missing_counterarguments": ["<short phrase>", "..."],\n'
-        f'  "overgeneralizations": ["<short phrase>", "..."],\n'
-        f'  "early_warnings": ["<short phrase>", "..."]\n'
-        f'}}'
-    )
 
 
 # ── SoT for Article Synthesis ────────────────────────────────────────────────
@@ -186,68 +96,6 @@ ACADEMIC_SOT_SOLVE_SYSTEM = (
     + JSON_ONLY_FOOTER
     + HUMANIZATION_RULES
 )
-
-
-def article_sot_skeleton_prompt(state, claims_json: str) -> str:
-    return (
-        f'{get_language_instruction(state)}\n\n'
-        f'Topic: {_wrap_user_input(state.problem)}\n\n'
-        f'Verified Claims:\n{claims_json}\n\n'
-        f'Create an article skeleton. Break into sections that can be written in parallel. '
-        f'For each section, specify:\n'
-        f'1. Section heading\n'
-        f'2. Which claims it uses (by claim_id)\n'
-        f'3. Dependencies (which sections must be written before this one)\n'
-        f'4. Estimated word count\n\n'
-        f'Output JSON: {{"sections": [{{'
-        f'"id": "S1", "heading": "...", "claim_ids": ["C1"], '
-        f'"dependencies": [], "word_count": 200'
-        f'}}]}}'
-    )
-
-
-def academic_sot_skeleton_prompt(state, claims_json: str) -> str:
-    doc_type = state.writing_state.get("document_type", "paper")
-    if doc_type == "thesis":
-        sections_guide = (
-            "Abstract | Introduction (research question, scope, significance) | "
-            "Literature Review (existing scholarship, theoretical framework, research gap) | "
-            "Methodology (research design, data sources, analytical approach) | "
-            "Findings (primary results, organized thematically) | "
-            "Analysis & Discussion (interpretation, implications, limitations) | "
-            "Conclusion (contributions, synthesis, future research) | "
-            "Bibliography"
-        )
-        word_targets = (
-            "Abstract: 250, Introduction: 600, Literature Review: 1000, "
-            "Methodology: 600, Findings: 800, Analysis & Discussion: 800, Conclusion: 500"
-        )
-    else:
-        sections_guide = (
-            "Abstract | Introduction (background, research question, objectives) | "
-            "Literature Review (related work, theoretical basis) | "
-            "Methodology (approach, data, analysis method) | "
-            "Results & Discussion (findings, interpretation, limitations) | "
-            "Conclusion (summary, implications, future work) | "
-            "References"
-        )
-        word_targets = (
-            "Abstract: 200, Introduction: 400, Literature Review: 600, "
-            "Methodology: 400, Results & Discussion: 600, Conclusion: 300"
-        )
-    return (
-        f'{get_language_instruction(state)}\n\n'
-        f'Topic: {_wrap_user_input(state.problem)}\n'
-        f'Document Type: {doc_type.title()}\n\n'
-        f'Verified Claims:\n{claims_json}\n\n'
-        f'Generate an academic skeleton following this structure:\n{sections_guide}\n\n'
-        f'Target word counts: {word_targets}\n\n'
-        f'For each section assign the relevant claim_ids and specify its academic purpose.\n\n'
-        f'Output JSON: {{"sections": [{{'
-        f'"id": "S1", "heading": "...", "claim_ids": ["C1"], '
-        f'"purpose": "...", "dependencies": [], "word_count": 400'
-        f'}}]}}'
-    )
 
 
 def article_sot_solve_prompt(state, section: dict, claims_json: str) -> str:

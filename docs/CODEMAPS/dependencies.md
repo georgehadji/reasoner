@@ -1,4 +1,4 @@
-<!-- Generated: 2026-11-13 | Files scanned: 532 | Token estimate: ~650 -->
+<!-- Generated: 2026-11-23 | Files scanned: 537 | Token estimate: ~650 -->
 
 # Dependencies — Reasoner
 
@@ -358,7 +358,7 @@ app/chat/page.tsx
   ├─ hooks/useConversationHistory
   ├─ components/ChatFeed
   ├─ components/Composer
-  ├─ components/PhaseTimeline
+  ├─ components/chat/RunProgress
   └─ stores/app-store (Zustand)
 ```
 

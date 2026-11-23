@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import {
   Sparkles,
   Trash2,
-  Sun,
   PanelLeft,
   Brain,
   Copy,
@@ -31,7 +30,6 @@ interface CommandPaletteProps {
   onClose: () => void;
   onNew: () => void;
   onClearComposer: () => void;
-  onToggleTheme: () => void;
   onToggleSidebar: () => void;
   onToggleNeuro: () => void;
   onToggleTier: () => void;
@@ -49,7 +47,6 @@ export function CommandPalette({
   onClose,
   onNew,
   onClearComposer,
-  onToggleTheme,
   onToggleSidebar,
   onToggleNeuro,
   onToggleTier,
@@ -60,6 +57,7 @@ export function CommandPalette({
   onRecordCommand,
 }: CommandPaletteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const router = useRouter();
@@ -68,7 +66,6 @@ export function CommandPalette({
     () => [
       { id: 'new', label: 'New problem', icon: <Sparkles className="h-4 w-4" />, action: onNew },
       { id: 'clear', label: 'Clear composer', icon: <Trash2 className="h-4 w-4" />, shortcut: 'Ctrl+L', action: onClearComposer },
-      { id: 'theme', label: 'Toggle theme', icon: <Sun className="h-4 w-4" />, action: onToggleTheme },
       { id: 'sidebar', label: 'Toggle sidebar', icon: <PanelLeft className="h-4 w-4" />, shortcut: 'B', action: onToggleSidebar },
       { id: 'neuro', label: 'Open Neuro panel', icon: <Brain className="h-4 w-4" />, action: onToggleNeuro },
       { id: 'tier', label: tier === 'premium' ? 'Switch to Budget' : 'Switch to Premium', icon: <ArrowUpCircle className="h-4 w-4" />, action: onToggleTier },
@@ -80,7 +77,7 @@ export function CommandPalette({
         ? [{ id: 'clear-cache', label: 'Clear server cache', icon: <DatabaseZap className="h-4 w-4" />, action: onClearCache }]
         : []),
     ],
-    [onNew, onClearComposer, onToggleTheme, onToggleSidebar, onToggleNeuro, onToggleTier, tier, onCopyLastResponse, onClearCache, router, onClose]
+    [onNew, onClearComposer, onToggleSidebar, onToggleNeuro, onToggleTier, tier, onCopyLastResponse, onClearCache, router, onClose]
   );
 
   const filtered = useMemo(() => {
@@ -91,12 +88,22 @@ export function CommandPalette({
 
   useEffect(() => {
     if (!isOpen) return;
+    const opener = document.activeElement as HTMLElement | null;
+    const root = rootRef.current;
     const raf = requestAnimationFrame(() => {
       setQuery('');
       setSelectedIndex(0);
       inputRef.current?.focus();
     });
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      // Closing makes the palette inert, which drops focus to <body>; hand it
+      // back to the opener, unless the command just run moved focus elsewhere.
+      const active = document.activeElement;
+      if (!active || active === document.body || root?.contains(active)) {
+        opener?.focus();
+      }
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -131,7 +138,11 @@ export function CommandPalette({
     // Closed, it stays mounted only to animate out; `inert` keeps its input out
     // of the Tab order and the accessibility tree, as `pointer-events-none` does not.
     <div
+      ref={rootRef}
       inert={!isOpen}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Command palette"
       className={cn(
         'fixed inset-0 z-[400] flex items-start justify-center p-4 pt-[20vh] transition-all duration-[var(--dur-component)]',
         isOpen
@@ -159,14 +170,15 @@ export function CommandPalette({
               setSelectedIndex(0);
             }}
             placeholder="Type a command..."
-            className="flex-1 bg-transparent text-[length:var(--text-sm)] text-[var(--text)] outline-none placeholder:text-[var(--text-muted)]"
+            aria-label="Search commands"
+            className="-my-[var(--space-1)] flex-1 rounded-[var(--radius-sm)] bg-transparent px-[var(--space-2)] py-[var(--space-1)] text-[length:var(--text-sm)] text-[var(--text)] placeholder:text-[var(--text-muted)]"
           />
           <kbd className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[length:var(--text-2xs)] text-[var(--text-muted)]">ESC</kbd>
         </div>
 
         {recentCommands.length > 0 && !query && (
           <div className="px-2 py-2">
-            <p className="mb-1 px-2 text-[length:var(--text-2xs)] font-medium uppercase tracking-wider text-[var(--text-muted)]">Recent</p>
+            <p className="mb-1 px-2 text-[length:var(--text-2xs)] font-medium text-[var(--text-muted)]">Recent</p>
             {recentCommands.map((id) => {
               const cmd = commands.find((c) => c.id === id);
               if (!cmd) return null;

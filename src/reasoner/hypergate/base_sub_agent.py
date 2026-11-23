@@ -186,9 +186,11 @@ class BaseSubAgent(ABC):
             timeout_seconds=self.TIMEOUT_SECONDS,
         )
         from reasoner.infrastructure.llm.ports import DegradedLLMResponse
-        if isinstance(result, DegradedLLMResponse):
-            raise RuntimeError(result.error)
-        return result
+        raw, meta = result
+        # The degraded marker is the text half of the tuple, not the tuple.
+        if isinstance(raw, DegradedLLMResponse):
+            raise RuntimeError(raw.error)
+        return raw, meta
 
     @staticmethod
     def _extract_json(text: str) -> dict[str, Any]:

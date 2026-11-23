@@ -413,7 +413,7 @@ Copy `.env.example` to `.env` and fill in:
 |----------|---------|
 | `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Supabase project credentials |
 | `JWT_SECRET_KEY` | Local dev JWT fallback when Supabase is unavailable |
-| `ENABLE_LEGACY_API_KEY` | Set `true` for v1 API backward compatibility |
+| `ALLOW_ANONYMOUS_RUNS` | Set `true` to allow account-less runs (fallback: legacy `ENABLE_LEGACY_API_KEY`) |
 
 **Database & Cache**
 | Variable | Purpose |

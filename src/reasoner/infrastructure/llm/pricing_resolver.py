@@ -36,6 +36,30 @@ from reasoner.infrastructure.llm.registry import _REGISTRY
 
 logger = logging.getLogger(__name__)
 
+# Local models (Ollama) run on the user's own machine and have no per-token
+# price. Keyed by alias and by served id, because call metadata carries the
+# served id ("qwen2"), which is neither a catalogue key nor a registry alias
+# and so used to fall through to the paid default.
+_LOCAL_MODEL_IDS = frozenset(
+    mid
+    for alias, entry in _REGISTRY.items()
+    if entry.get("is_local")
+    for mid in (alias, entry.get("model"))
+    if mid
+)
+_FREE = ModelPricing(0.0, 0.0)
+
+# The direct-provider lanes (providers/direct.py) report the vendor's own model
+# name ("claude-sonnet-5"), which is the catalogue id minus its "vendor/"
+# prefix. Index that bare name, dropping any name two vendors share, so a
+# direct call is priced at its real rate instead of the $1/$5 default.
+_by_name: dict[str, str | None] = {}
+for _mid in PRICING_DB:
+    if "/" in _mid:
+        _name = _mid.split("/", 1)[1]
+        _by_name[_name] = None if _name in _by_name else _mid
+_BARE_NAME_TO_ID = {name: mid for name, mid in _by_name.items() if mid}
+
 
 def get_pricing(model_id: str) -> ModelPricing:
     """Pricing for *model_id*, resolving registry aliases.
@@ -48,6 +72,8 @@ def get_pricing(model_id: str) -> ModelPricing:
     pricing = _domain_get_pricing(model_id)
     if pricing is not PRICING_DB["_default"]:
         return pricing
+    if model_id in _LOCAL_MODEL_IDS:
+        return _FREE
 
     entry = _REGISTRY.get(model_id)
     served = entry.get("model") if entry else None
@@ -56,6 +82,8 @@ def get_pricing(model_id: str) -> ModelPricing:
     # does) turns a hit into a miss for exactly those entries.
     if served in PRICING_DB:
         return PRICING_DB[served]
+    if model_id in _BARE_NAME_TO_ID:
+        return PRICING_DB[_BARE_NAME_TO_ID[model_id]]
 
     logger.warning(
         "No pricing for model %r (registry served id: %r) — falling back to the "
@@ -76,12 +104,21 @@ def call_cost_usd(metadata: dict) -> float:
     the DIRECT answer path, so neither bills $0 for a call that had tokens
     (docs/plans/audit-remediation-2026-10-20.md BIL-2).
     """
+    # Replies the router threw away (empty bodies) were billed too. Their cost and
+    # tokens ride on the final call under discarded_*. When they reported a cost, the
+    # call's own estimate must not price their tokens again; when they reported none,
+    # their tokens stay in the estimate, at the final model's rate.
+    discarded = metadata.get("discarded_cost_usd", 0.0) or 0.0
     cost = metadata.get("cost_usd", 0.0) or 0.0
     input_tokens = metadata.get("input_tokens", 0) or 0
-    if cost > 0 or input_tokens <= 0:
-        return cost
     output_tokens = metadata.get("output_tokens", 0) or 0
-    return get_pricing(metadata.get("model", "unknown")).calculate_cost(input_tokens, output_tokens)
+    if discarded > 0:
+        input_tokens -= metadata.get("discarded_input_tokens", 0) or 0
+        output_tokens -= metadata.get("discarded_output_tokens", 0) or 0
+    if cost > 0 or input_tokens <= 0:
+        return cost + discarded
+    own = get_pricing(metadata.get("model", "unknown")).calculate_cost(input_tokens, output_tokens)
+    return own + discarded
 
 
 __all__ = ["call_cost_usd", "get_pricing"]

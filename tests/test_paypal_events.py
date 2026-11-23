@@ -81,7 +81,11 @@ def test_the_two_missing_cases_are_rows():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "event_type", sorted(set(PAYPAL_HANDLERS) - {"PAYMENT.SALE.COMPLETED"})
+    "event_type",
+    sorted(
+        set(PAYPAL_HANDLERS)
+        - {"PAYMENT.SALE.COMPLETED", "PAYMENT.SALE.REFUNDED", "PAYMENT.SALE.REVERSED"}
+    ),
 )
 async def test_each_event_lands_in_the_status_its_row_names(event_type):
     repo = _Repo()

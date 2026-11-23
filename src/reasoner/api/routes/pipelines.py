@@ -21,7 +21,8 @@ from reasoner.api.run_admission import MeteredSSEResponse, admit_run
 from reasoner.api.run_observability import CreditSink, PrometheusObserver
 from reasoner.application.queries import GetPipelineStatusQuery
 from reasoner.application.services.run_metering import metered
-from reasoner.auth import Scope
+from reasoner.domain.auth import Scope
+from reasoner.domain.api_keys import RUN_SCOPE
 from reasoner.domain.saas import User
 
 logger = logging.getLogger(__name__)
@@ -150,7 +151,7 @@ async def get_pipeline_status(
 @router.post("/api/pipelines/{pipeline_id}/resume")
 async def resume_pipeline(
     pipeline_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_key_scope(RUN_SCOPE)),
     csrf_checked=Depends(require_csrf),
 ):
     """Resume a paused/failed pipeline from event history."""

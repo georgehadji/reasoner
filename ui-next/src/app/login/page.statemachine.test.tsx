@@ -12,6 +12,7 @@ vi.mock('@/lib/auth', () => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/login',
 }));
 
 import LoginPage from './page';

@@ -36,8 +36,8 @@ async def _seed(conn) -> str:
     ))
     await conn.execute(
         "INSERT INTO subscriptions (user_id, tier, status, current_period_start, "
-        "current_period_end, stripe_sub_id) VALUES ($1, 'pro', 'active', now(), now(), 'sub_1')",
-        uid,
+        "current_period_end, stripe_sub_id) VALUES ($1, 'pro', 'active', now(), now(), $2)",
+        uid, f"sub_{uuid4().hex}",  # stripe_sub_id is unique; tests seed several users
     )
     await conn.execute(
         "INSERT INTO usage_quotas (user_id, tier, used_queries, max_queries, period_start) "
@@ -136,7 +136,7 @@ async def test_the_pg_stores_are_named_for_the_registry():
         return None
 
     assert [s.name for s in pg_user_data_stores(get_pool)] == [
-        "query_log", "credit_ledger", "quota", "subscriptions", "profile",
+        "webhook_dead_letter", "query_log", "credit_ledger", "quota", "subscriptions", "profile",
     ]
 
 
@@ -157,7 +157,7 @@ async def test_api_key_cap_holds_under_parallel_creates():
             user_id = str(await _seed(conn))
         finally:
             await conn.close()
-        repo = PostgresApiKeyRepository(dsn, pool_size=10)
+        repo = PostgresApiKeyRepository(dsn)
         before = await repo.count_live_for_user(user_id)
         results = await asyncio.gather(*(
             repo.create(user_id, f"k{i}", f"h-{uuid4()}", "p", frozenset({"read"}), max_live=5)
@@ -165,3 +165,45 @@ async def test_api_key_cap_holds_under_parallel_creates():
         ))
         assert sum(r is not None for r in results) == max(0, 5 - before)
         assert await repo.count_live_for_user(user_id) == max(5, before)
+
+
+async def test_erase_removes_the_users_dead_lettered_webhook_events_only():
+    """Audit 7, finding 14: ``failed_webhook_events.payload`` holds the raw provider
+    event, and the table has no user column to delete by."""
+    import json
+
+    import asyncpg
+
+    async with _fresh_database() as dsn:
+        _alembic_upgrade(dsn)
+        pool = await asyncpg.create_pool(dsn, min_size=1, max_size=2)
+        try:
+            async with pool.acquire() as conn:
+                uid, other = await _seed(conn), await _seed(conn)
+                sub = await conn.fetchval(
+                    "SELECT stripe_sub_id FROM subscriptions WHERE user_id = $1", uid
+                )
+                email = await conn.fetchval("SELECT email FROM users WHERE id = $1", uid)
+                assert other
+                # The user's own email goes; one that merely contains it stays.
+                for ident in (sub, email, "sub_other_user", f"jim{email}"):
+                    payload = {"id": f"evt_{uuid4().hex}", "data": {"object": {"id": ident}}}
+                    await conn.execute(
+                        "INSERT INTO failed_webhook_events (provider, event_type, payload, error) "
+                        "VALUES ('stripe', 'invoice.paid', $1::jsonb, 'boom')", json.dumps(payload),
+                    )
+
+            async def get_pool():
+                return pool
+
+            for store in pg_user_data_stores(get_pool):
+                await store.erase(uid)
+
+            async with pool.acquire() as conn:
+                left = await conn.fetch("SELECT payload FROM failed_webhook_events")
+        finally:
+            await pool.close()
+
+    assert sorted(json.loads(r["payload"])["data"]["object"]["id"] for r in left) == sorted(
+        ["sub_other_user", f"jim{email}"]
+    )

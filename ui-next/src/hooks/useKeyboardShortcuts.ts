@@ -83,7 +83,8 @@ export function useKeyboardShortcuts({
         e.preventDefault();
         cbs.onToggleSidebar?.();
       }
-      if (e.key === 'Escape') {
+      // Escape inside a dialog closes that dialog; it must not also kill the run.
+      if (e.key === 'Escape' && !target.closest('dialog[open], [role="dialog"]')) {
         cbs.onStop?.();
       }
     }

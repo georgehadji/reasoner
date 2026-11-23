@@ -2,7 +2,6 @@
 
 import { useState, useRef, useCallback, useReducer, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTheme } from 'next-themes';
 import { useAppStore } from '@/stores/app-store';
 
 import { usePipelineStream } from '@/hooks/usePipelineStream';
@@ -16,12 +15,9 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Composer } from '@/components/layout/Composer';
 import { ShortcutModal } from '@/components/layout/ShortcutModal';
 import { CommandPalette } from '@/components/layout/CommandPalette';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { PhaseTimeline } from '@/components/layout/PhaseTimeline';
 import { UserMenu } from '@/components/layout/UserMenu';
 import { UpgradeModal } from '@/components/layout/UpgradeModal';
-import { SecurityBadge } from '@/components/layout/SecurityBadge';
 import { PipelineError } from '@/hooks/usePipelineStream';
 import { describeHttpError } from '@/lib/http-error';
 import { EmailVerifyBanner } from '@/components/layout/EmailVerifyBanner';
@@ -29,9 +25,8 @@ import { useIsLocalHost } from '@/lib/local-host';
 
 import { ChatFeed, ChatFeedMessage, RenderedPhase } from '@/components/chat/ChatFeed';
 import { ChatErrorBoundary } from '@/components/chat/ChatErrorBoundary';
-import { PipelineSkeleton } from '@/components/chat/PipelineSkeleton';
 import { PhaseEvent, Conversation, RunFollowupRequest, ConversationTurn, GateResponse } from '@/lib/types';
-import { METHOD_PHASES, METHOD_DESCRIPTIONS, LIMITS, PIPELINE_DEFAULTS } from '@/lib/config';
+import { METHOD_PHASES, LIMITS, PIPELINE_DEFAULTS } from '@/lib/config';
 import { buildMarkdownFromPhases } from '@/lib/markdown';
 import { saveConversation } from '@/lib/db';
 import { conversationToMessages } from '@/lib/conversation-history';
@@ -39,6 +34,7 @@ import { readSSEStream } from '@/lib/sse-reader';
 import { AttachmentUploadError, uploadAttachments, type UploadedAttachment } from '@/lib/attachments';
 import { copyToClipboard } from '@/lib/utils';
 import { clearCache, generateImage, generateImageEnhancement, resumePipelineStream, submitFeedback, fetchGateDecision } from '@/lib/api-client';
+import { FactsPrompt } from '@/components/chat/FactsPrompt';
 import { MethodChoicePrompt, MethodChoiceLoading } from '@/components/chat/MethodChoicePrompt';
 
 // --- Reducer function for managing messages state ---
@@ -173,6 +169,7 @@ function cleanDisplayPrompt(prompt: string): string {
 }
 
 const CONTINUATION_RE = /\b(continue|cont\.?|keep going|more|expand|elaborate|extend|add more|next (step|section|part)|again|revise|rewrite|improve|same topic|build on|follow up)\b/i;
+const isContinuation = (text: string) => CONTINUATION_RE.test(text);
 
 function clampImagePrompt(prompt: string) {
   const trimmed = prompt.trim();
@@ -216,6 +213,7 @@ export default function ChatPage() {
   const addRecentCommand = useAppStore((s) => s.addRecentCommand);
   const collapsed = useAppStore((s) => s.sidebarCollapsed);
   const autoMethodAlways = useAppStore((s) => s.autoMethodAlways);
+  const pickedMethod = useAppStore((s) => s.method);
   const toggleAutoMethodAlways = useAppStore((s) => s.toggleAutoMethodAlways);
 
   const { history, refresh: refreshHistory, remove: removeHistory } = useConversationHistory();
@@ -224,7 +222,6 @@ export default function ChatPage() {
   // Owns the active run's ticket: its abort signal, run id and conversation id.
   const run = useRunController(wsSendStop);
   const serverOnline = useServerStatus();
-  const { resolvedTheme, setTheme } = useTheme();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -244,17 +241,13 @@ export default function ChatPage() {
   // Auto-selected method from HyperGate — populated from the 'start' SSE event.
   const [autoSelectedMethod, setAutoSelectedMethod] = useState<string>(PIPELINE_DEFAULTS.method);
 
-  const [completedPhases, setCompletedPhases] = useState<number[]>([]);
   const [errorPhases, setErrorPhases] = useState<number[]>([]);
-  const [currentPhase, setCurrentPhase] = useState<number | undefined>(undefined);
-  const [phaseDurations, setPhaseDurations] = useState<Record<number, number>>({});
   const [phaseOpenMode, setPhaseOpenMode] = useState<'auto' | 'expand' | 'collapse'>('auto');
 
   // HyperGate method-confirmation gate — set while /api/gate is in flight,
   // and when it returns a low-confidence decision needing user input.
   const [gateChecking, setGateChecking] = useState(false);
   const [pendingChoice, setPendingChoice] = useState<{ problem: string; decision: GateResponse } | null>(null);
-  const phaseStartTimesRef = useRef<Record<number, number>>({});
   const chunkBufferRef = useRef('');
   const chunkFlushRafRef = useRef<number | null>(null);
 
@@ -268,8 +261,6 @@ export default function ChatPage() {
     };
   }, []);
 
-  const isContinuation = (text: string) => CONTINUATION_RE.test(text);
-
   const findLastAssistant = (msgs: ChatFeedMessage[]) => {
     for (let i = msgs.length - 1; i >= 0; i--) {
       if (msgs[i].role === 'assistant' && !msgs[i].isStreaming) return msgs[i];
@@ -278,7 +269,6 @@ export default function ChatPage() {
   };
 
   const {
-    scrollToBottom,
     showNewContentIndicator,
     dismissIndicator,
   } = useScrollAnchor(scrollContainerRef);
@@ -315,7 +305,7 @@ export default function ChatPage() {
   const submitRun = useCallback(async (
     ticket: RunTicket,
     problem: string,
-    opts?: { presetOverride?: string; skipGate?: boolean },
+    opts?: { presetOverride?: string; skipGate?: boolean; facts?: Record<string, string> },
   ) => {
 
     // ── HyperGate confirmation gate ──
@@ -323,8 +313,9 @@ export default function ChatPage() {
     // confident, proceed silently (today's UX). If it's not, pause here and let
     // the user confirm or pick a runner-up — skipped for image mode, follow-ups
     // (which don't go through HyperGate at all), and once the user opts out via
-    // "always pick automatically".
-    if (!opts?.skipGate && !isImageMode && !autoMethodAlways) {
+    // "always pick automatically", or when the user picked a method in the
+    // composer (there is nothing left for the gate to choose).
+    if (!opts?.skipGate && !isImageMode && !autoMethodAlways && !pickedMethod) {
       const lastAssistantMsgForGate = findLastAssistant(messages);
       const isFollowupForGate = !!lastAssistantMsgForGate && messages.length > 0 && isContinuation(problem);
       if (!isFollowupForGate) {
@@ -332,7 +323,7 @@ export default function ChatPage() {
         try {
           const gateResult = await fetchGateDecision(problem, getAutoPreset());
           setGateChecking(false);
-          if (gateResult.needs_confirmation && gateResult.preset) {
+          if (gateResult.stakes?.missing_facts?.length || (gateResult.needs_confirmation && gateResult.preset)) {
             setPendingChoice({ problem, decision: gateResult });
             return;
           }
@@ -351,13 +342,9 @@ export default function ChatPage() {
     setComposerText('');
     setRunning(true);
     // Resetting state that's managed by the parent component's state, not in the reducer
-    setCompletedPhases([]);
     setErrorPhases([]);
-    setCurrentPhase(undefined);
-    setPhaseDurations({});
     setAutoSelectedMethod(PIPELINE_DEFAULTS.method);
     setPhaseOpenMode('auto');
-    phaseStartTimesRef.current = {};
     chunkBufferRef.current = '';
     if (chunkFlushRafRef.current !== null) {
       cancelAnimationFrame(chunkFlushRafRef.current);
@@ -405,6 +392,7 @@ export default function ChatPage() {
       content: '',
       phases: [],
       isStreaming: true,
+      startedAt: Date.now(),
       currentPhaseName: undefined,
       loadingKind: undefined,
       loadingPrompt: undefined,
@@ -524,7 +512,7 @@ export default function ChatPage() {
                 : `Generated image using **${formattedImages[0]?.model || 'model'}**`,
             images: formattedImages,
             prompt_meta: { original: problem, enhanced: enhancedPrompt },
-          });
+          }, ticket.historyOwner);
           refreshHistory();
         } else {
           showImageResult(replyAdded, {
@@ -554,7 +542,12 @@ export default function ChatPage() {
     const isFollowup = !!lastAssistantMsg && messages.length > 0 && isContinuation(problem);
 
     let phases: RenderedPhase[] = [];
+    // Local, like `phases`: `messages` is this render's snapshot and never sees the steps
+    // dispatched during the run.
+    let researchSteps: NonNullable<ChatFeedMessage['researchSteps']> = [];
     let finalErrors: string[] = [];
+    // `done` lists every run error, including one an `error` frame already showed.
+    const shownErrors = new Set<string>();
     let finalTokens = { input: 0, output: 0, total: 0 };
     // Track the method discovered from the 'start' event within this run
     let runMethod = PIPELINE_DEFAULTS.method;
@@ -563,30 +556,35 @@ export default function ChatPage() {
     const onEvent = (ev: PhaseEvent) => {
       // Dispatch actions to the reducer based on event type
       switch (ev.type) {
-        case 'start':
+        case 'start': {
           if (ev.auto_selected_method) {
             runMethod = ev.auto_selected_method;
             setAutoSelectedMethod(ev.auto_selected_method);
           }
+          const startMethod = ev.auto_selected_method || ev.method;
+          if (startMethod) {
+            dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { method: startMethod } } });
+          }
           break;
+        }
         case 'method_selected':
+          // The run card's header carries the gate's choice and reason; it no
+          // longer lands in the feed as a separate "Using: …" line.
           if (ev.action === 'pipeline' && ev.method) {
-            const prettyMethod = ev.method.replace(/_/g, '-').replace(/\b\w/g, (l: string) => l.toUpperCase());
             const alts = (ev.alternatives || [])
               .map((a) => a.method.replace(/_/g, '-').replace(/\b\w/g, (l: string) => l.toUpperCase()))
               .join(', ');
-            const lowConfidence = typeof ev.confidence === 'number' && ev.confidence < 0.7;
-            const content = [
-              `Using: ${prettyMethod}${ev.reasoning ? ` — ${ev.reasoning}` : ''}`,
+            const classified = typeof ev.confidence === 'number' && ev.confidence > 0;
+            const lowConfidence = classified && (ev.confidence as number) < 0.7;
+            // Zero confidence means the gate could not classify; its reasoning
+            // is then an internal fallback note, not a reason.
+            const methodNote = [
+              classified && ev.reasoning ? ev.reasoning : null,
               lowConfidence && alts ? `Also considered: ${alts}` : null,
-            ].filter(Boolean).join(' · ');
+            ].filter(Boolean).join(' · ') || undefined;
             dispatchMessages({
-              type: 'ADD_MESSAGES',
-              payload: [{
-                id: 'info-method-' + Date.now(),
-                role: 'info',
-                content,
-              }],
+              type: 'UPDATE_MESSAGE',
+              payload: { messageId: assistantId, updates: { method: ev.method, methodNote } },
             });
           }
           break;
@@ -608,10 +606,8 @@ export default function ChatPage() {
             const methodPhases = getMethodPhases(runMethod);
             const displayName = ev.name || methodPhases.find((p) => p.id === ev.phase)?.name || '';
             const startModels = Array.isArray(ev.models) ? (ev.models as string[]) : undefined;
-            phaseStartTimesRef.current[ev.phase] = performance.now();
-            setCurrentPhase(ev.phase);
             // Update the assistant message to show current phase and models
-            dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { currentPhaseName: displayName, phaseModels: startModels } } });
+            dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { currentPhase: ev.phase, currentPhaseName: displayName, phaseModels: startModels } } });
           }
           break;
         case 'agent_start':
@@ -646,12 +642,13 @@ export default function ChatPage() {
             plan: String(ev.plan || ''),
             urls: Array.isArray(ev.urls) ? ev.urls : [],
           };
+          researchSteps = [...researchSteps, step];
           dispatchMessages({
             type: 'UPDATE_MESSAGE',
             payload: {
               messageId: assistantId,
               updates: {
-                researchSteps: [...(messages.find((m) => m.id === assistantId)?.researchSteps || []), step],
+                researchSteps,
               },
             },
           });
@@ -670,15 +667,6 @@ export default function ChatPage() {
               data: phaseData,
             };
             phases = [...phases, renderedPhase];
-            const serverDuration = typeof (phaseData as Record<string, unknown>).duration === 'number'
-              ? (phaseData as Record<string, unknown>).duration as number
-              : undefined;
-            const durationMs = serverDuration !== undefined
-              ? serverDuration * 1000
-              : performance.now() - (phaseStartTimesRef.current[phaseNum] ?? performance.now());
-            setPhaseDurations((prev) => ({ ...prev, [phaseNum]: durationMs / 1000 }));
-            setCompletedPhases((prev) => (prev.includes(phaseNum) ? prev : [...prev, phaseNum]));
-            setCurrentPhase(undefined);
 
             const phaseModels = (phaseData as Record<string, unknown>).models as string[] | undefined;
             
@@ -686,6 +674,7 @@ export default function ChatPage() {
             const phaseCompleteUpdates: Partial<ChatFeedMessage> = {
               content: buildMarkdownFromPhases(phases),
               phases: [...phases],
+              currentPhase: undefined,
               currentPhaseName: undefined,
             };
             if (displayName === 'Synthesis') {
@@ -735,10 +724,13 @@ export default function ChatPage() {
         case 'phase_error':
           if (typeof ev.phase === 'number') {
             setErrorPhases((prev) => (prev.includes(ev.phase!) ? prev : [...prev, ev.phase!]));
-            setCurrentPhase(undefined);
           }
           break;
         case 'error': {
+          // A non-critical phase failed: the run carries on to synthesis, and
+          // `done` lists the error. Ending the stream here hid a live run.
+          if (ev.fatal === false) break;
+          shownErrors.add(ev.message || 'Pipeline error');
           // Flush any remaining buffered text before stopping
           if (chunkFlushRafRef.current !== null) {
             cancelAnimationFrame(chunkFlushRafRef.current);
@@ -759,7 +751,6 @@ export default function ChatPage() {
             errorRetryable: ev.retryable ?? null,
             errorRetryAfter: ev.retry_after ?? null,
           }] });
-          setCurrentPhase(undefined);
           break;
         }
         case 'recall_used':
@@ -804,7 +795,6 @@ export default function ChatPage() {
           }
           // Add a cancellation message
           dispatchMessages({ type: 'ADD_MESSAGES', payload: [{ id: 'info-' + Date.now(), role: 'error', content: ev.message || 'Stopped by user' }] });
-          setCurrentPhase(undefined);
           break;
         }
         case 'done': {
@@ -821,7 +811,6 @@ export default function ChatPage() {
           finalErrors = ev.errors || [];
           finalTokens = ev.total_tokens || { input: 0, output: 0, total: 0 };
           const totalDuration = ev.duration;
-          setCurrentPhase(undefined);
 
           const finalContent = buildMarkdownFromPhases(phases);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -843,7 +832,7 @@ export default function ChatPage() {
           
           if (finalErrors.length > 0) {
             // Add error messages if any
-            dispatchMessages({ type: 'ADD_MESSAGES', payload: finalErrors.map((err, i) => ({ id: 'err-' + Date.now() + '-' + i, role: 'error', content: err })) });
+            dispatchMessages({ type: 'ADD_MESSAGES', payload: finalErrors.filter((err) => !shownErrors.has(err)).map((err, i) => ({ id: 'err-' + Date.now() + '-' + i, role: 'error', content: err })) });
           }
 
           // Save conversation to DB -- into the thread this run started in,
@@ -862,7 +851,7 @@ export default function ChatPage() {
             problem,
             phases: phases.map((p) => ({ phase: p.phase, name: p.name, data: p.data })),
             errors: finalErrors,
-            preset: getAutoPreset(),
+            preset: runPreset,
             method: runMethod,
             total_tokens: finalTokens,
             duration: totalDuration,
@@ -870,7 +859,7 @@ export default function ChatPage() {
             response_content: buildMarkdownFromPhases(phases),
             pipeline_id: ticket.clientRunId || undefined,
           };
-          saveConversation(conv).then(refreshHistory).catch(console.error);
+          saveConversation(conv, ticket.historyOwner).then(refreshHistory).catch(console.error);
           break;
         }
       }
@@ -879,6 +868,9 @@ export default function ChatPage() {
     // Generate a client-side run ID so WebSocket can subscribe to the same pipeline
     const clientRunId = 'run-' + (crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
     ticket.clientRunId = clientRunId;
+
+    // Resolved once: the request and the saved history record must name the same preset.
+    const runPreset = opts?.presetOverride || getAutoPreset();
 
     try {
       const state = useAppStore.getState();
@@ -893,7 +885,7 @@ export default function ChatPage() {
         ticket.conversationId = followupConvId;
         const followupReq: RunFollowupRequest = {
           question: problem,
-          preset: getAutoPreset(),
+          preset: runPreset,
           top_k: 2,
           sequential: false,
           enhance_prompt: true,
@@ -918,7 +910,7 @@ export default function ChatPage() {
         setConversationId(newConvId);
         const req = {
           problem,
-          preset: opts?.presetOverride || getAutoPreset(),
+          preset: runPreset,
           top_k: 2,
           sequential: false,
           enhance_prompt: true,
@@ -928,9 +920,11 @@ export default function ChatPage() {
           attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
           file_ids: uploadedAttachments.length > 0 ? uploadedAttachments.map((a) => a.file_id) : undefined,
           client_run_id: clientRunId,
-          // The user already confirmed a specific method via the gate picker —
-          // skip re-running HyperGate so the chosen preset is locked in.
-          force_pipeline: !!opts?.presetOverride,
+          // The user already chose a method, via the gate picker or the
+          // composer's method menu: skip re-running HyperGate so the chosen
+          // preset is locked in.
+          force_pipeline: !!opts?.presetOverride || !!pickedMethod,
+          facts: opts?.facts && Object.keys(opts.facts).length > 0 ? opts.facts : undefined,
         };
         await startRun(req, onEvent, ticket.abort.signal);
       }
@@ -973,7 +967,6 @@ export default function ChatPage() {
       // Update assistant message with connection error
       dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { isStreaming: false } } });
       dispatchMessages({ type: 'ADD_MESSAGES', payload: [{ id: 'err-' + Date.now(), role: 'error', content: msg }] });
-      setCurrentPhase(undefined);
     } finally {
       dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { isStreaming: false } } });
       // After Stop + a quick resubmit this run is stale: it must not clear the new run's state or WS.
@@ -983,11 +976,11 @@ export default function ChatPage() {
       }
       clearAttachments();
     }
-  }, [run, attachments, isImageMode, isLocal, user, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setCompletedPhases, setErrorPhases, setCurrentPhase, setPhaseDurations, setAutoSelectedMethod, setPhaseOpenMode, isContinuation, getAutoPreset, autoMethodAlways]);
+  }, [run, attachments, isImageMode, isLocal, user, tier, messages, startRun, startFollowup, wsConnect, wsDisconnect, dispatchMessages, setRunning, setComposerText, clearAttachments, refreshHistory, setErrorPhases, setAutoSelectedMethod, setPhaseOpenMode, getAutoPreset, autoMethodAlways, pickedMethod]);
 
   const handleSubmit = useCallback(async (
     providedText?: string,
-    opts?: { presetOverride?: string; skipGate?: boolean },
+    opts?: { presetOverride?: string; skipGate?: boolean; facts?: Record<string, string> },
   ) => {
     const problem = (providedText ?? composerText).trim();
     if (!problem) return;
@@ -1009,6 +1002,15 @@ export default function ChatPage() {
     handleSubmit(choice.problem, { presetOverride: preset, skipGate: true });
   }, [pendingChoice, handleSubmit]);
 
+  // Facts come first and run on the gate's own pick: asking again which method
+  // to use would be a second prompt in a row for one submit.
+  const handleFactsSubmit = useCallback((facts: Record<string, string>) => {
+    const choice = pendingChoice;
+    setPendingChoice(null);
+    if (!choice) return;
+    handleSubmit(choice.problem, { presetOverride: choice.decision.preset ?? undefined, skipGate: true, facts });
+  }, [pendingChoice, handleSubmit]);
+
   const handleMethodChoiceCancel = useCallback(() => {
     if (pendingChoice) setComposerText(pendingChoice.problem);
     setPendingChoice(null);
@@ -1017,21 +1019,16 @@ export default function ChatPage() {
   const handleStop = useCallback(() => {
     run.stop();
     setRunning(false);
-    setCurrentPhase(undefined);
-  }, [run, setRunning, setCurrentPhase]);
+  }, [run, setRunning]);
 
   function handleNew() {
     if (run.isActive()) handleStop();
     // Dispatch action to clear messages and reset other states managed by parent
     dispatchMessages({ type: 'CLEAR_MESSAGES' });
     setComposerText('');
-    setCompletedPhases([]);
     setErrorPhases([]);
-    setCurrentPhase(undefined);
-    setPhaseDurations({});
     setAutoSelectedMethod(PIPELINE_DEFAULTS.method);
     setPhaseOpenMode('auto');
-    phaseStartTimesRef.current = {};
     conversationIdRef.current = null;
     setConversationId(null);
   }
@@ -1042,10 +1039,7 @@ export default function ChatPage() {
     const ticket = run.begin();
     if (!ticket) return;
     setRunning(true);
-    setCompletedPhases([]);
     setErrorPhases([]);
-    setCurrentPhase(undefined);
-    setPhaseDurations({});
 
     const assistantId = 'a-resume-' + Date.now();
     const assistantMsg: ChatFeedMessage = {
@@ -1054,18 +1048,21 @@ export default function ChatPage() {
       content: '',
       phases: [],
       isStreaming: true,
+      // A resumed run keeps the method its conversation was loaded with.
+      method: autoSelectedMethod,
+      startedAt: Date.now(),
     };
     dispatchMessages({ type: 'ADD_MESSAGES', payload: [assistantMsg] });
 
     let resumePhases: RenderedPhase[] = [];
     let resumeErrors: string[] = [];
+    const shownResumeErrors = new Set<string>();
 
     const onResumeEvent = (ev: PhaseEvent) => {
       switch (ev.type) {
         case 'phase_start':
           if (typeof ev.phase === 'number') {
-            setCurrentPhase(ev.phase);
-            dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { currentPhaseName: ev.name } } });
+            dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { currentPhase: ev.phase, currentPhaseName: ev.name } } });
           }
           break;
         case 'phase_complete':
@@ -1077,18 +1074,17 @@ export default function ChatPage() {
               data: ev.data ?? {},
             };
             resumePhases = [...resumePhases, renderedPhase];
-            setCompletedPhases((prev) => (prev.includes(ev.phase!) ? prev : [...prev, ev.phase!]));
-            setCurrentPhase(undefined);
-            dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { content: buildMarkdownFromPhases(resumePhases), phases: [...resumePhases], currentPhaseName: undefined } } });
+            dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { content: buildMarkdownFromPhases(resumePhases), phases: [...resumePhases], currentPhase: undefined, currentPhaseName: undefined } } });
           }
           break;
         case 'phase_error':
           if (typeof ev.phase === 'number') {
             setErrorPhases((prev) => (prev.includes(ev.phase!) ? prev : [...prev, ev.phase!]));
-            setCurrentPhase(undefined);
           }
           break;
         case 'error':
+          if (ev.fatal === false) break; // non-critical phase; the run goes on
+          shownResumeErrors.add(ev.message || 'Resume error');
           dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { isStreaming: false } } });
           dispatchMessages({ type: 'ADD_MESSAGES', payload: [{ id: 'err-' + Date.now(), role: 'error', content: ev.message || 'Resume error' }] });
           break;
@@ -1096,7 +1092,7 @@ export default function ChatPage() {
           resumeErrors = ev.errors || [];
           dispatchMessages({ type: 'UPDATE_MESSAGE', payload: { messageId: assistantId, updates: { content: buildMarkdownFromPhases(resumePhases), phases: [...resumePhases], isStreaming: false, currentPhaseName: undefined } } });
           if (resumeErrors.length > 0) {
-            dispatchMessages({ type: 'ADD_MESSAGES', payload: resumeErrors.map((err, i) => ({ id: 'err-' + Date.now() + '-' + i, role: 'error', content: err })) });
+            dispatchMessages({ type: 'ADD_MESSAGES', payload: resumeErrors.filter((err) => !shownResumeErrors.has(err)).map((err, i) => ({ id: 'err-' + Date.now() + '-' + i, role: 'error', content: err })) });
           }
           break;
       }
@@ -1116,7 +1112,6 @@ export default function ChatPage() {
       run.finish(ticket);
       if (!stale) {
         setRunning(false);
-        setCurrentPhase(undefined);
       }
     }
   }
@@ -1125,23 +1120,13 @@ export default function ChatPage() {
     if (run.isActive()) handleStop();
     conversationIdRef.current = conv.conversation_id || conv.id;
     setConversationId(conversationIdRef.current);
-    const renderedPhases: RenderedPhase[] = conv.phases.map((p, idx) => ({
-      index: idx,
-      phase: p.phase,
-      name: p.name,
-      data: p.data,
-    }));
     const loadedMessages = conversationToMessages(conv, buildMarkdownFromPhases) as ChatFeedMessage[];
     // Dispatch action to set loaded messages
     dispatchMessages({ type: 'SET_MESSAGES', payload: loadedMessages });
     
-    // Restore the method so PhaseTimeline shows the right phases for loaded conversations
+    // Restore the method so a resumed run's card shows the right phases
     setAutoSelectedMethod(conv.method || PIPELINE_DEFAULTS.method);
-    setCompletedPhases(renderedPhases.map((p) => p.phase));
     setErrorPhases([]);
-    setCurrentPhase(undefined);
-    setPhaseDurations({});
-    phaseStartTimesRef.current = {};
   }
 
   async function handleClearCache() {
@@ -1181,7 +1166,9 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-[100dvh] w-full bg-[var(--bg)] text-[var(--text)] overflow-hidden">
+    // `.site`: the app takes the site palette (charcoal in both schemes); its
+    // role remap re-skins the sidebar, composer and phase cards without touching them.
+    <div className="site flex h-[100dvh] w-full bg-[var(--bg)] text-[var(--text)] overflow-hidden">
       <Sidebar
         conversations={history}
         onLoad={handleLoad}
@@ -1196,7 +1183,7 @@ export default function ChatPage() {
       <div className="relative flex flex-1 flex-col sm:ml-0 overflow-hidden">
         {/* Borderless: the sidebar's own ground already separates rail from
             conversation, so a rule here just boxes the column in. */}
-        <header className={`flex h-14 shrink-0 items-center justify-between px-4 ${collapsed ? 'sm:ml-14' : ''}`}>
+        <header className={`flex h-14 shrink-0 items-center justify-between px-4 ${collapsed ? 'ml-14' : ''}`}>
           <div className="flex items-center gap-3">
             {/* --ok/--unknown are reserved for epistemic labels now. A filled
                 dot vs. a hollow ring carries "connected" vs. "undetermined"
@@ -1213,6 +1200,12 @@ export default function ChatPage() {
                 }`}
               />
             </Tooltip>
+            {/* Colour alone said nothing to anyone who did not hover it. */}
+            {serverOnline === false && (
+              <span role="status" className="text-[length:var(--text-xs)] text-[var(--text-muted)]">
+                Server offline
+              </span>
+            )}
             {wsStatus !== 'idle' && (
               <div className="flex items-center gap-1.5">
                 <Tooltip side="bottom" text={wsStatus === 'error' && wsLastError ? wsLastError : `WebSocket: ${wsStatus}`}>
@@ -1255,41 +1248,23 @@ export default function ChatPage() {
                   onClick={() => router.push('/login')}
                   className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-[length:var(--text-sm)] font-medium text-[var(--accent-text)] transition-opacity hover:opacity-90"
                 >
-                  Sign In
+                  Sign in
                 </button>
                 )}
               </>
             )}
-            <SecurityBadge className="hidden sm:flex" />
+            {/* No Secure badge (the site header dropped it; /security makes that case)
+                and no theme toggle: the product is charcoal in both schemes. */}
             <UserMenu />
-            <ThemeToggle />
           </div>
         </header>
 
-        {hasMessages && activeAssistantMsg && (
-          <div>
-            <div className="px-4 pt-2 text-[length:var(--text-xs)] text-[var(--text-muted)]">
-              <Tooltip text={METHOD_DESCRIPTIONS[autoSelectedMethod.replace(/_/g, '-')] || ''}>
-                <span className="cursor-help">
-                  Method: <span className="text-[var(--text)]">{autoSelectedMethod.replace(/_/g, '-').replace(/\b\w/g, (l) => l.toUpperCase())}</span>
-                </span>
-              </Tooltip>
-            </div>
-            <PhaseTimeline
-            method={autoSelectedMethod}
-            currentPhase={currentPhase}
-            completedPhases={completedPhases}
-            errorPhases={errorPhases}
-            phaseDurations={phaseDurations}
-            onExpandAll={() => setPhaseOpenMode('expand')}
-            onCollapseAll={() => setPhaseOpenMode('collapse')}
-          />
-          </div>
-        )}
-
+        {/* No header method label or phase rail: the run card in the feed
+            (RunProgress) names the method once it is known and shows the steps. */}
         <EmailVerifyBanner />
         <div
           id="main-content"
+          role="main"
           ref={scrollContainerRef}
           className="relative flex-1 overflow-y-auto scroll-smooth scrollbar-gray"
           style={{
@@ -1301,9 +1276,6 @@ export default function ChatPage() {
             <>
               <ChatErrorBoundary fallback={<div className="p-4 text-[var(--red)]">Display error. Please refresh.</div>}>
                 <>
-                  {activeAssistantMsg && activeAssistantMsg.phases?.length === 0 && activeAssistantMsg.isStreaming && (
-                    <PipelineSkeleton method={autoSelectedMethod} />
-                  )}
                   <ChatFeed
                     messages={messages}
                     onScrollToBottom={dismissIndicator}
@@ -1319,8 +1291,19 @@ export default function ChatPage() {
             </>
           ) : (
             <>
+              <Composer running={running} onSubmit={() => handleSubmit()} onStop={handleStop} centered />
+              {/* Below the composer, as in the follow-up branch: the scroll
+                  anchor pins this container to the bottom whenever content
+                  mounts, so a prompt above the composer was scrolled out of
+                  view and Enter looked like it did nothing. */}
               {gateChecking && <MethodChoiceLoading />}
-              {pendingChoice && (
+              {pendingChoice && pendingChoice.decision.stakes?.missing_facts?.length ? (
+                <FactsPrompt
+                  questions={pendingChoice.decision.stakes.missing_facts}
+                  onSubmit={handleFactsSubmit}
+                  onCancel={handleMethodChoiceCancel}
+                />
+              ) : pendingChoice && (
                 <MethodChoicePrompt
                   decision={pendingChoice.decision}
                   alwaysAuto={autoMethodAlways}
@@ -1329,7 +1312,6 @@ export default function ChatPage() {
                   onCancel={handleMethodChoiceCancel}
                 />
               )}
-              <Composer running={running} onSubmit={() => handleSubmit()} onStop={handleStop} centered />
             </>
           )}
         </div>
@@ -1342,7 +1324,13 @@ export default function ChatPage() {
               </div>
             )}
             {gateChecking && <MethodChoiceLoading />}
-            {pendingChoice && (
+            {pendingChoice && pendingChoice.decision.stakes?.missing_facts?.length ? (
+              <FactsPrompt
+                questions={pendingChoice.decision.stakes.missing_facts}
+                onSubmit={handleFactsSubmit}
+                onCancel={handleMethodChoiceCancel}
+              />
+            ) : pendingChoice && (
               <MethodChoicePrompt
                 decision={pendingChoice.decision}
                 alwaysAuto={autoMethodAlways}
@@ -1368,10 +1356,6 @@ export default function ChatPage() {
         onClose={() => setCommandPaletteOpen(false)}
         onNew={handleNew}
         onClearComposer={() => setComposerText('')}
-        // Toggling the class directly added `.dark` while next-themes' own
-        // `.light` stayed put, so nothing changed and the stored preference
-        // desynchronised. Go through next-themes.
-        onToggleTheme={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
         onToggleSidebar={toggleSidebar}
         onToggleNeuro={toggleNeuroPanel}
         onToggleTier={toggleTier}

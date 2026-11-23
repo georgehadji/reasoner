@@ -12,7 +12,7 @@ from typing import Any
 import anyio
 
 from reasoner.api.execution.cancel import StreamingConnectionContext
-from reasoner.api.execution.direct import _stream_direct_answer
+from reasoner.api.execution.direct import CANCELLED, _stream_direct_answer, race_cancel
 from reasoner.api.execution.sse_observer import RunStream
 from reasoner.api.execution.web_search import _stream_web_search_results
 from reasoner.api.history import HistoryEntry, history_repo
@@ -25,6 +25,7 @@ from reasoner.application.services.adaptive_routing import build_adaptive_routin
 from reasoner.application.services.pipeline_service import PipelineService
 from reasoner.application.services.preset_service import PresetService
 from reasoner.application.services.run_metering import track_run_spend
+from reasoner.application.services.run_steps import drain_fallback_events
 from reasoner.application.services.spend_limit_service import (
     RUN_TIER_LOOKUP_TIMEOUT_S,
     apply_spend_limits,
@@ -265,6 +266,7 @@ def _build_runner(
 
 
 _CANCEL_POLL_SECONDS = 2.0
+_STOPPED = "stopped by user"
 
 
 async def _cancel_requested(run_id: str, cancel_event: Any) -> None:
@@ -281,6 +283,15 @@ async def _cancel_requested(run_id: str, cancel_event: Any) -> None:
                 return
 
 
+async def _relay_remote_cancel(run_id: str, cancel_event: Any) -> None:
+    """Set the local event when a Stop lands on another worker.
+
+    Every stage of the run then sees it.
+    """
+    await _cancel_requested(run_id, cancel_event)
+    cancel_event.set()
+
+
 async def _run_phases(
     pipeline: Any,
     state: PipelineState,
@@ -295,7 +306,12 @@ async def _run_phases(
     This used to be a second phase loop -- its own retries, timeouts, quality
     gate and fatality rule -- kept here only so SSE frames could be emitted
     between the steps. The frames are an observer now, and WorkflowRunner runs
-    the phases for this driver exactly as it does for the CLI.
+    the phases for this driver as it does for the CLI.
+
+    The phase loop is shared; the run-level steps around it are not.
+    ReasonerPipeline.run adds translation, fusion and post-synthesis
+    verification (all billed) and this driver does not. Unbilled steps live in
+    application/services/run_steps.py so both drivers apply them.
     """
     from reasoner.application.flows.factory import WorkflowFactory
 
@@ -311,7 +327,8 @@ async def _run_phases(
     # cancels the run task, which propagates into whichever phase coroutine is
     # in flight.
     run_task = asyncio.ensure_future(runner.run(strategy, state))
-    cancel_watch = asyncio.ensure_future(_cancel_requested(run_id, cancel_event))
+    # execute_run relays remote Stops into the event.
+    cancel_watch = asyncio.ensure_future(cancel_event.wait())
     try:
         done, _ = await asyncio.wait(
             {run_task, cancel_watch}, return_when=asyncio.FIRST_COMPLETED
@@ -397,7 +414,12 @@ async def _settle_preflight(
     (preflight, None) to go ahead; (None, reason) when the run stops here
     because it was answered without a pipeline or refused by the caller's plan.
     """
-    preflight = await orchestrator.preflight(req, initial_state, user_id=user_id)
+    preflight = await race_cancel(
+        orchestrator.preflight(req, initial_state, user_id=user_id), cancel_event
+    )
+    if preflight is CANCELLED:
+        await stream.emit({"type": "cancelled", "message": "Pipeline stopped by user"})
+        return None, _STOPPED
 
     if preflight.gate_reasoning:
         await stream.emit({
@@ -421,7 +443,12 @@ async def _settle_preflight(
         from reasoner.infrastructure.llm import spend_tracker
 
         await spend_tracker.refresh(user_id)  # see other workers' monthly spend
-    rejection = check_run_allowed(preflight.effective_preset_name, user_tier, user_id)
+    rejection = check_run_allowed(
+        preflight.effective_preset_name,
+        user_tier,
+        user_id,
+        agent_model=getattr(initial_state, "agent_model", None),
+    )
     if rejection is not None:
         logger.info(
             "Run %s refused: %s cap for tier %s (preset %s)",
@@ -460,7 +487,11 @@ async def _finish_run(
     run_id: str,
     run_start: float,
     stream: RunStream,
+    router: Any,
 ) -> None:
+    # Events that landed after the early drain in execute_run, before postflight
+    # persists them (the CLI path drains at the end of ReasonerPipeline.run).
+    drain_fallback_events(state, router)
     tokens = _token_totals(state)
     await _record_history(req, state, user_id, tokens)
     await stream.done(state, tokens, time.monotonic() - run_start)
@@ -506,6 +537,8 @@ class PipelineExecutionService:
         # (HyperGate LLM calls) completes.
         await stream.emit({"type": "connecting", "message": "Running system check…"})
         keepalive = asyncio.ensure_future(stream.keepalive())
+        # Covers preflight, direct answers and the phases alike.
+        cancel_relay = asyncio.ensure_future(_relay_remote_cancel(run_id, cancel_event))
 
         state: PipelineState | None = None
         orchestrator = PipelineOrchestrator(
@@ -522,6 +555,9 @@ class PipelineExecutionService:
                 run_id, cancel_event, stream,
             )
             if preflight is None:
+                if stopped_because == _STOPPED:
+                    await stream.cancelled(None, _STOPPED)
+                    return RunOutcome("cancelled", reason=_STOPPED)
                 return RunOutcome("rejected", reason=stopped_because)
 
             pipeline, state, emitter, method = _build_run(
@@ -530,6 +566,8 @@ class PipelineExecutionService:
             # Cancelled, failed or disconnected runs end without a cost frame;
             # the metering wrapper reads the state's running total instead.
             run_state = state
+            # Preflight's fallback events, so phase spans and the SSE frames see them.
+            drain_fallback_events(state, preflight.router)
             track_run_spend(lambda: run_state.total_cost_usd or 0.0)
             await _announce_start(req, preflight, method, emitter, user_id, stream)
             await _enhance_prompt(req, pipeline, state, stream)
@@ -541,7 +579,15 @@ class PipelineExecutionService:
                 await stream.cancelled(state, "stopped by user")
                 return RunOutcome("cancelled", state, "stopped by user")
 
-            await _finish_run(orchestrator, req, state, user_id, run_id, run_start, stream)
+            if getattr(state, "_run_fatal", False):
+                # The runner stopped on a critical or run-fatal phase failure.
+                raise RuntimeError(
+                    state.errors[-1] if state.errors else "run stopped on a fatal phase error"
+                )
+
+            await _finish_run(
+                orchestrator, req, state, user_id, run_id, run_start, stream, preflight.router
+            )
             return RunOutcome("completed", state)
         except asyncio.CancelledError:
             # Disconnect is a normal exit, so its terminal write must survive
@@ -557,6 +603,9 @@ class PipelineExecutionService:
             )
         finally:
             keepalive.cancel()
+            cancel_relay.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await keepalive
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await cancel_relay
             await _teardown(conn_context, run_id)

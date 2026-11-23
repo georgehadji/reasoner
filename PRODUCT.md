@@ -17,6 +17,11 @@ cost if it is wrong.
 - **Individual power users.** They already have a chatbot and want something better than
   it for hard problems, and will pay per run to get it.
 
+**Landing-page focus (2026-11-13):** regulated and high-stakes buyers who must defend an
+answer to someone else: defence and security, healthcare operations (never clinical),
+research and teaching, legal and compliance, aerospace and engineering, government and
+policy. The pitch is auditability, not better answers. Sold through paid pilots.
+
 Developers consuming the HTTP API, MCP server or TypeScript SDK exist as a surface
 (`docs/`, `developers/`, `capabilities/`, `src/reasoner/api/mcp/`, `sdk/typescript/`)
 but were not confirmed as a primary audience. Treat them as secondary until stated
@@ -93,8 +98,9 @@ date, availability commitments, uptime or latency numbers.
 - `spec/banlist.md` is binding on every visual decision.
 - **`docs/DESIGN.md` is not this product's design system.** It documents ElevenLabs and
   is reference material only. Nothing in it governs Reasoner.
-- Hue is a data channel, spent on epistemic status and on danger. `--accent` is
-  achromatic by decision, not by omission.
+- The site is a two-ink riso print: federal blue is the interactive ink, fluorescent
+  pink the second drum. Epistemic status is carried by rule pattern first and ink
+  second, so hue is no longer reserved for data (changed 2026-11-13).
 - Claims are labeled VERIFIED, INFERENCE, HYPOTHESIS or UNKNOWN. Anything not verifiable
   in this repository is written as `[INPUT REQUIRED: <question>]` rather than guessed.
 

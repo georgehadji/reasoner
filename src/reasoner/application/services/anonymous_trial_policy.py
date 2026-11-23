@@ -1,6 +1,6 @@
 """Anonymous trial spend cap.
 
-Anonymous runs (``/api/run`` with ``ENABLE_LEGACY_API_KEY=true``, no account)
+Anonymous runs (``/api/run`` with ``ALLOW_ANONYMOUS_RUNS=true``, no account)
 skip the per-user credit ledger entirely by design -- ``run_metering.metered()``
 never settles against a ``user_id=None`` context, because there's no account
 to charge. That's correct, but without a separate check it also means

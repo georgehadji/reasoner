@@ -35,8 +35,9 @@ def resolve_phases(strategy: WorkflowStrategy, state: PipelineState) -> list[Pha
     Both drivers built this themselves and disagreed on the result. The SSE
     driver appended the Layer B egress rewrite and the CLI did not, so watermark
     egress rewriting has never applied to a CLI, headless or MCP run. Resolving
-    the list in one place is what makes "one execution engine" true rather than
-    "two engines that currently agree".
+    the list in one place makes the phase loop shared. It does not make the
+    drivers identical: ReasonerPipeline.run wraps the loop in billed run-level
+    steps the SSE driver skips (see application/services/run_steps.py).
     """
     phases = list(strategy.get_phases(state))
 
@@ -113,6 +114,8 @@ class WorkflowRunner:
             # quality layer even with the flag off.
             success = await self.services.run_phase(step, state)
             if not success and (step.critical or getattr(state, "_run_fatal", False)):
+                # The driver reads this: the run stopped early, it did not finish.
+                state._run_fatal = True
                 break
         return state
 
@@ -139,11 +142,17 @@ class WorkflowRunner:
         phase_key = f"Phase {num}: {name}"
         state._current_phase_key = phase_key
 
-        # P1.9: Skip phase if spend cap was exceeded in a previous phase
+        # P1.9: Stop once a spend cap was crossed in an earlier phase. It is a
+        # failure, not a skip: returning True here finished the run with no
+        # synthesis and `errors: []`, so it was recorded as completed and its
+        # empty answer was cached and replayed.
         if getattr(state, "_spend_cap_exceeded", False):
-            logger.info("Spend cap exceeded — skipping phase %s", phase_key)
+            logger.info("Spend cap exceeded — stopping before phase %s", phase_key)
             state.phase_tokens[phase_key] = {"input": 0, "output": 0}
-            return True
+            cap = getattr(state, "spend_cap_hit", "") or "spend"
+            state.add_error(f"Run halted: {cap} spend cap reached before {phase_key}")
+            state._run_fatal = True
+            return False
 
         if obs is not None:
             await obs.on_phase_start(step, state)

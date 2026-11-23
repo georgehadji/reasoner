@@ -76,14 +76,16 @@ export function UserMenu() {
         className="flex h-10 items-center gap-[var(--space-2)] rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] px-[var(--space-3)] text-[length:var(--text-sm)] leading-[var(--lh-ui)] text-[var(--text)] transition-colors duration-[var(--dur-micro)] ease-[var(--ease-standard)] hover:bg-[var(--surface-3)]"
         aria-expanded={open}
         aria-controls="user-menu-panel"
-        /* The visible email and tier must stay in the accessible name
-           (WCAG 2.5.3). A bare "User menu" label overrode them, so a
-           screen-reader user could not tell which account was signed in. */
-        aria-label={`Account menu for ${user.email}`}
+        /* The visible email and tier are the accessible name (WCAG 2.5.3),
+           so no aria-label: any label either dropped the tier or failed to
+           match the visible text. On a phone the email is visually hidden
+           but stays in the name, so a screen-reader user still hears which
+           account is signed in. */
       >
         <User className="h-4 w-4 text-[var(--text-muted)]" aria-hidden="true" />
         <span className="hidden max-w-[120px] truncate sm:inline">{user.email}</span>
-        <span className="inline-flex items-center rounded-[var(--radius-pill)] bg-[var(--accent-dim)] px-1.5 py-0.5 text-[length:var(--text-2xs)] leading-[var(--lh-tight)] font-medium text-[var(--accent)]">
+        <span className="sr-only sm:hidden">{user.email}</span>{' '}
+        <span className="inline-flex items-center rounded-[var(--radius-pill)] bg-[var(--accent-dim)] px-1.5 py-0.5 text-[length:var(--text-2xs)] leading-[var(--lh-tight)] font-medium text-[var(--text)]">
           {tierLabel}
         </span>
         <ChevronDown

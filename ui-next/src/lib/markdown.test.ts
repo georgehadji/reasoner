@@ -369,3 +369,34 @@ describe('buildMarkdownFromPhase — article sources_cited', () => {
     expect(md).toContain('- Merriam-Webster');
   });
 });
+
+describe('buildMarkdownFromPhase — pre-mortem checkpoints', () => {
+  it('renders the milestone and go/no-go criterion the prompt asks for', () => {
+    // phases/pre_mortem.py emits {milestone, go_nogo_criterion}; reading only
+    // checkpoint/text rendered every item as the literal word "Checkpoint".
+    const md = buildMarkdownFromPhase(1, 5, 'Hardened Redesign', {
+      pre_mortem_state: {
+        checkpoints: [{ milestone: 'Week 4: 50 paid subscribers', go_nogo_criterion: 'Churn under 10%' }],
+      },
+    });
+    expect(md).toContain('- Week 4: 50 paid subscribers: Churn under 10%');
+    expect(md).not.toContain('- Checkpoint');
+  });
+});
+
+describe('buildMarkdownFromPhase — coding final assembly', () => {
+  it('renders the readme, each file as code, and the limitations', () => {
+    // Final Assembly is the coding run's answer; it used to render nothing.
+    const md = buildMarkdownFromPhase(6, 5, 'Final Assembly', {
+      coding_state: {
+        readme: 'Merges overlapping intervals.',
+        language: 'python',
+        final_files: [{ path: 'intervals.py', content: 'x = "```"\n', changed: true }],
+        known_limitations: ['Assumes sorted input'],
+      },
+    });
+    expect(md).toContain('Merges overlapping intervals.');
+    expect(md).toContain('**intervals.py**\n````python\nx = "```"\n````');
+    expect(md).toContain('- Assumes sorted input');
+  });
+});

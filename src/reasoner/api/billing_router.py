@@ -51,7 +51,7 @@ async def create_checkout(
     from reasoner.infrastructure.persistence.subscription_repo import PostgresSubscriptionRepository
 
     existing = await PostgresSubscriptionRepository(
-        settings.DATABASE_URL.replace("+asyncpg", ""), pool_size=10,
+        settings.DATABASE_URL.replace("+asyncpg", ""),
     ).get_subscription_by_user(str(user.id))
     decision = checkout_allowed(existing, tier_enum)
     if decision is not CheckoutDecision.ALLOW:
@@ -112,7 +112,6 @@ async def get_subscription(user: User = Depends(require_key_scope("read"))):
 
     repo = PostgresSubscriptionRepository(
         settings.DATABASE_URL.replace("+asyncpg", ""),
-        pool_size=10,
     )
     sub = await repo.get_subscription_by_user(str(user.id))
     if sub is None:

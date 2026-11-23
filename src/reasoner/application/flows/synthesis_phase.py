@@ -7,6 +7,7 @@ import re
 
 import reasoner.phases as phases
 from reasoner.application.flows.base import WorkflowServices
+from reasoner.application.services.run_steps import record_answerability
 from reasoner.core.constants import (
     DEFAULT_MAX_TOKENS,
     get_token_budget,
@@ -28,7 +29,7 @@ from reasoner.parsing import (
     parse_evidence_bundles,
     strip_json_fences,
 )
-from reasoner.sanitization import clean_llm_artifacts_with_report
+from reasoner.sanitization import clean_llm_artifacts_with_report, scrub_strings
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +83,53 @@ def enforce_citations(text: str, allowed_urls: set[str]) -> tuple[str, list[str]
         parts[i] = _BARE_URL_RE.sub(_bare, _MD_LINK_RE.sub(_link, parts[i]))
     return "".join(parts), list(dict.fromkeys(removed))
 
+def _stakes_block(state: PipelineState) -> str:
+    """Scope instruction for a high-stakes run in active mode; "" otherwise."""
+    from reasoner.application.services.stakes_service import (
+        detect_stakes,
+        scope_for,
+        scope_prompt_block,
+        stakes_mode,
+    )
+
+    profile = detect_stakes(state.problem)
+    if not profile.is_high or stakes_mode() != "active":
+        return ""
+    return scope_prompt_block(profile.domain, scope_for(state.problem))
+
+
+def _rank_sources_by_authority(state: PipelineState) -> None:
+    """Active high-stakes run: put primary sources first, so the synthesis context keeps them."""
+    from reasoner.application.services.stakes_service import (
+        detect_stakes,
+        resolve_jurisdiction,
+        stakes_mode,
+    )
+    from reasoner.domain.authority_sources import rank_by_authority
+
+    profile = detect_stakes(state.problem)
+    if not profile.is_high or stakes_mode() != "active":
+        return
+    country = resolve_jurisdiction(state.problem)
+    if state.vetted_context:
+        state.vetted_context = rank_by_authority(state.vetted_context, profile.domain, country)
+    if state.web_discovery_results:
+        state.web_discovery_results = rank_by_authority(
+            state.web_discovery_results, profile.domain, country
+        )
+
+
 async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) -> None:
+    await _synthesize(state, services)
+    # Inside the phase, not after the run: the SSE driver serializes this
+    # phase's frame (reliability included) the moment the phase returns, and
+    # the web path never reaches ReasonerPipeline.run (audit A-01).
+    record_answerability(state)
+
+
+async def _synthesize(state: PipelineState, services: WorkflowServices) -> None:
     services.log("SYNTHESIS", "Synthesizing final solution...", state)
+    _rank_sources_by_authority(state)
 
     # Simplified synthesis logic extracted from pipeline.py
     from reasoner.pipeline import TOKEN_OPTIMIZATION, USE_PHASE_SUBAGENTS
@@ -104,7 +150,7 @@ async def run_synthesis_phase(state: PipelineState, services: WorkflowServices) 
     raw, _ = await services.call_llm(
         role="synthesis",
         system_prompt=system_prompt,
-        user_prompt=phases.synthesis_prompt(state),
+        user_prompt=phases.synthesis_prompt(state) + _stakes_block(state),
         state=state,
         max_tokens=get_token_budget("synthesis") if TOKEN_OPTIMIZATION["dynamic_budgets"] else DEFAULT_MAX_TOKENS
     )
@@ -132,11 +178,16 @@ def finalize_solution(raw: str, state: PipelineState, services: WorkflowServices
         insights = data.get("critical_insights", [])
         if insights:
             parts.append("Critical Insights:\n" + "\n".join(f"- {i}" for i in insights))
-        bp = data.get("action_blueprint", [])
-        if bp:
-            parts.append("Action Blueprint:\n" + "\n".join(
-                f"- {b.get('step', '')}: {b.get('action', '')}" for b in bp if isinstance(b, dict)
-            ))
+        # A step may be a plain string; a dict-only filter printed the heading
+        # with nothing under it. An empty "step" printed ": action".
+        steps = [
+            "- " + ": ".join(str(v) for v in (b.get("step"), b.get("action")) if v)
+            if isinstance(b, dict) else f"- {b}"
+            for b in coerce_list(data.get("action_blueprint"))
+            if b and (not isinstance(b, dict) or b.get("step") or b.get("action"))
+        ]
+        if steps:
+            parts.append("Action Blueprint:\n" + "\n".join(steps))
         oq = data.get("open_questions", [])
         if oq:
             parts.append("Open Questions:\n" + "\n".join(f"- {q}" for q in oq))
@@ -181,9 +232,36 @@ def finalize_solution(raw: str, state: PipelineState, services: WorkflowServices
 
     # Apply promotion rules: model-sourced VERIFIED is capped at HYPOTHESIS
     # This import is lazy to avoid circular dependency at module level
+    scope: dict = {}
     try:
-        from reasoner.application.services.evidence_service import apply_promotion_rules
-        evidence_bundles = apply_promotion_rules(evidence_bundles)
+        from reasoner.application.services.evidence_service import (
+            HighStakesPolicy,
+            apply_promotion_rules,
+            reconcile_labels,
+        )
+        from reasoner.application.services.stakes_service import (
+            detect_stakes,
+            scope_for,
+            stakes_mode,
+        )
+        from reasoner.domain.stakes import Jurisdiction, StakesProfile
+
+        profile = detect_stakes(state.problem)
+        active = profile.is_high and stakes_mode() == "active"
+        scope = scope_for(state.problem) if active else {}
+        policy = (
+            HighStakesPolicy(
+                StakesProfile(
+                    domain=profile.domain,
+                    confidence=profile.confidence,
+                    jurisdiction=Jurisdiction(country=scope["jurisdiction"]),
+                )
+            )
+            if active
+            else None
+        )
+        evidence_bundles = apply_promotion_rules(evidence_bundles, allowed_urls, policy)
+        clean_labels = reconcile_labels(clean_labels, evidence_bundles)
     except Exception as exc:
         # Silence here is the worst possible outcome for this particular call:
         # promotion rules are what cap a model-sourced VERIFIED claim down to
@@ -224,16 +302,6 @@ def finalize_solution(raw: str, state: PipelineState, services: WorkflowServices
 
     # Egress Layer A scrub on the remaining user-facing prose fields --
     # core_solution was already scrubbed above via clean_llm_artifacts_with_report.
-    def _scrub_strings(items: list) -> tuple[list[str], int]:
-        cleaned: list[str] = []
-        changed = 0
-        for item in items:
-            text, report = clean_llm_artifacts_with_report(str(item))
-            cleaned.append(text)
-            if report is not None:
-                changed += report.suspicious_total
-        return cleaned, changed
-
     def _scrub_blueprint_steps(items: list[dict]) -> tuple[list[dict], int]:
         changed = 0
         cleaned: list[dict] = []
@@ -248,10 +316,18 @@ def finalize_solution(raw: str, state: PipelineState, services: WorkflowServices
             cleaned.append(new_step)
         return cleaned, changed
 
-    critical_insights, insights_changed = _scrub_strings(
+    critical_insights, insights_changed = scrub_strings(
         coerce_list(json_data.get("critical_insights"))
     )
-    open_questions, questions_changed = _scrub_strings(coerce_list(json_data.get("open_questions")))
+    open_questions, questions_changed = scrub_strings(coerce_list(json_data.get("open_questions")))
+    if scope and "Facts I am stating" not in (state.problem or ""):
+        # A non-interactive caller never saw the gate's questions: surface them here.
+        from reasoner.application.services.stakes_service import detect_stakes, missing_facts
+
+        domain = detect_stakes(state.problem).domain
+        for question in missing_facts(state.problem, domain, scope["jurisdiction"]):
+            if question not in open_questions:
+                open_questions.append(question)
     clean_bp, blueprint_changed = _scrub_blueprint_steps(clean_bp)
 
     all_sources = _coerce_sources(coerce_list(json_data.get("sources")))
@@ -292,4 +368,5 @@ def finalize_solution(raw: str, state: PipelineState, services: WorkflowServices
         sources=sources,
         layout_hints=json_data.get("layout_hints", {}),
         evidence=evidence_bundles,
+        scope=scope,
     )

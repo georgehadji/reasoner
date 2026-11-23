@@ -58,6 +58,8 @@ export interface PhaseEvent {
   error_type?: string;
   retryable?: boolean;
   retry_after?: number;
+  /** On `error`: false when only a non-critical phase failed and the run goes on. */
+  fatal?: boolean;
   /** Cost transparency fields on done event */
   total_cost_usd?: number;
   phase_costs?: Record<string, number>;
@@ -200,6 +202,32 @@ export interface RunRequest {
   /** Skip HyperGate re-classification — used when the client already resolved
    *  a specific preset via /api/gate (user confirmed or accepted a method). */
   force_pipeline?: boolean;
+  /** High-stakes only: the user's answers to the gate's missing-facts questions,
+   *  keyed by question text (max 3, each side <= 200 chars). */
+  facts?: Record<string, string>;
+  /** ISO country code such as "GR", or "EU". */
+  jurisdiction?: string;
+}
+
+export type StakesDomain = 'health' | 'legal' | 'financial';
+
+export interface GateStakes {
+  domain: StakesDomain;
+  jurisdiction: string | null;
+  jurisdiction_needed: boolean;
+  missing_facts: string[];
+}
+
+export interface SynthesisScope {
+  jurisdiction?: string | null;
+  as_of?: string;
+}
+
+export type ReliabilityLevel = 'answer' | 'answer_with_caveats' | 'refer';
+
+export interface SynthesisReliability {
+  level?: ReliabilityLevel;
+  reasons?: string[];
 }
 
 /** Response shape of POST /api/gate. */
@@ -212,6 +240,8 @@ export interface GateResponse {
   complexity: string | null;
   alternatives: (MethodAlternative & { preset: string | null })[];
   needs_confirmation: boolean;
+  /** Null unless the problem is high-stakes (health, legal, financial). */
+  stakes?: GateStakes | null;
 }
 
 export interface RunFollowupRequest {
@@ -250,7 +280,6 @@ export interface MethodPreset {
 export interface MethodPhase {
   id: number;
   name: string;
-  short: string;
 }
 
 export interface MethodDef {

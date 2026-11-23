@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import os
 from datetime import datetime
 from uuid import UUID
 
@@ -12,6 +10,7 @@ import asyncpg
 
 from reasoner.core.ports.api_key_repository import ApiKeyRepository
 from reasoner.domain.api_keys import ApiKey
+from reasoner.infrastructure.persistence.pg_pool import get_shared_pool
 
 logger = logging.getLogger(__name__)
 
@@ -45,32 +44,11 @@ def _to_key(row: asyncpg.Record) -> ApiKey:
 class PostgresApiKeyRepository(ApiKeyRepository):
     """API key storage in PostgreSQL."""
 
-    _pool: asyncpg.Pool | None = None
-    _pool_lock: asyncio.Lock | None = None
-
-    def __init__(self, dsn: str, pool_size: int | None = None):
+    def __init__(self, dsn: str):
         self._dsn = dsn
-        self._pool_size = (
-            pool_size
-            if pool_size is not None
-            else int(os.environ.get("DB_POOL_SIZE", "10"))
-        )
 
     async def _get_pool(self) -> asyncpg.Pool:
-        if PostgresApiKeyRepository._pool_lock is None:
-            PostgresApiKeyRepository._pool_lock = asyncio.Lock()
-
-        if PostgresApiKeyRepository._pool is not None:
-            return PostgresApiKeyRepository._pool
-
-        async with PostgresApiKeyRepository._pool_lock:
-            if PostgresApiKeyRepository._pool is None:
-                PostgresApiKeyRepository._pool = await asyncpg.create_pool(
-                    self._dsn,
-                    min_size=1,
-                    max_size=self._pool_size,
-                )
-            return PostgresApiKeyRepository._pool
+        return await get_shared_pool(self._dsn)
 
     async def create(
         self,

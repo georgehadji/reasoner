@@ -12,9 +12,10 @@ Order is the contract:
   3. `identity`, the sign-in account, after everything keyed on the user id.
 `vectors` precedes `uploads` because it lists the uploads to find their indexes.
 
-`profile` and `identity` are the account itself. `DELETE /api/user/data` is
-reachable with a `history:delete` API key and must not close the account, so it
-erases `data_stores()`; `POST /api/account/delete` needs the account-delete
+`profile` and `identity` are the account itself, and `BILLING_STORE_NAMES` its
+balance and limits. `DELETE /api/user/data` is reachable with a `history:delete`
+API key and must not close the account or reset what it owes, so it erases
+`data_stores()`; `POST /api/account/delete` needs the account-delete
 scope and erases the whole registry.
 """
 
@@ -26,13 +27,18 @@ from reasoner.application.ports.user_data import UserDataStore
 from reasoner.core.settings import settings
 
 ACCOUNT_STORE_NAMES = frozenset({"profile", "identity"})
+# What the user owes or has paid. `DELETE /api/user/data` leaves them: erasing the
+# ledger removes the ``monthly:<period>`` row that blocks a second grant, and erasing
+# the spend counter or the quota resets the ceilings, so the next call is free again.
+# Full account deletion erases them with everything else (audit 7, finding 1).
+BILLING_STORE_NAMES = frozenset({"credit_ledger", "quota", "subscriptions", "valkey"})
 
 
 async def _pg_pool():
     from reasoner.infrastructure.persistence.quota_repo_postgres import PostgresQuotaRepository
 
     dsn = settings.DATABASE_URL.replace("+asyncpg", "")
-    return await PostgresQuotaRepository(dsn, pool_size=2)._get_pool()
+    return await PostgresQuotaRepository(dsn)._get_pool()
 
 
 class _IdentityStore:
@@ -94,5 +100,6 @@ def user_data_stores() -> list[UserDataStore]:
 
 
 def data_stores() -> list[UserDataStore]:
-    """Everything the user produced, without the account itself."""
-    return [s for s in user_data_stores() if s.name not in ACCOUNT_STORE_NAMES]
+    """Everything the user produced, without the account or its billing state."""
+    kept = ACCOUNT_STORE_NAMES | BILLING_STORE_NAMES
+    return [s for s in user_data_stores() if s.name not in kept]

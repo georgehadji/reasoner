@@ -179,6 +179,8 @@ def _import_settings(**extra):
         "EXEC_SANDBOX_ENABLED": "false",
         "TRUSTED_PROXIES": "",
         "ALLOW_NO_TRUSTED_PROXIES": "",
+        "SUPABASE_URL": "https://example.supabase.co",
+        "SUPABASE_SERVICE_ROLE_KEY": "k" * 40,
         **extra,
     }
     return subprocess.run(
@@ -197,6 +199,13 @@ def test_production_refuses_empty_trusted_proxies():
 )
 def test_production_starts_with_proxies_or_opt_out(extra):
     assert _import_settings(**extra).returncode == 0
+
+
+@pytest.mark.parametrize("missing", ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"])
+def test_production_refuses_to_start_without_supabase(missing):
+    # Everything else is valid, so only the Supabase guard can fire.
+    proc = _import_settings(TRUSTED_PROXIES="10.0.0.1", **{missing: ""})
+    assert proc.returncode != 0 and "SUPABASE_URL" in proc.stderr
 
 
 # G. orphaned reservations ----------------------------------------------------

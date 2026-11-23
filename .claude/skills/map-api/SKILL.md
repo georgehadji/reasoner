@@ -15,11 +15,12 @@ folders:
 |------|--------------|
 | `__init__.py` (37KB) | App factory + `lifespan`; CORS, middleware, router mounting, `/api/run` streaming entry, CSRF token route, architecture-components endpoint, active-user loop. Largest file in the folder — most cross-cutting wiring lives here. |
 | `admin_auth.py` | Shared `verify_admin_key` / `require_admin_key` primitive used by all five admin call sites. |
-| `auth_deps.py` | FastAPI auth + rate-limit dependencies: `require_api_key`, `require_auth`, `optional_auth`, `get_client_id`. |
+| `auth_deps.py` | `require_csrf` (exempts authenticated `rsn_` keys) and the rate-limiter factory. Legacy-key deps removed. |
 | `billing_router.py` | Stripe/PayPal checkout, portal, subscription, webhook endpoints. |
 | `cache.py` | Two-tier response cache (memory + disk) with pruning; `_cache_key`, `get_cache_stats`, `clear_memory_cache`. |
 | `client_ip.py` | `get_client_ip` — trusted-proxy-aware; only trusts X-Forwarded-For from `TRUSTED_PROXIES`. |
-| `cron.py` | Periodic background jobs: `run_neuro_maintenance`. |
+| `cron.py` | Periodic background job bodies: `run_reservation_sweep`, `run_unsettled_replay`, `run_neuro_maintenance`. |
+| `maintenance.py` | In-process loop started in the lifespan (`MAINTENANCE_LOOP_ENABLED`): one worker per interval takes the Valkey lock `maintenance:lock`, then runs the sweep, the unsettled replay and the dead-letter and feedback prunes, each isolated. |
 | `csrf.py` | Stateless double-submit CSRF via HMAC-SHA256; must match the Next.js frontend implementation. |
 | `dependencies.py` (26KB) | SaaS auth DI: resolves API keys/JWTs to users, quota + rate-limit gates, provisioning pool. |
 | `error_handler.py` | Global exception handlers (HTTP, validation, generic); persists errors with request context. `register_error_handlers`. |
@@ -90,4 +91,4 @@ folders:
 - HyperGate DIRECT/WEB_SEARCH answers bypass the pipeline entirely via `execution/direct.py`.
 - Serializers moved out: use `application/services/serializers.py`, not `api/serializers.py`.
 - CSRF is double-submit HMAC — backend `csrf.py` and the Next.js proxy must agree. `CSRF_ENFORCE_BACKEND=false` in CI.
-- Three auth surfaces exist: `auth_deps.py` (legacy/API key), `dependencies.py` (SaaS user/JWT/quota), `admin_auth.py` (admin key). Pick the matching one; don't add a fourth.
+- Two auth surfaces exist: `dependencies.py` (SaaS user/JWT/rsn_ key/quota) and `admin_auth.py` (admin key). Pick the matching one; don't add a third.

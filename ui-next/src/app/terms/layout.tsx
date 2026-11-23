@@ -4,7 +4,7 @@ import { absoluteUrl } from '@/lib/site';
 export const metadata: Metadata = {
   title: 'Terms of Service',
   description:
-    'The terms governing use of Reasoner, including acceptable use, credit billing, availability, and liability.',
+    'The terms governing use of Reasoner: ownership of your work, AI accuracy, prohibited uses, availability, and governing law.',
   alternates: { canonical: absoluteUrl('/terms') },
 };
 

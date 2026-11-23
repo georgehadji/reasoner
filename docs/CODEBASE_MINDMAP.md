@@ -1,8 +1,8 @@
 # CODEBASE_MINDMAP.md — Reasoner (v3.0 Post-Refactor)
 
 > High-fidelity codebase reconstruction.  
-> **Last updated:** 2026-11-13  
-> **Python source files:** 532 | **Models:** 203 | **Presets:** 98 | **Methods:** 31 | **Phase modules:** 32
+> **Last updated:** 2026-11-23  
+> **Python source files:** 537 | **Models:** 203 | **Presets:** 102 | **Methods:** 32 | **Phase modules:** 32
 
 ---
 
@@ -420,7 +420,6 @@ Problem Input
      ├─ <Composer> (input + presets)
      └─ <Modals>
         ├─ <ShortcutModal>
-        ├─ <SecurityModal>
         ├─ <UpgradeModal>
         └─ <NeuroPanel>
 ```

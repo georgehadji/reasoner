@@ -7,49 +7,72 @@
 
 import { CAPABILITIES } from './capabilities.generated';
 
+/** Which section of /faq an answer sits in. */
+export type FaqTopic = 'product' | 'cost' | 'code' | 'data';
+
 export interface FaqEntry {
+  topic: FaqTopic;
   q: string;
   a: string;
 }
 
+/** The id of an answer on /faq, so other pages can link straight to it.
+ *  `faq.test.ts` fails if two questions collapse to the same anchor. */
+export function faqAnchor(q: string): string {
+  return q
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 export const FAQS: readonly FaqEntry[] = [
   {
+    topic: 'product',
     q: 'What is Reasoner?',
     a: 'Reasoner is a multi-method AI reasoning engine. It classifies your question, decomposes it into sub-problems, answers them in parallel using models from different labs, independently critiques and scores the candidates, stress-tests the survivors, and synthesises a final answer in which every claim is labelled VERIFIED, HYPOTHESIS, or UNKNOWN.',
   },
   {
+    topic: 'product',
     q: 'How is Reasoner different from a chatbot?',
     a: 'A chatbot produces one model’s first response. Reasoner runs a structured pipeline in which generation, critique, and stress-testing are performed by different models from different labs, so mistakes have to survive review by a model that does not share the failure modes of the one that made them.',
   },
   {
+    topic: 'cost',
     q: 'How does billing work?',
     a: 'Usage is metered in credits, where 1,000 credits equal $1.00 of underlying model spend. Each plan grants a monthly allowance — 500 credits on Free, 25,000 on Pro, 250,000 on Enterprise. You are charged after a run completes, based on what the models actually cost, so a failed run or a cache hit costs nothing.',
   },
   {
+    topic: 'cost',
     q: 'What happens when I run out of credits?',
     a: 'The next run returns HTTP 402 and the app prompts you to top up. Because runs settle after they complete, the run that exhausted your balance still finished and was charged. Your balance refills automatically at the start of the next billing period.',
   },
   {
+    topic: 'code',
     q: 'Can I use Reasoner from my own code?',
-    a: 'Yes. Create an API key in Settings, then send it as a bearer token to the REST API. POST /api/run streams results as Server-Sent Events, and the terminal event reports the exact token counts and cost of the run. Keys are scoped and can be given an expiry, and are revocable at any time.',
+    a: 'Yes. Create an API key in Settings, then send it as a bearer token. POST /api/agent/run streams results as Server-Sent Events, and the terminal event reports the exact token counts and cost of the run; POST /api/agent/run/sync waits and returns one JSON object. Keys are scoped and can be given an expiry, and are revocable at any time.',
   },
   {
+    topic: 'product',
     q: 'Which AI models does Reasoner use?',
     a: `Reasoner routes across ${CAPABILITIES.directModels} directly registered reasoning models and more than ${CAPABILITIES.routableModels} through OpenRouter, spanning ${CAPABILITIES.providerAdapters} model labs including Anthropic, OpenAI, Google, DeepSeek, Mistral, xAI, and Perplexity. Routing is by role and preset rather than by a fixed favourite.`,
   },
   {
+    topic: 'product',
     q: 'Why does Reasoner use models from different companies?',
     a: 'Models trained on overlapping data with overlapping methods share blind spots. Asking one model family five times returns one opinion repeated five times, and the apparent agreement reads as confidence. Reasoner requires at least three labs during generation — four on Premium presets — and forces the critiquing model to come from a different ecosystem than the generators.',
   },
   {
+    topic: 'data',
     q: 'What is Neuro Memory?',
-    a: 'Neuro Memory is the tiered long-term memory layer. It stores prior conversations across in-memory, on-disk, and embedding-searchable tiers, and surfaces relevant fragments in later runs without spending the whole context window. It is isolated per account and can be cleared at any time.',
+    a: 'Neuro Memory is the tiered long-term memory layer. It stores prior conversations across in-memory, on-disk, and embedding-searchable tiers, and surfaces relevant fragments in later runs without spending the whole context window. It is isolated per account, and erasing your data through the API erases it too.',
   },
   {
+    topic: 'data',
     q: 'Is my data used for training?',
-    a: 'No. Your queries and results are not used to train models. We do not yet publish a fixed retention period or offer self-serve zero-retention mode — both are on our roadmap. Contact us to request export or deletion in the meantime. Data is encrypted with AES-256-GCM at rest and TLS 1.3 in transit.',
+    a: 'No. Your queries and results are not used to train or fine-tune models. Runs, uploads and their search index are encrypted before storage, and connections use HTTPS. You can export or erase your data through the API, or delete your account from settings; the privacy page lists every store. A fixed retention period and a zero-retention mode are not available yet.',
   },
   {
+    topic: 'cost',
     q: 'Can I cancel my subscription?',
     a: 'Yes, at any time from the billing portal in your Dashboard. Premium access and your credit allowance remain active until the end of the current billing period.',
   },

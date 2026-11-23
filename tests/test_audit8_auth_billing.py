@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -46,32 +47,32 @@ async def test_run_only_key_is_refused_export_but_jwt_passes():
     assert await guard(_Req("bearer"), jwt_user) is jwt_user
 
 
-# 2. legacy keys are scope-checked ---------------------------------------------
+# 2. a non-JWT, non-rsn_ token is no longer a credential ---------------------
 
 
-def test_legacy_token_gets_its_own_auth_method():
+def test_auth_method_is_key_or_bearer():
     assert deps._auth_method("rsn_live_abc") == "api_key"
-    assert deps._auth_method("not-a-jwt-or-rsn-key") == "legacy_key"
     assert deps._auth_method("aaaa.bbbb.cccc") == "bearer"
 
 
 @pytest.mark.asyncio
-async def test_read_only_legacy_key_cannot_pass_a_delete_guard():
+async def test_read_only_key_cannot_pass_a_delete_guard():
     guard = deps.require_key_scope("account:delete")
     user = User(id=uuid4(), email="l@internal", scopes={"read"})
     with pytest.raises(HTTPException) as exc:
-        await guard(_Req("legacy_key"), user)
+        await guard(_Req("api_key"), user)
     assert exc.value.status_code == 403
 
 
+@pytest.mark.parametrize("anonymous", [True, False])
 @pytest.mark.asyncio
-async def test_legacy_key_never_carries_admin(monkeypatch):
-    legacy = SimpleNamespace(key_hash="h" * 64, name="n", scopes={"read", "write", "admin"})
-    manager = SimpleNamespace(authenticate=AsyncMock(return_value=legacy))
-    monkeypatch.setattr(deps.settings, "ENABLE_LEGACY_API_KEY", True)
-    monkeypatch.setattr("reasoner.auth.get_auth_manager", lambda: manager)
-    user = await deps._resolve_auth_token("legacy-secret")
-    assert user.scopes == {"read", "write"}
+async def test_opaque_bearer_token_is_rejected_even_when_anonymous_runs_allowed(
+    monkeypatch, anonymous
+):
+    monkeypatch.setattr(deps.settings, "ALLOW_ANONYMOUS_RUNS", anonymous)
+    with pytest.raises(HTTPException) as exc:
+        await deps._resolve_auth_token("legacy-secret")
+    assert exc.value.status_code == 401
 
 
 # 3. email clash is a clear 409 ------------------------------------------------
@@ -158,7 +159,7 @@ def _dup_repo(existing):
 @pytest.mark.asyncio
 async def test_second_live_checkout_is_cancelled_at_the_provider():
     uid = uuid4()
-    port = SimpleNamespace(cancel_subscription=AsyncMock())
+    port = SimpleNamespace(cancel_subscription=AsyncMock(), refund_latest_charge=AsyncMock())
     repo = _dup_repo(_stripe_sub(uid, "sub_old"))
     await BillingService(port)._apply_webhook(
         "checkout.session.completed", _stripe_sub(uid, "sub_new"), repo, None
@@ -170,7 +171,7 @@ async def test_second_live_checkout_is_cancelled_at_the_provider():
 @pytest.mark.asyncio
 async def test_redelivery_of_the_same_checkout_still_upserts():
     uid = uuid4()
-    port = SimpleNamespace(cancel_subscription=AsyncMock())
+    port = SimpleNamespace(cancel_subscription=AsyncMock(), refund_latest_charge=AsyncMock())
     repo = _dup_repo(_stripe_sub(uid, "sub_1"))
     await BillingService(port)._apply_webhook(
         "checkout.session.completed", _stripe_sub(uid, "sub_1"), repo, None
@@ -207,11 +208,33 @@ async def test_late_cancel_does_not_downgrade_a_user_with_a_live_plan(monkeypatc
         yield conn
 
     pool = SimpleNamespace(fetchval=AsyncMock(return_value=live), acquire=acquire)
-    monkeypatch.setattr(PostgresSubscriptionRepository, "_pool", pool)
-    monkeypatch.setattr(PostgresSubscriptionRepository, "_pool_loop", None)
+    monkeypatch.setattr(
+        "reasoner.infrastructure.persistence.subscription_repo.get_shared_pool",
+        AsyncMock(return_value=pool),
+    )
     cancelled_old = Subscription(
         id=uuid4(), user_id=uuid4(), tier=SubscriptionTier.FREE,
         status=SubscriptionStatus.CANCELLED, stripe_subscription_id="sub_old",
     )
     await PostgresSubscriptionRepository("dsn").sync_quota_for_subscription(cancelled_old)
     assert conn.executed[-1][1] == expected
+
+
+@pytest.mark.parametrize(
+    ("env", "expected"),
+    [
+        ({"ENABLE_LEGACY_API_KEY": "true"}, "True"),  # pre-rename deploys keep working
+        ({"ENABLE_LEGACY_API_KEY": "true", "ALLOW_ANONYMOUS_RUNS": "false"}, "False"),
+        ({}, "False"),
+    ],
+)
+def test_old_env_var_still_enables_anonymous_runs(env, expected):
+    import subprocess
+    import sys
+
+    base = {k: v for k, v in os.environ.items() if k not in ("ENABLE_LEGACY_API_KEY", "ALLOW_ANONYMOUS_RUNS")}
+    out = subprocess.run(
+        [sys.executable, "-c", "from reasoner.core.settings import settings; print(settings.ALLOW_ANONYMOUS_RUNS)"],
+        env={**base, **env}, capture_output=True, text=True, check=True,
+    )
+    assert out.stdout.strip() == expected

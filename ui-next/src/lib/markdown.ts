@@ -118,7 +118,7 @@ export function buildMarkdownFromPhase(
         });
       }
       if (Array.isArray(c.vetting_flags) && c.vetting_flags.length) {
-        append(`  ⚠️ Vetting flags: ${c.vetting_flags.length}\n`);
+        append(`  Vetting flags: ${c.vetting_flags.length}\n`);
       }
     });
     append('\n');
@@ -225,7 +225,7 @@ export function buildMarkdownFromPhase(
   }
   // ── State Objects (dispatched via lookup) ──
   // OPTIMIZATION: Skip all 11 state blocks if none are present (common for Perspectives/Classification phases)
-  const _STATE_KEYS = ['cove_state','pre_mortem_state','bayesian_state','dialectical_state','analogical_state','sot_state','tot_state','pot_state','self_discover_state','delphi_state','writing_state','debate_rounds'];
+  const _STATE_KEYS = ['cove_state','pre_mortem_state','bayesian_state','dialectical_state','analogical_state','sot_state','tot_state','pot_state','self_discover_state','delphi_state','writing_state','debate_rounds','coding_state'];
   if (_STATE_KEYS.some(k => (d as Record<string, unknown>)[k] !== undefined)) {
 
   // ── CoVE state ──
@@ -362,8 +362,10 @@ export function buildMarkdownFromPhase(
         if (typeof c === 'string') {
           append(`- ${c}\n`);
         } else if (typeof c === 'object' && c !== null) {
-          const cp = c.checkpoint || c.text || c.validation_metric || 'Checkpoint';
-          append(`- ${cp}${c.target ? ` (Target: ${c.target})` : ''}\n`);
+          // phases/pre_mortem.py asks for {milestone, go_nogo_criterion}.
+          const cp = c.milestone || c.checkpoint || c.text || c.validation_metric || 'Checkpoint';
+          const gate = c.go_nogo_criterion ? `: ${c.go_nogo_criterion}` : '';
+          append(`- ${cp}${gate}${c.target ? ` (Target: ${c.target})` : ''}\n`);
         }
       });
       append('\n');
@@ -706,6 +708,30 @@ export function buildMarkdownFromPhase(
       append('\n');
     }
   }
+  // ── Coding: Final Assembly's files are the run's answer ──
+  if (d.coding_state && typeof d.coding_state === 'object') {
+    const cs = d.coding_state as Record<string, unknown>;
+    if (typeof cs.readme === 'string' && cs.readme.trim()) append(cs.readme + '\n\n');
+    if (Array.isArray(cs.final_files)) {
+      for (const f of cs.final_files as Array<Record<string, unknown>>) {
+        if (typeof f.content !== 'string' || !f.content.trim()) continue;
+        const lang = typeof f.language === 'string' && f.language ? f.language : typeof cs.language === 'string' ? cs.language : '';
+        // A fence longer than any backtick run in the code, so the code cannot close it.
+        const longest = Math.max(0, ...(f.content.match(/`+/g) ?? []).map((r) => r.length));
+        const fence = '`'.repeat(Math.max(3, longest + 1));
+        const body = f.content.endsWith('\n') ? f.content : f.content + '\n';
+        append(`**${String(f.path || 'file')}**\n${fence}${lang}\n${body}${fence}\n\n`);
+      }
+    }
+    for (const [key, title] of [['fixes_applied', 'Fixes Applied'], ['known_limitations', 'Known Limitations']] as const) {
+      const items = cs[key];
+      if (Array.isArray(items) && items.length) {
+        append(`**${title}**\n`);
+        items.forEach((s) => append(`- ${String(s)}\n`));
+        append('\n');
+      }
+    }
+  }
   // ── Self-Discover state ──
   if (d.self_discover_state && typeof d.self_discover_state === 'object') {
     const sd = d.self_discover_state as Record<string, unknown>;
@@ -851,8 +877,8 @@ export function buildMarkdownFromPhase(
       (ws.cove_verification_answers as Array<Record<string, any>>).forEach((a) => {
         const verdict = typeof a.verdict === 'string' ? a.verdict : '?';
         const answer = typeof a.answer === 'string' ? a.answer : '';
-        const icon = verdict === 'supports' ? '✅' : verdict === 'contradicts' ? '❌' : '⚠️';
-        append(`- ${icon} ${answer}\n`);
+        const label = verdict === 'supports' ? 'Supports' : verdict === 'contradicts' ? 'Contradicts' : 'Unclear';
+        append(`- **${label}:** ${answer}\n`);
       });
       append('\n');
     }
@@ -867,8 +893,8 @@ export function buildMarkdownFromPhase(
         (ws.claims as Array<Record<string, any>>).slice(0, 5).forEach((c, i) => {
           const text = typeof c.text === 'string' ? c.text : '';
           const status = typeof c.status === 'string' ? c.status : '';
-          const icon = status === 'verified' ? '✅' : status === 'weak' ? '⚠️' : status === 'rejected' ? '❌' : '';
-          append(`  ${i + 1}. ${icon} ${text}\n`);
+          const label = status === 'verified' ? '**Verified:** ' : status === 'weak' ? '**Weak:** ' : status === 'rejected' ? '**Rejected:** ' : '';
+          append(`  ${i + 1}. ${label}${text}\n`);
         });
         if (ws.claims.length > 5) append(`  ... and ${ws.claims.length - 5} more\n`);
         append('\n');
@@ -948,7 +974,7 @@ export function buildMarkdownFromPhase(
     if (Array.isArray(ws.factcheck_reviews) && ws.factcheck_reviews.length) {
       append('**Fact-Check Reviews**\n');
       (ws.factcheck_reviews as Array<Record<string, any>>).forEach((fr, i) => {
-        const verified = fr.verified === true ? '✅' : '⚠️';
+        const verified = fr.verified === true ? '**Verified**' : '**Not verified**';
         const conf = typeof fr.confidence === 'number' ? `${Math.round(fr.confidence * 100)}%` : '?';
         append(`${i + 1}. ${verified} Paragraph ${fr.paragraph_num || i + 1} — confidence: ${conf}\n`);
         if (Array.isArray(fr.unverified_claims) && fr.unverified_claims.length) {
