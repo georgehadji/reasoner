@@ -312,8 +312,39 @@ class StripeBillingAdapter(BillingPort):
             user_id=await self._resolve_user_id({"customer": customer_id}),
             tier=SubscriptionTier.FREE,
             status=SubscriptionStatus.PAST_DUE,
+            stripe_subscription_id=await self._charge_subscription_id(obj),
             stripe_customer_id=customer_id,
         )
+
+    async def _charge_subscription_id(self, obj: dict) -> str | None:
+        """The subscription the refunded or disputed charge paid for, else None.
+
+        BillingService uses it to leave a different live subscription alone
+        (a refunded duplicate checkout). None means unknown, and the caller then
+        acts as before. Lookup failures are logged, never raised: a chargeback
+        must still be applied.
+        """
+        intent = obj.get("payment_intent")
+        if not intent:
+            return None
+        try:
+            payments = to_plain(
+                await asyncio.to_thread(
+                    stripe.InvoicePayment.list,
+                    payment={"type": "payment_intent", "payment_intent": intent},
+                )
+            )
+            invoice_id = next(
+                (p.get("invoice") for p in payments.get("data", []) if p.get("invoice")), None
+            )
+            if not invoice_id:
+                return None
+            invoice = to_plain(await asyncio.to_thread(stripe.Invoice.retrieve, invoice_id))
+            details = (invoice.get("parent") or {}).get("subscription_details") or {}
+            return details.get("subscription") or invoice.get("subscription")
+        except Exception:  # noqa: BLE001 - best effort, see docstring
+            logger.warning("Could not resolve the subscription of charge %s", obj.get("id"))
+            return None
 
     def _timestamp_to_datetime(self, ts: int | None):
         from datetime import datetime

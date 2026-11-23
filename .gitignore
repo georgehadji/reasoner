@@ -177,3 +177,6 @@ spec/.gate-enabled
 # scripts/gate.py's proof markers -- one run's evidence that a CI gate
 # actually executed, not a build artifact anything reads afterward.
 /.gates/
+
+# Local design-skill workspace
+.taste-skill/

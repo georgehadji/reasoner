@@ -7,8 +7,8 @@ from reasoner.presets import PRESETS, get_preset_tier
 # preset, including all 24 "-premium" ones. The actual source of truth is
 # get_preset_tier(), which derives PRO from the "-premium" suffix against
 # the raw registry dict (domain/preset_core.py). That derivation isn't wired
-# into any route yet (api/dependencies.py's require_tier() imports it but
-# never calls it — tracked as TODO(#501), out of scope here), but it's the
+# into any route yet (the unused require_tier() that imported it was deleted;
+# tracked as TODO(#501), out of scope here), but it's the
 # function that's actually correct, so these tests check it instead of the
 # vestigial .required_tier attribute.
 

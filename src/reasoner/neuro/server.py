@@ -934,7 +934,23 @@ def create_neuro_router(config: NeuroConfig | None = None) -> APIRouter:
 
     # Imported lazily: reasoner.api imports this module, so a module-level
     # import would close the cycle.
-    from reasoner.api.dependencies import get_optional_user
+    from reasoner.api.dependencies import enforce_key_scope, get_optional_user
+
+    def _scoped_owner(scope: str):
+        """``_owner``, but an rsn_ key caller must also hold *scope*.
+
+        Recalled memory reaches the owner's future prompts, so a narrow key
+        (say ``preset:read``) must not read or write it. Anonymous and session
+        callers are unaffected: scopes only narrow what a key may do.
+        """
+
+        async def dep(request: Request, owner: str | None = Depends(_owner)) -> str | None:
+            user = getattr(request.state, "user", None)
+            if user is not None:
+                enforce_key_scope(request, user, scope)
+            return owner
+
+        return dep
 
     async def _owner(user=Depends(get_optional_user)) -> str | None:
         """Identity that owns the requested agent_id, or None if anonymous.
@@ -956,11 +972,13 @@ def create_neuro_router(config: NeuroConfig | None = None) -> APIRouter:
         return await service.health()
 
     @router.post("/recall", response_model=RecallResponse)
-    async def recall(req: RecallRequest, owner: str | None = Depends(_owner)):
+    async def recall(
+        req: RecallRequest, owner: str | None = Depends(_scoped_owner("history:read"))
+    ):
         return await service.recall_chunks(req, owner=owner)
 
     @router.post("/learn")
-    async def learn(req: LearnRequest, owner: str | None = Depends(_owner)):
+    async def learn(req: LearnRequest, owner: str | None = Depends(_scoped_owner("write"))):
         return await service.ingest(req, owner=owner)
 
     @router.get("/sessions")
@@ -968,7 +986,7 @@ def create_neuro_router(config: NeuroConfig | None = None) -> APIRouter:
         agent_id: str | None = None,
         limit: int = 20,
         offset: int = 0,
-        owner: str | None = Depends(_owner),
+        owner: str | None = Depends(_scoped_owner("history:read")),
     ):
         return await service.list_sessions(
             agent_id=agent_id, limit=limit, offset=offset, owner=owner

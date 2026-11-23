@@ -12,7 +12,7 @@ import logging
 import re
 import time
 from collections import OrderedDict
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -396,13 +396,18 @@ def require_key_scope(scope: str):
     """
 
     async def guard(request: Request, user: User = Depends(get_current_user)) -> User:
-        if getattr(request.state, "auth_method", None) in KEY_AUTH_METHODS and not key_allows(
-            user.scopes, scope
-        ):
-            raise HTTPException(status_code=403, detail=f"API key lacks the '{scope}' scope")
+        enforce_key_scope(request, user, scope)
         return user
 
     return guard
+
+
+def enforce_key_scope(request: Request, user: Any, scope: str) -> None:
+    """403 if *user* came in on an rsn_ key that lacks *scope*; anyone else passes."""
+    if getattr(request.state, "auth_method", None) in KEY_AUTH_METHODS and not key_allows(
+        user.scopes, scope
+    ):
+        raise HTTPException(status_code=403, detail=f"API key lacks the '{scope}' scope")
 
 
 async def require_admin_scope(user: User = Depends(get_current_user)) -> User:
@@ -472,39 +477,6 @@ async def close_tier_lookup() -> None:
         await close_shared_pools()
     except Exception as exc:
         logger.warning("Shared Postgres pool close failed: %s", exc)
-
-
-def require_tier(min_tier: SubscriptionTier):
-    """
-    Factory that returns a FastAPI dependency enforcing minimum subscription tier.
-
-    Usage:
-        @app.post("/api/premium-only")
-        async def premium_route(user: User = Depends(require_tier(SubscriptionTier.PRO))):
-            ...
-    """
-    from fastapi import HTTPException
-
-    async def checker(
-        request: Request, user: User = Depends(get_current_user)
-    ) -> User:
-        # Resolves the caller's entitled tier from their subscription.
-        # _resolve_user_tier() falls back to FREE on every uncertain path, so a
-        # subscription-store outage denies paid access rather than granting it.
-        if not settings.PRESET_TIER_ENFORCEMENT_ENABLED:
-            return user
-        user_tier = await resolve_request_tier(request, user)
-        if not tier_satisfies(user_tier, min_tier):
-            raise HTTPException(
-                status_code=403,
-                detail=(
-                    f"This feature requires the {min_tier.value} plan. "
-                    f"Your current plan is {user_tier.value}."
-                ),
-            )
-        return user
-
-    return checker
 
 
 async def check_rate_limit(

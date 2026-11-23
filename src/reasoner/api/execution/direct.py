@@ -52,7 +52,10 @@ async def race_cancel(awaitable: Any, cancel_event: asyncio.Event | None) -> Any
 def _with_extra_cost(meta: dict[str, Any], extra_usd: float) -> dict[str, Any]:
     if extra_usd <= 0:
         return meta
-    return {**meta, "cost_usd": call_cost_usd(meta) + extra_usd}
+    # call_cost_usd has folded the discarded_* spend into the total; drop the keys so
+    # the next call_cost_usd on this metadata does not add it a second time.
+    kept = {k: v for k, v in meta.items() if not k.startswith("discarded_")}
+    return {**kept, "cost_usd": call_cost_usd(meta) + extra_usd}
 
 
 async def _call_with_model_fallback(

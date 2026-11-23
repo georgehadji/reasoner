@@ -20,7 +20,7 @@ from reasoner.domain.core_types import FinalSolution, MetaCognitiveAudit
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.infrastructure.llm.router import ProviderRouter
 from reasoner.models import ClaimLabel
-from reasoner.sanitization import clean_llm_artifacts_with_report
+from reasoner.sanitization import clean_llm_artifacts_with_report, scrub_strings
 from reasoner.subagents.models import PhaseSubAgentOutput
 from reasoner.subagents.synthesis.consensus_mapper import ConsensusMapperSubAgent
 from reasoner.subagents.synthesis.contradiction_resolver import ContradictionResolverSubAgent
@@ -124,16 +124,6 @@ class SynthesisHyperAgent:
             result.get("core_solution", "")
         )
 
-        def _scrub_strings(items: list) -> tuple[list[str], int]:
-            cleaned: list[str] = []
-            changed = 0
-            for item in items:
-                text, report = clean_llm_artifacts_with_report(str(item))
-                cleaned.append(text)
-                if report is not None:
-                    changed += report.suspicious_total
-            return cleaned, changed
-
         def _scrub_blueprint_steps(items: list) -> tuple[list, int]:
             changed = 0
             cleaned: list = []
@@ -151,8 +141,8 @@ class SynthesisHyperAgent:
                 cleaned.append(new_step)
             return cleaned, changed
 
-        critical_insights, insights_changed = _scrub_strings(result.get("critical_insights", []))
-        open_questions, questions_changed = _scrub_strings(result.get("open_questions", []))
+        critical_insights, insights_changed = scrub_strings(result.get("critical_insights", []))
+        open_questions, questions_changed = scrub_strings(result.get("open_questions", []))
         action_blueprint, blueprint_changed = _scrub_blueprint_steps(result.get("action_blueprint", []))
 
         state.meta.provenance_report = {

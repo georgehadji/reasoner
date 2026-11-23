@@ -254,9 +254,22 @@ class BillingService:
         is_dispute = event_type == "charge.dispute.created"
         cents = obj.get("amount") if is_dispute else obj.get("amount_refunded")
         key = f"{'dispute' if is_dispute else 'refund'}:{obj.get('id')}"
+        existing = await repo.get_subscription_by_user(str(sub.user_id))
+        # A charge that paid for another subscription (a refunded duplicate
+        # checkout) bought no credits -- _is_duplicate_live never stores or
+        # syncs it -- and must not downgrade the one the user is on. Unknown
+        # (None) keeps the old behaviour so a real chargeback still lands.
+        other = existing is not None and sub.stripe_subscription_id not in (
+            None, existing.stripe_subscription_id,
+        )
+        if other:
+            logger.info(
+                "%s for user %s paid for %s, not the stored subscription; nothing to claw back",
+                key, sub.user_id, sub.stripe_subscription_id,
+            )
+            return
         await claw_back_credits(str(sub.user_id), key, cents, obj.get("currency"), event_type)
         if is_dispute or obj.get("refunded"):
-            existing = await repo.get_subscription_by_user(str(sub.user_id))
             if existing is not None and existing.stripe_subscription_id:
                 await repo.set_subscription_status(
                     existing.stripe_subscription_id, "past_due", event_at

@@ -57,6 +57,7 @@ export function CommandPalette({
   onRecordCommand,
 }: CommandPaletteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const router = useRouter();
@@ -87,12 +88,22 @@ export function CommandPalette({
 
   useEffect(() => {
     if (!isOpen) return;
+    const opener = document.activeElement as HTMLElement | null;
+    const root = rootRef.current;
     const raf = requestAnimationFrame(() => {
       setQuery('');
       setSelectedIndex(0);
       inputRef.current?.focus();
     });
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      // Closing makes the palette inert, which drops focus to <body>; hand it
+      // back to the opener, unless the command just run moved focus elsewhere.
+      const active = document.activeElement;
+      if (!active || active === document.body || root?.contains(active)) {
+        opener?.focus();
+      }
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -127,6 +138,7 @@ export function CommandPalette({
     // Closed, it stays mounted only to animate out; `inert` keeps its input out
     // of the Tab order and the accessibility tree, as `pointer-events-none` does not.
     <div
+      ref={rootRef}
       inert={!isOpen}
       role="dialog"
       aria-modal="true"
@@ -158,6 +170,7 @@ export function CommandPalette({
               setSelectedIndex(0);
             }}
             placeholder="Type a command..."
+            aria-label="Search commands"
             className="-my-[var(--space-1)] flex-1 rounded-[var(--radius-sm)] bg-transparent px-[var(--space-2)] py-[var(--space-1)] text-[length:var(--text-sm)] text-[var(--text)] placeholder:text-[var(--text-muted)]"
           />
           <kbd className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[length:var(--text-2xs)] text-[var(--text-muted)]">ESC</kbd>

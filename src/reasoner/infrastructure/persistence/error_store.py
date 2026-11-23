@@ -8,18 +8,18 @@ with full request context for debugging production issues.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import sqlite3
 import threading
 import time
-from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from reasoner.infrastructure.persistence.feedback_store import FeedbackStore
 
 logger = logging.getLogger(__name__)
 
@@ -116,16 +116,7 @@ class ErrorStore:
                 logger.warning("error store: WAL switch lost a race, continuing", exc_info=True)
         return self._connection
 
-    async def _run_in_executor(self, func: Callable, *args) -> Any:
-        """Run sync function in thread pool with locking."""
-        loop = asyncio.get_running_loop()
-        executor = self._get_executor()
-
-        def locked_func():
-            with self._lock:
-                return func(*args)
-
-        return await loop.run_in_executor(executor, locked_func)
+    _run_in_executor = FeedbackStore._run_in_executor  # identical copy, shared
 
     def _init_db(self) -> None:
         """Initialize database schema."""

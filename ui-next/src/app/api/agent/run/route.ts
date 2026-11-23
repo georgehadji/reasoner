@@ -54,6 +54,8 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
+      // Client disconnect aborts the backend stream so the run stops billing.
+      signal: req.signal,
     });
 
     return new Response(upstream.body, {
@@ -61,6 +63,6 @@ export async function POST(req: NextRequest) {
       headers: sanitizeResponseHeaders(upstream),
     });
   } catch (err) {
-    return proxyErrorResponse(err, 'Agent run', upstreamUrl);
+    return proxyErrorResponse(err, 'Agent run', upstreamUrl, req);
   }
 }

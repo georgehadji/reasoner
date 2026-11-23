@@ -84,8 +84,10 @@ def is_authorized(record: OwnershipRecord | None, user_id: str | None) -> bool:
       is the safe default a caller can only override via a deliberate
       backfill (see PipelineOwnershipRepository.backfill_from_json), not by
       this function inventing an allow.
-    - Record with user_id=None -> allow. This is an explicit prior decision
-      (the run was created without an owner), not a lookup failure.
+    - Record with user_id=None -> allow anonymous callers only. The run was
+      created without an owner, so the anonymous client that started it can
+      still watch it; a signed-in user holding a leaked id cannot read,
+      resume or delete it.
     - Otherwise -> allow only for the matching owner.
 
     This function is pure and cannot see lookup failures — callers must
@@ -95,5 +97,5 @@ def is_authorized(record: OwnershipRecord | None, user_id: str | None) -> bool:
     if record is None:
         return False
     if record.user_id is None:
-        return True
+        return user_id is None
     return record.user_id == user_id

@@ -112,10 +112,13 @@ async def test_discover_is_cached_and_topic_normalized():
 
     lw._discover_cache.clear()
     fake = AsyncMock(return_value={"results": [1]})
-    with patch.object(lw, "_run", fake):
-        await lw.discover(topic="tech", mode="normal")
-        await lw.discover(topic="TECH", mode="normal")
-        await lw.discover(topic="not-a-topic", mode="normal")
+    req = SimpleNamespace()
+    # The charge on a miss is covered by test_audit7_phase4; here only the cache is under test.
+    with patch.object(lw, "_run", fake), patch.object(lw, "admit_flat_charge", AsyncMock()), \
+            patch.object(lw, "close_flat_charge", AsyncMock()):
+        await lw.discover(req, topic="tech", mode="normal")
+        await lw.discover(req, topic="TECH", mode="normal")
+        await lw.discover(req, topic="not-a-topic", mode="normal")
     assert fake.await_count == 1
     assert len(lw._discover_cache) == 1
     lw._discover_cache.clear()

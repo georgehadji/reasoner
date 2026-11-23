@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { stopPipeline } from '@/lib/api-client';
+import { getHistoryOwner } from '@/lib/db';
 
 /**
  * One run, captured when it starts. Its handlers read from the ticket, never
@@ -14,6 +15,8 @@ export interface RunTicket {
   clientRunId: string | null;
   /** The thread this run saves into, fixed once at start. */
   conversationId: string | null;
+  /** History owner at start: a sign-out mid-run must not move the save into another user's (or the anonymous) database. */
+  historyOwner: string | null;
 }
 
 /**
@@ -37,7 +40,7 @@ export function useRunController(sendWsStop: (runId: string) => void) {
 
   const begin = useCallback((): RunTicket | null => {
     if (ticketRef.current) return null;
-    const ticket: RunTicket = { abort: new AbortController(), clientRunId: null, conversationId: null };
+    const ticket: RunTicket = { abort: new AbortController(), clientRunId: null, conversationId: null, historyOwner: getHistoryOwner() };
     ticketRef.current = ticket;
     return ticket;
   }, []);

@@ -5,7 +5,8 @@ import { useAppStore } from '@/stores/app-store';
 import { EXAMPLE_PROMPTS, LIMITS, TIMING, API } from '@/lib/config';
 import { cn } from '@/lib/utils';
 import { isEnabled } from '@/hooks/useFeatureFlags';
-import { ArrowUp, Sparkles, Plus, X, FileText, Image as ImageIcon, Upload, Lock, Square, ShieldCheck } from 'lucide-react';
+import { ArrowUp, Sparkles, Plus, X, FileText, Image as ImageIcon, Upload, Lock, Square, ShieldCheck, ChevronDown } from 'lucide-react';
+import { methodsByCost, type MethodSlug } from '@/lib/methods';
 import { Tooltip } from '@/components/ui/Tooltip';
 
 interface ComposerProps {
@@ -91,6 +92,9 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
   const toggleWesternOnly = useAppStore((s) => s.toggleWesternOnly);
   const isImageMode = useAppStore((s) => s.isImageMode);
   const toggleImageMode = useAppStore((s) => s.toggleImageMode);
+  const method = useAppStore((s) => s.method);
+  const setMethod = useAppStore((s) => s.setMethod);
+  const getAutoPreset = useAppStore((s) => s.getAutoPreset);
   const hasContent = composerText.trim().length > 0 || attachments.length > 0;
 
   const [estimate, setEstimate] = useState<{ tokens: number; cost: string; duration: number } | null>(null);
@@ -130,10 +134,10 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
 
   useEffect(() => {
     if (!isEnabled('cost-transparency')) return;
-    const preset = `auto-${westernOnly ? 'western-' : ''}${tier === 'premium' ? 'premium' : 'budget'}`;
+    const preset = getAutoPreset();
     const timer = setTimeout(() => fetchEstimate(composerText, preset), TIMING.estimateDebounceMs);
     return () => clearTimeout(timer);
-  }, [composerText, tier, westernOnly, fetchEstimate]);
+  }, [composerText, tier, westernOnly, method, getAutoPreset, fetchEstimate]);
 
   function autoResize() {
     const el = textareaRef.current;
@@ -289,6 +293,43 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
     );
   }
 
+  /* Native <select>: keyboard, screen-reader and mobile pickers come free.
+     Empty value = "Auto", HyperGate picks the method. */
+  function MethodSelect() {
+    return (
+      <Tooltip text={method ? 'Method fixed for this question' : 'Reasoner picks the method'}>
+        <div className="relative flex items-center">
+          {method && (
+            <span className="pointer-events-none absolute left-[var(--space-3)] flex">
+              <ActiveDot />
+            </span>
+          )}
+          <select
+            value={method ?? ''}
+            onChange={(e) => setMethod((e.target.value || null) as MethodSlug | null)}
+            aria-label="Reasoning method"
+            className={cn(
+              TOGGLE_BASE,
+              'appearance-none bg-transparent pr-[var(--space-8)]',
+              method ? cn(TOGGLE_ON, 'pl-[var(--space-6)]') : TOGGLE_OFF,
+            )}
+          >
+            <option value="">Auto method</option>
+            <optgroup label="Cheapest first">
+              {methodsByCost(tier).map((m) => (
+                <option key={m.slug} value={m.slug}>{m.label}</option>
+              ))}
+            </optgroup>
+          </select>
+          <ChevronDown
+            aria-hidden="true"
+            className={cn('pointer-events-none absolute right-[var(--space-3)] top-1/2 h-3 w-3 -translate-y-1/2', method ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]')}
+          />
+        </div>
+      </Tooltip>
+    );
+  }
+
   function ImageModeToggle() {
     return (
       <Tooltip text={isImageMode ? 'Image mode — switch to reasoning' : 'Switch to image generation'}>
@@ -410,7 +451,8 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
         <div className="flex items-center gap-[var(--space-1)]">
           <AttachButton />
         </div>
-        <div className="flex items-center gap-[var(--space-1)]">
+        <div className="flex flex-wrap items-center justify-end gap-[var(--space-1)]">
+          {!isImageMode && <MethodSelect />}
           <TierToggle />
           <WesternToggle />
           <ImageModeToggle />
@@ -449,7 +491,7 @@ function ComposerComponent({ running, onSubmit, onStop, centered, isFollowup }: 
               : 'A hard one goes to rival labs at once. A critic from another lab scores the answers, and each claim comes back labelled verified, hypothesis or unknown.'}
           </p>
 
-          {inputBox(96, isImageMode ? 'Describe the image you want to generate…' : 'How can I help you today?')}
+          {inputBox(96, isImageMode ? 'Describe the image you want to generate…' : 'A decision, a plan to test, a claim to check…')}
 
           {!isImageMode && (
             <ul className="-ml-[var(--space-2)] mt-[var(--space-6)] flex list-none flex-col items-start gap-[var(--space-1)]" aria-label="Example problems">

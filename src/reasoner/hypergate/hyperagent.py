@@ -169,6 +169,7 @@ _CODING_SIGNAL = re.compile(
 # debate this") never selects a pipeline.
 _NAMED_METHODS: dict[str, str] = {
     "iterative_critique": r"iterative[\s-]+critique",
+    "self_refine": r"self[\s-]+refine",
     "multi_perspective": r"multi[\s-]*perspective",
     "pre_mortem": r"pre[\s-]*mortem",
     "self_discover": r"self[\s-]+discover",

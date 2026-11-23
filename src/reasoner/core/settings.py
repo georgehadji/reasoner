@@ -103,6 +103,10 @@ class Settings:
     # Mounts the MCP Streamable-HTTP transport at /mcp. Off by default: most
     # installs use stdio (mcp_server.py) instead. Requires the mcp extra.
     ENABLE_MCP_HTTP: bool = os.getenv("ENABLE_MCP_HTTP", "false").lower() in ("1", "true", "yes")
+    # Runs the reservation sweep, unsettled-run replay and row pruning in the API process.
+    MAINTENANCE_LOOP_ENABLED: bool = os.getenv("MAINTENANCE_LOOP_ENABLED", "true").lower() in (
+        "1", "true", "yes",
+    )
     # Early HTTP 403 for a preset the caller's tier cannot run. Premium presets are
     # already refused at runtime regardless of this flag (check_run_allowed in
     # spend_limit_service, surfaced as an SSE PRESET_TIER_REQUIRED frame after
@@ -694,6 +698,12 @@ if settings.ENVIRONMENT == "production":
     ):
         if os.getenv(provider_key) and not os.getenv(webhook_var):
             raise RuntimeError(f"{webhook_var} must be set in production when {provider_key} is.")
+    # Production auth is Supabase only: get_auth_adapter refuses the local HS256
+    # adapter, so without these every authenticated call would fail at runtime.
+    if not (settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY):
+        raise RuntimeError(
+            "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in production."
+        )
     # Without trusted proxies every caller behind the load balancer shares its
     # IP, so per-IP rate limits and the anonymous trial cap act on one bucket.
     if not settings.TRUSTED_PROXIES and os.getenv("ALLOW_NO_TRUSTED_PROXIES", "").lower() not in (

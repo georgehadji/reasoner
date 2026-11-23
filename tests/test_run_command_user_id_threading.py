@@ -72,10 +72,11 @@ async def test_handler_preserves_anonymous_runs():
     assert executor.execute_run.await_args.kwargs["user_id"] is None
 
 
-def test_null_owner_record_is_world_readable():
-    """Documents why the NULL owner above was a security bug, not a cosmetic one."""
+def test_null_owner_record_is_open_to_anonymous_callers_only():
+    """A NULL owner was world-readable; a signed-in user with a leaked id is now refused."""
     unowned = OwnershipRecord(user_id=None, run_id="run-abc")
-    assert is_authorized(unowned, "someone-else") is True
+    assert is_authorized(unowned, "someone-else") is False
+    assert is_authorized(unowned, None) is True
 
     owned = OwnershipRecord(user_id="user-42", run_id="run-abc")
     assert is_authorized(owned, "user-42") is True

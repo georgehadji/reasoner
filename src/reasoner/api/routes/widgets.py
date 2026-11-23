@@ -7,13 +7,16 @@ import time
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
 from reasoner.api.auth_deps import require_csrf
-from reasoner.api.dependencies import check_rate_limit
+from reasoner.api.dependencies import check_rate_limit, get_optional_user
+from reasoner.api.run_admission import admit_flat_charge, close_flat_charge
 from reasoner.api.schemas import SuggestionRequestModel, sanitize_strings_deep
 from reasoner.application.commands import ExecuteWidgetCommand
+from reasoner.core.constants_limits import PAID_WIDGET_NAMES, SEARCH_ESTIMATED_COST_USD
+from reasoner.domain.saas import User
 from reasoner.infrastructure.llm.registry import list_models
 from reasoner.presets import PRESETS
 from reasoner.sanitization import sanitize_for_prompt
@@ -101,33 +104,59 @@ async def get_suggestions(req: SuggestionRequestModel):
 @router.post("/api/widget/execute")
 async def execute_widget(
     req: ExecuteWidgetRequest,
+    request: Request,
+    user: User | None = Depends(get_optional_user),
     csrf_checked=Depends(require_csrf),
     rate_limit_checked=Depends(check_rate_limit),
 ) -> dict[str, Any]:
     """Execute widget using new architecture.
 
-    Supports auto-detection from query or explicit widget execution.
+    Supports auto-detection from query or explicit widget execution. A widget that
+    spends on a paid search provider is charged flat, like ``/api/search``.
     """
+    charge = None
+    served = False
     try:
         from reasoner.api import get_architecture_components
+        from reasoner.infrastructure.widgets import get_widget_registry
 
         _, handler_registry = get_architecture_components()
 
         sanitized_query, _ = sanitize_for_prompt(req.query)
 
+        widget_type, params = req.widget_type, req.params
+        if req.auto_detect:
+            # Detect once here and run that widget by name: the handler's own
+            # auto-detect would detect again, and could run a widget other than the
+            # one charged for.
+            detections = await get_widget_registry().detect_widgets(sanitized_query)
+            if not detections:
+                return {"detected": False, "widgets": []}
+            widget_type, params = detections[0].widget.name, detections[0].params
+        if widget_type in PAID_WIDGET_NAMES:
+            charge = await admit_flat_charge(
+                request, user=user, cost_usd=SEARCH_ESTIMATED_COST_USD, kind=f"widget-{widget_type}"
+            )
+
         command = ExecuteWidgetCommand(
             command_id=str(uuid.uuid4()),
             timestamp=time.time(),
-            widget_type=req.widget_type,
-            params=req.params,
-            auto_detect=req.auto_detect,
+            widget_type=widget_type,
+            params=params,
+            auto_detect=False,
             query=sanitized_query,
         )
         result = await handler_registry.handle_command(command)
+        served = any(w.get("success") for w in result.get("widgets", []))
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Widget execution error: {e}")
         return {"error": "Internal server error", "detected": False}
+    finally:
+        if charge is not None:
+            await close_flat_charge(charge, served=served)
 
 
 @router.get("/api/widgets/list")

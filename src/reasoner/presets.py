@@ -77,6 +77,8 @@ def _derive_method_from_preset_name(preset: str) -> str:
         return "debate"
     if "iterative" in preset:
         return "iterative_critique"
+    if "self-refine" in preset:
+        return "self_refine"
     if "jury" in preset or "orchestrated" in preset:
         return "jury"
     if "research" in preset:
