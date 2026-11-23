@@ -479,39 +479,6 @@ async def close_tier_lookup() -> None:
         logger.warning("Shared Postgres pool close failed: %s", exc)
 
 
-def require_tier(min_tier: SubscriptionTier):
-    """
-    Factory that returns a FastAPI dependency enforcing minimum subscription tier.
-
-    Usage:
-        @app.post("/api/premium-only")
-        async def premium_route(user: User = Depends(require_tier(SubscriptionTier.PRO))):
-            ...
-    """
-    from fastapi import HTTPException
-
-    async def checker(
-        request: Request, user: User = Depends(get_current_user)
-    ) -> User:
-        # Resolves the caller's entitled tier from their subscription.
-        # _resolve_user_tier() falls back to FREE on every uncertain path, so a
-        # subscription-store outage denies paid access rather than granting it.
-        if not settings.PRESET_TIER_ENFORCEMENT_ENABLED:
-            return user
-        user_tier = await resolve_request_tier(request, user)
-        if not tier_satisfies(user_tier, min_tier):
-            raise HTTPException(
-                status_code=403,
-                detail=(
-                    f"This feature requires the {min_tier.value} plan. "
-                    f"Your current plan is {user_tier.value}."
-                ),
-            )
-        return user
-
-    return checker
-
-
 async def check_rate_limit(
     request: Request,
     user: User | None = Depends(get_optional_user),

@@ -28,7 +28,6 @@ from httpx import ASGITransport, AsyncClient
 from reasoner.api.dependencies import (
     check_preset_access,
     check_preset_access_if_authenticated,
-    require_tier,
     tier_satisfies,
 )
 from reasoner.core.settings import settings
@@ -117,12 +116,6 @@ class TestEnforcementOff:
             assert await check_preset_access("debate-premium", user) is None
         resolve.assert_not_awaited()
 
-    @pytest.mark.asyncio
-    async def test_require_tier_passes_user_through(self, user, monkeypatch):
-        monkeypatch.setattr(settings, "PRESET_TIER_ENFORCEMENT_ENABLED", False)
-        monkeypatch.setattr(settings, "ENVIRONMENT", "production")
-        checker = require_tier(PRO)
-        assert await checker(_req(), user) is user
 
 
 @pytest.mark.usefixtures("enforcement_on")
@@ -198,14 +191,6 @@ class TestEnforcementOn:
             assert await check_preset_access_if_authenticated("debate-premium", None) is None
         resolve.assert_not_awaited()
 
-    @pytest.mark.asyncio
-    async def test_require_tier_blocks_and_allows(self, user):
-        checker = require_tier(PRO)
-        with _as_tier(FREE), pytest.raises(HTTPException) as exc:
-            await checker(_req(), user)
-        assert exc.value.status_code == 403
-        with _as_tier(PRO):
-            assert await checker(_req(), user) is user
 
 
 class TestTierResolutionIsBoundedAndMemoised:
