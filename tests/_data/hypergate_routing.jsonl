@@ -60,3 +60,9 @@
 {"prompt": "Tell me about photosynthesis", "research": false, "note": "FLOW-5: 'about <word>'"}
 {"prompt": "Σκέψεις για την τεχνητή νοημοσύνη", "research": false, "note": "FLOW-5: Greek 'για την <word>'"}
 {"prompt": "Write a report on Q3 sales as a Python script", "route": "sub_agents", "note": "FLOW-5: the coding signal runs before the writing fast path"}
+{"prompt": "what can you do for me?", "route": "direct", "note": "a question about Reasoner itself ran the 6-phase pipeline, whose perspectives then analysed their own JSON-format rules"}
+{"prompt": "Who are you?", "route": "direct", "note": "question about Reasoner itself"}
+{"prompt": "How can you help me?", "route": "direct", "note": "question about Reasoner itself"}
+{"prompt": "τι μπορείς να κάνεις για μένα;", "route": "direct", "note": "question about Reasoner itself, Greek"}
+{"prompt": "what can you do about my failing CI build", "route": "sub_agents", "note": "a request, not a question about Reasoner: the self-question fast path is anchored at the end"}
+{"prompt": "who are you voting for in the next election and why", "route": "sub_agents", "note": "starts like a self-question but goes on"}
