@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from typing import TYPE_CHECKING
 
@@ -13,6 +12,7 @@ from reasoner.core.constants import (
     get_quality_judge_model,
     get_quality_judge_threshold,
 )
+from reasoner.core.parsing import ParseError, extract_json
 from reasoner.quality.criteria import PhaseQualityResult, evaluate_rules
 
 if TYPE_CHECKING:
@@ -219,10 +219,18 @@ class PhaseMonitor:
         from reasoner.infrastructure.llm.router import ProviderRouter
 
         judge = ProviderRouter.from_model_ids(self._judge_model)
-        response, _meta = await judge.call(
+        response, meta = await judge.call(
             "primary", _JUDGE_SYSTEM, prompt,
             max_tokens=GATE_MAX_TOKENS, temperature=GATE_TEMPERATURE,
         )
+        # The judge is billed by the provider but runs outside the executor, which
+        # is where cost normally enters the run. Put it on the run here, or it is
+        # never charged (audit 7, finding 6). call_cost_usd, like the executor: it
+        # estimates from tokens when no cost is reported and adds discarded replies.
+        cost = ProviderRouter.call_cost_usd(meta or {})
+        if cost > 0:
+            state.total_cost_usd += cost
+            state.phase_costs["quality_judge"] = state.phase_costs.get("quality_judge", 0.0) + cost
         raw = (response if isinstance(response, str) else getattr(response, "text", "")).strip()
         parsed = _parse_judge_response(raw)
         if parsed is None:
@@ -253,34 +261,8 @@ class PhaseMonitor:
 
 def _parse_judge_response(raw: str) -> dict | None:
     """Extract JSON from LLM judge response, tolerating markdown fences."""
-    text = raw
-    if "```" in text:
-        for line in text.splitlines():
-            stripped = line.strip()
-            if stripped.startswith("{"):
-                text = stripped
-                break
-        else:
-            start = text.find("{")
-            end = text.rfind("}") + 1
-            if start != -1 and end > start:
-                text = text[start:end]
-
     try:
-        data = json.loads(text)
-        if isinstance(data, dict) and "score" in data:
-            return data
-    except json.JSONDecodeError:
-        pass
-
-    start = raw.find("{")
-    end = raw.rfind("}") + 1
-    if start != -1 and end > start:
-        try:
-            data = json.loads(raw[start:end])
-            if isinstance(data, dict) and "score" in data:
-                return data
-        except json.JSONDecodeError:
-            pass
-
-    return None
+        data = extract_json(raw)
+    except ParseError:
+        return None
+    return data if "score" in data else None

@@ -652,7 +652,9 @@ class LLMExecutor:
         # P1.9: If the provider didn't return a real cost, estimate from token counts.
         # pricing_resolver, not domain.pricing: it resolves registry aliases and
         # direct-provider ids that domain.pricing prices at the $1/$5 default.
-        if cost_usd <= 0:
+        # Always asked, not only when nothing was reported: call_cost_usd adds the cost
+        # of the replies the router discarded, which cost_usd no longer carries.
+        if cost_usd <= 0 or metadata.get("discarded_cost_usd"):
             try:
                 from reasoner.infrastructure.llm.pricing_resolver import call_cost_usd
                 cost_usd = call_cost_usd(metadata)

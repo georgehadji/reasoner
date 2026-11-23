@@ -10,11 +10,14 @@ import asyncio
 import logging
 import time
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from reasoner.api.auth_deps import require_csrf
-from reasoner.api.dependencies import check_rate_limit
+from reasoner.api.dependencies import check_rate_limit, get_optional_user
+from reasoner.api.run_admission import admit_flat_charge, close_flat_charge
 from reasoner.api.schemas import CalculationRequest
+from reasoner.core.constants_limits import SEARCH_ESTIMATED_COST_USD
+from reasoner.domain.saas import User
 from reasoner.infrastructure.widgets.calculator import calculate_expression
 from reasoner.infrastructure.widgets.registry import get_widget_registry
 
@@ -92,9 +95,15 @@ _discover_cache: dict[tuple[str, str], tuple[float, dict]] = {}
 
 @router.get("/api/discover")
 async def discover(
-    topic: str = "tech", mode: str = "normal", rate_limit_checked=Depends(check_rate_limit)
+    request: Request,
+    topic: str = "tech",
+    mode: str = "normal",
+    user: User | None = Depends(get_optional_user),
+    rate_limit_checked=Depends(check_rate_limit),
 ):
-    """Get trending content for a topic (legacy endpoint)."""
+    """Get trending content for a topic (legacy endpoint). A cache miss is a paid search."""
+    charge = None
+    served = False
     try:
         # Unknown topics already fall back to "tech" downstream; do it here so
         # arbitrary strings cannot mint cache keys.
@@ -103,13 +112,22 @@ async def discover(
         hit = _discover_cache.get(key)
         if hit and time.monotonic() - hit[0] < _DISCOVER_TTL_SECONDS:
             return hit[1]
+        charge = await admit_flat_charge(
+            request, user=user, cost_usd=SEARCH_ESTIMATED_COST_USD, kind="widget-discover"
+        )
         data = await _run("discover", {"topic": key[0]})
+        served = not data.get("error")  # an error payload is not a search the caller got
         # Legacy shape: echoes the mode, no "sources".
         content = {k: v for k, v in data.items() if k != "sources"} | {"mode": key[1]}
         cacheable = isinstance(content, dict) and not content.get("error")
         if cacheable and (len(_discover_cache) < _DISCOVER_CACHE_MAX or key in _discover_cache):
             _discover_cache[key] = (time.monotonic(), content)
         return content
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Discover error: {e}")
         return {"error": "Internal server error", "results": []}
+    finally:
+        if charge is not None:
+            await close_flat_charge(charge, served=served)

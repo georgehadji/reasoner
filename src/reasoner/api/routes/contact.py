@@ -13,14 +13,17 @@ import logging
 import re
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
 from reasoner.api.auth_deps import require_csrf
+from reasoner.api.client_ip import get_client_ip
 from reasoner.api.dependencies import check_rate_limit
 from reasoner.application.ports.email_port import EmailMessage, EmailPort
+from reasoner.core.constants_limits import CONTACT_RATE_LIMIT_PER_HOUR
 from reasoner.core.settings import settings
 from reasoner.infrastructure.email.resend_adapter import ResendEmailAdapter
+from reasoner.infrastructure.rate_limiter import RateLimitConfig, RateLimiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -61,6 +64,28 @@ class ContactRequest(BaseModel):
         return value
 
 
+_contact_limiter: RateLimiter | None = None
+
+
+async def contact_rate_limit(request: Request) -> None:
+    """A strict per-address bucket: the form reaches one inbox, and the global
+    limiter allows far more than a person sends (audit 7, finding 20)."""
+    global _contact_limiter
+    if _contact_limiter is None:
+        _contact_limiter = RateLimiter(RateLimitConfig(
+            requests_per_minute=CONTACT_RATE_LIMIT_PER_HOUR,
+            requests_per_hour=CONTACT_RATE_LIMIT_PER_HOUR,
+            burst_size=CONTACT_RATE_LIMIT_PER_HOUR,
+        ))
+    allowed, info = await _contact_limiter.is_allowed(f"contact:{get_client_ip(request)}")
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many messages. Try again later.",
+            headers={"Retry-After": str(info.get("retry_after") or 3600)},
+        )
+
+
 def get_email_adapter() -> EmailPort:
     return ResendEmailAdapter()
 
@@ -71,6 +96,7 @@ async def submit_contact(
     adapter: EmailPort = Depends(get_email_adapter),
     csrf_checked=Depends(require_csrf),
     rate_limit_checked=Depends(check_rate_limit),
+    contact_limited=Depends(contact_rate_limit),
 ):
     """Send a contact form submission. Anonymous: the form is public."""
     inbox = settings.CONTACT_EMAIL or settings.NOTIFICATION_EMAIL

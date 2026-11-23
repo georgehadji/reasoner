@@ -42,15 +42,19 @@ async def run_debate_opening_phase(state: PipelineState, services: WorkflowServi
     results = await asyncio.gather(_get_opening("A", stance_a), _get_opening("B", stance_b), return_exceptions=True)
     statements = []
     failures: list[str] = []
+    causes: list[BaseException] = []
     for side, r in zip(["A", "B"], results, strict=True):
         if isinstance(r, Exception):
+            causes.append(r)
             msg = f"Debate opening '{side}' failed: {r}"
             services.log("DEBATE", msg, state)
             state.errors.append(msg)
             failures.append(msg)
         else:
             statements.append(r)
-    require_survivors(statements, failures, phase=2, phase_name="Opening Statements")
+    require_survivors(
+        statements, failures, phase=2, phase_name="Opening Statements", causes=causes
+    )
     state.debate_rounds.append({"round": 1, "type": "opening", "statements": statements})
 
 async def run_debate_rebuttal_phase(state: PipelineState, services: WorkflowServices) -> None:

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sized
+from collections.abc import Callable, Sequence, Sized
 from typing import Any, Protocol, runtime_checkable
 
-from reasoner.core.exceptions import PhaseError
+from reasoner.core.exceptions import PhaseError, is_run_fatal
 from reasoner.core.ports.code_executor import CodeExecutorPort
 from reasoner.core.ports.llm_port import LLMPort
 from reasoner.domain.pipeline_state import PipelineState
@@ -98,15 +98,28 @@ class PhaseObserver(Protocol):
 
 
 def require_survivors(
-    items: Sized, errors: list[str], *, phase: int, phase_name: str
+    items: Sized,
+    errors: list[str],
+    *,
+    phase: int,
+    phase_name: str,
+    causes: Sequence[BaseException] = (),
 ) -> None:
-    """Raise when a fan-out phase produced nothing.
+    """Raise when a fan-out phase produced nothing, or when a call failed run-fatally.
+
+    A run-fatal failure in ``causes`` (exhausted credits, a rejected key) is re-raised
+    as it is, even when other calls survived: every later phase fails the same way or
+    bills past the limit (audit 7, finding 4). Passing only strings hid a 402 as a
+    generic PhaseError, and the run went on.
 
     Zero survivors is an execution failure, not a low score: without the raise
     the runner counts the phase complete, a ``critical`` flag never fires, and
     the run keeps paying for later phases that have nothing to work on
     (docs/plans/audit-remediation-2-2026-10-20.md FLOW-3).
     """
+    for cause in causes:
+        if isinstance(cause, Exception) and is_run_fatal(cause):
+            raise cause
     if not len(items):
         raise PhaseError(
             f"All {phase_name} calls failed: " + ("; ".join(errors) or "no output"),

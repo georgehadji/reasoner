@@ -86,7 +86,10 @@ async def test_f3_empty_attempt_cost_carried_forward():
     with patch("reasoner.infrastructure.llm.router._per_call", lambda p: p):
         _, meta = await router.call("role", "s", "u")
     assert seen == ["a", "b"]
-    assert meta["cost_usd"] == pytest.approx(0.75)
+    # The discarded attempt's spend rides under its own key (audit 7, finding 15), so the
+    # final call's own cost is still visible to the estimate; the total is unchanged.
+    assert meta["cost_usd"] == pytest.approx(0.25)
+    assert meta["discarded_cost_usd"] == pytest.approx(0.5)
     assert meta["input_tokens"] == 30
 
 
