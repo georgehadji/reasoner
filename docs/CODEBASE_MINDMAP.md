@@ -2,7 +2,7 @@
 
 > High-fidelity codebase reconstruction.  
 > **Last updated:** 2026-11-23  
-> **Python source files:** 536 | **Models:** 203 | **Presets:** 102 | **Methods:** 32 | **Phase modules:** 32
+> **Python source files:** 537 | **Models:** 203 | **Presets:** 102 | **Methods:** 32 | **Phase modules:** 32
 
 ---
 

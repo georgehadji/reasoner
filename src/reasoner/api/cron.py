@@ -49,6 +49,21 @@ async def run_reservation_sweep() -> dict:
     return {"released": released}
 
 
+async def run_unsettled_replay(limit: int = 50) -> dict:
+    """Settle runs that were served but could not be billed (audit 6, finding 4).
+
+    Safe to repeat: each replay uses the run's original ledger reference.
+    """
+    from reasoner.api.dependencies import _get_credit_service
+    from reasoner.application.services.unsettled_run_replay_service import (
+        UnsettledRunReplayService,
+    )
+    from reasoner.infrastructure.valkey.unsettled_runs import ValkeyUnsettledRunStore
+
+    service = UnsettledRunReplayService(ValkeyUnsettledRunStore(), _get_credit_service())
+    return await service.replay(limit=min(limit, 200))
+
+
 async def run_neuro_maintenance() -> dict:
     """Run neuro lifecycle maintenance: archive hot→warm→cold sessions.
 
