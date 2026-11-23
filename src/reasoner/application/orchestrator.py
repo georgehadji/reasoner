@@ -442,7 +442,7 @@ class PipelineOrchestrator:
             wanted = settings.NEURO_CONTEXT_MAX_CHUNKS
             chunks = await port.recall(
                 problem,
-                agent_id=model_policy.memory_agent_id(agent_id),
+                agent_id=model_policy.memory_agent_id(agent_id, owner),
                 max_results=min(wanted * 2, 20),
                 owner=owner,
             )
@@ -543,7 +543,7 @@ class PipelineOrchestrator:
                     prompt=getattr(req, "problem", ""),
                     response=synthesis_text,
                     agent_id=model_policy.memory_agent_id(
-                        getattr(state, "conversation_id", None)
+                        getattr(state, "conversation_id", None), user_id
                     ),
                     owner=user_id,
                     metadata={

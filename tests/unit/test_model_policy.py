@@ -79,6 +79,11 @@ def test_memory_store_is_separate_and_anonymous_stays_anonymous():
     with restrict_blocs(WESTERN_BLOCS):
         assert model_policy.memory_agent_id("conv1") == "conv1-western"
         assert model_policy.memory_agent_id(None) is None
+        # Audit 7, finding 3: an owner with no id used to reach their shared
+        # "default" tenant, which the non-Western embedder built.
+        assert model_policy.memory_agent_id(None, "u1") == "default-western"
+        assert model_policy.is_western_memory(model_policy.memory_agent_id(None, "u1"))
+    assert model_policy.memory_agent_id(None, "u1") is None
     assert model_policy.is_western_memory("u-x-conv1-western")
 
 

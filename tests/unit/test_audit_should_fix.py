@@ -143,3 +143,38 @@ def test_fenced_json_is_valid_cascade_output():
     assert extract_json_any('```json\n{"a": 1}\n```') == {"a": 1}
     assert extract_json_any("[1, 2]") == [1, 2]
     assert extract_json_any("not json at all") is None
+
+
+# ── audit 7, finding 2: /api/run-with-context honours Western-only ──────────
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("preset", "expected"),
+    [("debate-western-budget", {"US", "EU"}), ("debate-budget", None)],
+)
+async def test_context_run_applies_the_presets_bloc_restriction(monkeypatch, preset, expected):
+    from reasoner.api.routes import context
+    from reasoner.api.schemas import ContextAnalysisRequest
+    from reasoner.core import model_policy
+
+    seen: list[object] = []
+
+    class _StopError(Exception):
+        pass
+
+    class _SpyPresetService:
+        def build_router(self, preset):
+            seen.append(model_policy.allowed_blocs())  # first call that reaches providers
+            raise _StopError
+
+    monkeypatch.setattr(
+        "reasoner.application.services.preset_service.PresetService", _SpyPresetService
+    )
+    req = ContextAnalysisRequest(problem="p" * 20, preset=preset, context=[])
+
+    with pytest.raises(_StopError):
+        await context.run_with_context(None, req, None, None, None, None, None)
+
+    assert seen == [expected and frozenset(expected)]
+    assert model_policy.allowed_blocs() is None, "the restriction does not leak past the call"
