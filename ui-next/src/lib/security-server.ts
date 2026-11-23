@@ -303,7 +303,14 @@ export async function readJsonBody(req: NextRequest, maxBytes = 1024 * 1024): Pr
  * to the browser. Only a ValidationError message is user-facing: the validators
  * write it for the caller.
  */
-export function proxyErrorResponse(err: unknown, label: string, upstreamUrl?: string): NextResponse {
+export function proxyErrorResponse(
+  err: unknown,
+  label: string,
+  upstreamUrl?: string,
+  req?: { signal: AbortSignal },
+): Response {
+  // The client went away: nobody reads this response, so skip the error log.
+  if (req?.signal.aborted) return new Response(null, { status: 499 });
   if (err instanceof ValidationError) {
     return NextResponse.json({ error: err.message }, { status: 400 });
   }

@@ -54,8 +54,6 @@ export async function POST(req: NextRequest) {
       headers: sanitizeResponseHeaders(upstream),
     });
   } catch (err) {
-    // Client went away: nobody reads this response, so skip the error log.
-    if (req.signal.aborted) return new Response(null, { status: 499 });
-    return proxyErrorResponse(err, 'Run followup', upstreamUrl);
+    return proxyErrorResponse(err, 'Run followup', upstreamUrl, req);
   }
 }

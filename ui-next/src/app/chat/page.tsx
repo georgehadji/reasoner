@@ -542,6 +542,9 @@ export default function ChatPage() {
     const isFollowup = !!lastAssistantMsg && messages.length > 0 && isContinuation(problem);
 
     let phases: RenderedPhase[] = [];
+    // Local, like `phases`: `messages` is this render's snapshot and never sees the steps
+    // dispatched during the run.
+    let researchSteps: NonNullable<ChatFeedMessage['researchSteps']> = [];
     let finalErrors: string[] = [];
     // `done` lists every run error, including one an `error` frame already showed.
     const shownErrors = new Set<string>();
@@ -639,12 +642,13 @@ export default function ChatPage() {
             plan: String(ev.plan || ''),
             urls: Array.isArray(ev.urls) ? ev.urls : [],
           };
+          researchSteps = [...researchSteps, step];
           dispatchMessages({
             type: 'UPDATE_MESSAGE',
             payload: {
               messageId: assistantId,
               updates: {
-                researchSteps: [...(messages.find((m) => m.id === assistantId)?.researchSteps || []), step],
+                researchSteps,
               },
             },
           });

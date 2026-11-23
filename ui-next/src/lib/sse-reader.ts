@@ -2,6 +2,18 @@
 
 import { PhaseEvent } from '@/lib/types';
 
+/** Only a malformed line is ignored; an error thrown by `onEvent` propagates to the reader. */
+function dispatch(line: string, onEvent: (ev: PhaseEvent) => void): void {
+  if (!line.startsWith('data: ')) return;
+  let ev: PhaseEvent;
+  try {
+    ev = JSON.parse(line.slice(6));
+  } catch {
+    return; // ignore malformed sse lines
+  }
+  onEvent(ev);
+}
+
 /**
  * Read a Server-Sent Events stream from a ReadableStream.
  *
@@ -27,28 +39,12 @@ export async function readSSEStream(
       const lines = buffer.split('\n');
       buffer = lines.pop() ?? '';
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const ev: PhaseEvent = JSON.parse(line.slice(6));
-            onEvent(ev);
-          } catch {
-            // ignore malformed sse lines
-          }
-        }
+        dispatch(line, onEvent);
       }
     }
     // Flush any bytes the decoder held for multi-byte sequences
     buffer += decoder.decode();
-    for (const line of buffer.split('\n')) {
-      if (line.startsWith('data: ')) {
-        try {
-          const ev: PhaseEvent = JSON.parse(line.slice(6));
-          onEvent(ev);
-        } catch {
-          // ignore malformed sse lines
-        }
-      }
-    }
+    for (const line of buffer.split('\n')) dispatch(line, onEvent);
   } finally {
     reader.releaseLock();
   }
