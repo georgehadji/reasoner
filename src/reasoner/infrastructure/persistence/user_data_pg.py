@@ -46,6 +46,41 @@ EXPORT_FIELDS: dict[str, tuple[str, ...]] = {
 EXPORT_PAGE_SIZE = 1000
 
 
+class WebhookDeadLetterStore:
+    """Failed webhook events (``failed_webhook_events``). The table has no user
+    column: ``payload`` is the provider's raw event, with the customer's email, name
+    and customer id. Rows are matched on the user's provider customer ids and their
+    email, read from ``subscriptions`` and ``users``, so this store must erase before
+    both of them (audit 7, finding 14)."""
+
+    name = "webhook_dead_letter"
+
+    def __init__(self, get_pool: Callable[[], Awaitable[Any]]) -> None:
+        self._get_pool = get_pool
+
+    async def export(self, user_id: str) -> None:
+        return None  # the provider's record of the event, not data we hold
+
+    async def erase(self, user_id: str) -> None:
+        pool = await self._get_pool()
+        await pool.execute(
+            """
+            DELETE FROM failed_webhook_events f
+            USING (
+                SELECT stripe_customer_id AS ident FROM subscriptions WHERE user_id = $1
+                UNION SELECT paypal_sub_id FROM subscriptions WHERE user_id = $1
+                UNION SELECT stripe_sub_id FROM subscriptions WHERE user_id = $1
+                UNION SELECT email FROM users WHERE id = $1
+            ) i
+            WHERE i.ident IS NOT NULL AND i.ident <> ''
+              -- The whole JSON string, quotes included: a bare substring match let
+              -- bob@x.com erase the events of jimbob@x.com.
+              AND strpos(f.payload::text, to_json(i.ident)::text) > 0
+            """,
+            user_id,
+        )
+
+
 class PgUserDataStore:
     def __init__(
         self,
@@ -88,9 +123,10 @@ class PgUserDataStore:
         await pool.execute(f"DELETE FROM {self._table} WHERE {self._key} = $1", user_id)
 
 
-def pg_user_data_stores(get_pool: Callable[[], Awaitable[Any]]) -> list[PgUserDataStore]:
+def pg_user_data_stores(get_pool: Callable[[], Awaitable[Any]]) -> list[Any]:
     """In erase order: dependants first, the ``users`` row last."""
     return [
+        WebhookDeadLetterStore(get_pool),  # before subscriptions and users: it reads them
         PgUserDataStore("query_log", "query_log", "user_id", get_pool, order_by="created_at"),
         PgUserDataStore(
             "credit_ledger", "credit_ledger", "user_id", get_pool, order_by="created_at"

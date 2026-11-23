@@ -179,31 +179,44 @@ async def test_history_erase_raises_when_files_remain():
 
 
 class _Valkey:
+    """A dict-backed client with the glob match of ``SCAN MATCH``."""
+
     def __init__(self, keys):
-        self.keys_, self.deleted = keys, []
+        self.data = dict.fromkeys(keys, "1")
 
-    async def keys(self, pattern):
-        self.pattern = pattern
-        return self.keys_
+    async def scan_iter(self, match="*"):
+        import fnmatch
 
-    async def delete(self, *keys):
-        self.deleted.extend(keys)
+        for key in list(self.data):
+            if fnmatch.fnmatchcase(key, match):
+                yield key
+
+    async def unlink(self, *keys):
+        for key in keys:
+            self.data.pop(key, None)
 
 
 @pytest.mark.asyncio
-async def test_valkey_erase_deletes_the_users_keys_only():
-    client = _Valkey(["user:u:a", "user:u:b"])
+async def test_valkey_erase_deletes_what_the_real_writers_wrote():
+    """Audit 7, finding 8: the old pattern, ``user:<id>:*``, matched nothing."""
+    from reasoner.infrastructure.llm.spend_tracker import spend_key
+    from reasoner.infrastructure.persistence.cached_quota_repo import quota_key
+
+    other = "someone-else"
+    client = _Valkey([
+        spend_key(UID, "2026-10"), spend_key(UID, "2026-11"), quota_key(UID),
+        spend_key(other, "2026-11"), quota_key(other),
+    ])
 
     await ValkeyStore(lambda: client).erase(UID)
 
-    assert client.pattern == f"user:{UID}:*"
-    assert client.deleted == ["user:u:a", "user:u:b"]
+    assert set(client.data) == {spend_key(other, "2026-11"), quota_key(other)}
 
 
 @pytest.mark.asyncio
 async def test_valkey_erase_raises_when_valkey_is_down():
     class _Down:
-        async def keys(self, pattern):
+        def scan_iter(self, match="*"):
             raise ConnectionError("down")
 
     with pytest.raises(ConnectionError):
