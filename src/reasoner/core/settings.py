@@ -103,6 +103,10 @@ class Settings:
     # Mounts the MCP Streamable-HTTP transport at /mcp. Off by default: most
     # installs use stdio (mcp_server.py) instead. Requires the mcp extra.
     ENABLE_MCP_HTTP: bool = os.getenv("ENABLE_MCP_HTTP", "false").lower() in ("1", "true", "yes")
+    # Runs the reservation sweep, unsettled-run replay and row pruning in the API process.
+    MAINTENANCE_LOOP_ENABLED: bool = os.getenv("MAINTENANCE_LOOP_ENABLED", "true").lower() in (
+        "1", "true", "yes",
+    )
     # Early HTTP 403 for a preset the caller's tier cannot run. Premium presets are
     # already refused at runtime regardless of this flag (check_run_allowed in
     # spend_limit_service, surfaced as an SSE PRESET_TIER_REQUIRED frame after

@@ -37,6 +37,8 @@ os.environ.setdefault("RATE_LIMITER_REDIS_FAILURE_MODE", "fail_open")
 # install a live jev adapter and send real requests to OpenRouter. Tests that
 # exercise jev inject a fake DecisionPort and set the mode themselves.
 os.environ.setdefault("JEV_MODE", "off")
+# Tests that start the app lifespan must not start the maintenance loop.
+os.environ.setdefault("MAINTENANCE_LOOP_ENABLED", "false")
 # The event store (and pipeline ownership, which shares its file) defaulted to
 # src/reasoner/events.db, so the suite wrote into the developer's own store and
 # its rows outlived the run. Ownership is first-writer-wins (SEC-7), so a test
