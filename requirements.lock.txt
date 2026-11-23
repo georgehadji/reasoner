@@ -34,6 +34,7 @@ anyio==4.16.0 \
     # via
     #   -r requirements.txt
     #   anthropic
+    #   fastapi
     #   google-genai
     #   httpx
     #   httpx2
