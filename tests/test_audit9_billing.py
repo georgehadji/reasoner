@@ -135,7 +135,11 @@ async def test_stripe_checkout_check_and_write_run_under_user_lock():
             events.append("upsert")
             return False
 
-    sub = _sub(stripe_subscription_id="sub_1", paypal_subscription_id=None)
+    sub = _sub(
+        stripe_subscription_id="sub_1",
+        paypal_subscription_id=None,
+        status=SubscriptionStatus.ACTIVE,
+    )
     await BillingService(port=None)._apply_webhook("checkout.session.completed", sub, Repo())
     assert events == ["lock", "check", "upsert", "unlock"]
 

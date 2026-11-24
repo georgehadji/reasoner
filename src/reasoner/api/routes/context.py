@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 
@@ -37,6 +38,7 @@ from reasoner.application.services.spend_limit_service import (
     check_run_allowed,
 )
 from reasoner.core import model_policy
+from reasoner.core.constants_limits import PIPELINE_ABSOLUTE_TIMEOUT_SECONDS
 from reasoner.domain.pipeline_state import PipelineState
 from reasoner.domain.saas import SubscriptionTier, User
 
@@ -112,16 +114,10 @@ async def run_with_context(
                 },
             )
 
-        # Validate URLs inside context items before anything is reserved.
-        from reasoner.security.url_validator import is_safe_url
-        for item in req.context:
-            for _key, value in item.items():
-                if isinstance(value, str) and value.startswith(("http://", "https://")):
-                    if not is_safe_url(value):
-                        raise HTTPException(
-                            status_code=403,
-                            detail=f"Unsafe URL in context: {value}",
-                        )
+        # No URL pre-check: the route never fetches the URLs in ``context``, they are
+        # prompt text, so the check protected nothing. It resolved DNS synchronously
+        # on the event loop, one lookup per URL (6 s measured for 20 URLs). The URL
+        # count is capped in ContextAnalysisRequest instead.
 
         from reasoner.application.services.preset_service import PresetService
 
@@ -207,13 +203,30 @@ async def run_with_context(
             # Last, so nothing above can fail while credits are held outside metered().
             adm = await admit_run(request, user=user, problem=req.problem, preset=effective_preset)
             tier_label = tier.value if user else "anonymous"
-            async for _ in metered(
-                _cost_frames(state, steps),
-                adm.run_context(tier=tier_label, interface="context"),
-                CreditSink(),
-                PrometheusObserver(tier=tier_label, preset=effective_preset, interface="context"),
-            ):
-                pass
+            # The same absolute limit as run_stream: without it a stuck run outlives
+            # its reservation, and the sweeper releases credits that are still in use.
+            deadline = asyncio.timeout(PIPELINE_ABSOLUTE_TIMEOUT_SECONDS or None)
+            try:
+                async with deadline:
+                    async for _ in metered(
+                        _cost_frames(state, steps),
+                        adm.run_context(tier=tier_label, interface="context"),
+                        CreditSink(),
+                        PrometheusObserver(
+                            tier=tier_label, preset=effective_preset, interface="context"
+                        ),
+                    ):
+                        pass
+            except TimeoutError:
+                if not deadline.expired():
+                    raise  # a provider's own timeout, not our deadline
+                raise HTTPException(
+                    status_code=504,
+                    detail=(
+                        "Pipeline exceeded absolute timeout of "
+                        f"{PIPELINE_ABSOLUTE_TIMEOUT_SECONDS}s"
+                    ),
+                ) from None
 
             # Return the final solution
             if state.final_solution:

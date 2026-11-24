@@ -11,7 +11,9 @@ from uuid import UUID, uuid4
 import stripe
 
 from reasoner.application.ports.billing_port import BillingPort
+from reasoner.core.exceptions import ConfigurationError
 from reasoner.domain.saas import (
+    LIVE_STATUSES,
     Subscription,
     SubscriptionStatus,
     SubscriptionTier,
@@ -202,6 +204,16 @@ class StripeBillingAdapter(BillingPort):
             logger.warning("Unknown Stripe subscription status %r on %s; treating as past_due",
                            raw_status, sub_dict.get("id"))
             status = SubscriptionStatus.PAST_DUE
+        if price_id and tier == SubscriptionTier.FREE and status in LIVE_STATUSES:
+            # A paying subscription on a price we do not map. Mapping it to FREE
+            # would sync the user's quota down while Stripe keeps billing them.
+            # Raising sends the event to the dead-letter table (webhooks.py) and
+            # leaves the stored tier unchanged until someone fixes the price env.
+            logger.error(
+                "Live Stripe subscription %s has unmapped price %s; tier left unchanged",
+                sub_dict.get("id"), price_id,
+            )
+            raise ConfigurationError(f"Stripe price {price_id} maps to no tier")
         return Subscription(
             id=uuid4(),
             user_id=user_id,

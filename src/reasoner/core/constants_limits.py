@@ -584,6 +584,19 @@ IMAGE_GEN_DEFAULT_PRESET: str = IMAGE_GEN_BUDGET_PRESET
 IMAGE_GEN_DEFAULT_ASPECT_RATIO: str = "1:1"
 IMAGE_GEN_ALLOWED_ASPECT_RATIOS: tuple[str, ...] = ("1:1", "16:9", "9:16", "4:3", "3:4")
 IMAGE_GEN_DEFAULT_RESOLUTION: str = "1024x1024"
+# The sizes a caller may ask for (audit 8 WS3-5). Any string used to pass, so a
+# "8192x8192" request was priced like a 1024x1024 one. Each entry is priced by
+# its pixel count in estimate_service.estimate_image_cost.
+IMAGE_GEN_ALLOWED_RESOLUTIONS: tuple[str, ...] = (
+    "512x512",
+    "768x768",
+    "1024x1024",
+    "1024x1536",
+    "1536x1024",
+    "1024x1792",
+    "1792x1024",
+    "2048x2048",
+)
 IMAGE_GEN_DEFAULT_WIDTH: int = 1024
 IMAGE_GEN_DEFAULT_HEIGHT: int = 1024
 IMAGE_GEN_REMOTE_TIMEOUT_SECONDS: float = 20.0

@@ -28,6 +28,13 @@ USER = str(uuid4())
 REPO = "reasoner.infrastructure.billing.stripe_adapter._subscription_repo"
 
 
+@pytest.fixture(autouse=True)
+def _price_x_is_pro(monkeypatch):
+    """The fixtures' price must map to a tier: a live subscription on an unmapped
+    price is refused (audit 8 WS3-6)."""
+    monkeypatch.setenv("STRIPE_PRO_PRICE_ID", "price_x")
+
+
 def _customer(metadata=None):
     return stripe.Customer.construct_from({"id": "cus_1", "metadata": metadata or {}}, KEY)
 
@@ -237,3 +244,21 @@ def test_admin_route_accepts_the_allowlisted_principal_in_production(monkeypatch
         with pytest.raises(HTTPException) as denied:
             admin._require_admin(plain)
     assert denied.value.status_code == 403
+
+
+# ── Audit 8 WS3-6: an unmapped price is not FREE ───────────────────────
+
+
+def test_live_subscription_on_an_unmapped_price_is_refused(monkeypatch):
+    from reasoner.core.exceptions import ConfigurationError
+
+    monkeypatch.setenv("STRIPE_PRO_PRICE_ID", "price_other")
+    adapter = StripeBillingAdapter(KEY)
+    with pytest.raises(ConfigurationError):
+        adapter._stripe_sub_to_domain(_stripe_sub("active"), USER)
+
+
+def test_ended_subscription_on_an_unmapped_price_still_maps_to_free(monkeypatch):
+    monkeypatch.setenv("STRIPE_PRO_PRICE_ID", "price_other")
+    sub = StripeBillingAdapter(KEY)._stripe_sub_to_domain(_stripe_sub("canceled"), USER)
+    assert sub.tier.value == "free"

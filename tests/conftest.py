@@ -186,3 +186,19 @@ async def auto_clean_state():
             reset_langfuse()
             await reset_token_cache()
         asyncio.run(_run_resets_after())
+
+
+@pytest.fixture
+def anonymous_trial_open(monkeypatch):
+    """Let anonymous runs past the per-IP trial cap.
+
+    Audit 8 D13 made an unreachable Valkey refuse anonymous runs (503). Tests that
+    exercise a route as an anonymous caller are about the route, not the counter, so
+    they must not depend on a Valkey being up. The cap itself is tested in
+    tests/test_anonymous_trial_policy.py.
+    """
+    from unittest.mock import AsyncMock
+
+    monkeypatch.setattr(
+        "reasoner.api.run_admission.enforce_anonymous_trial_cap", AsyncMock(return_value=None)
+    )

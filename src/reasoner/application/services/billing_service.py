@@ -91,6 +91,38 @@ async def _paypal_refund(sub, repo, event_at, obj=None) -> None:
     )
 
 
+_REFUND_LEDGER_PAGE_SIZE = 200
+_REFUND_LEDGER_PAGES = 5
+
+
+async def _refunded_cents_so_far(user_id: str, charge_id, total: int) -> int:
+    """Cents of this charge already clawed back, read from ``refund:<charge>:<cents>`` rows."""
+    if _credit_service_provider is None:
+        return 0
+    prefix = f"refund:{charge_id}"
+    done = 0
+    credits = _credit_service_provider()
+    # shortcut: newest 1000 ledger rows only (the ledger has no lookup by reference);
+    # a first partial refund older than that is clawed back a second time. Upgrade to a
+    # reference-prefix query if charges outlive that window in practice.
+    for page in range(_REFUND_LEDGER_PAGES):
+        rows = await credits.list_ledger(
+            user_id, limit=_REFUND_LEDGER_PAGE_SIZE, offset=page * _REFUND_LEDGER_PAGE_SIZE
+        )
+        for entry in rows:
+            ref = entry.reference_id or ""
+            if ref == prefix:
+                return total  # pre-fix row keyed on the charge alone: its amount is unknown
+            if ref.startswith(prefix + ":"):
+                try:
+                    done = max(done, int(ref.rsplit(":", 1)[1]))
+                except ValueError:
+                    continue
+        if len(rows) < _REFUND_LEDGER_PAGE_SIZE:
+            break
+    return done
+
+
 async def claw_back_credits(user_id: str, key: str, cents: int, currency, label: str) -> None:
     """Debit the credits a refunded or disputed payment bought, idempotent on ``key``."""
     if _credit_service_provider is None:
@@ -248,12 +280,21 @@ class BillingService:
         The ledger row is keyed ``dispute:<id>`` / ``refund:<charge id>`` so a
         replayed event moves nothing twice, and overdraws: the credits may
         already be spent. A dispute, or a charge refunded in full, also puts the
-        subscription past_due. shortcut: a second partial refund on one charge
-        reuses the key and is not clawed back; key on the refund id if that matters.
+        subscription past_due. shortcut: earlier refunds are read from the user's
+        last 200 ledger rows; a charge whose earlier refund fell out of that window
+        is clawed back in full again.
         """
         is_dispute = event_type == "charge.dispute.created"
         cents = obj.get("amount") if is_dispute else obj.get("amount_refunded")
-        key = f"{'dispute' if is_dispute else 'refund'}:{obj.get('id')}"
+        if is_dispute:
+            key = f"dispute:{obj.get('id')}"
+        else:
+            # amount_refunded is cumulative and the event carries no refund id, so
+            # the key names the cumulative figure and only the new part is debited.
+            total = cents or 0
+            key = f"refund:{obj.get('id')}:{total}"
+            already = await _refunded_cents_so_far(str(sub.user_id), obj.get("id"), total)
+            cents = max(total - already, 0)
         existing = await repo.get_subscription_by_user(str(sub.user_id))
         # A charge that paid for another subscription (a refunded duplicate
         # checkout) bought no credits -- _is_duplicate_live never stores or
@@ -283,6 +324,10 @@ class BillingService:
         """
         from reasoner.domain.saas import LIVE_STATUSES
 
+        # An update for a subscription that already ended is not a second live
+        # subscription: cancelling and refunding it would refund the user's real one.
+        if sub.status not in LIVE_STATUSES:
+            return False
         existing = await repo.get_subscription_by_user(str(sub.user_id))
         if (
             existing is None

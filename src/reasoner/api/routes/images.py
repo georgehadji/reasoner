@@ -164,7 +164,7 @@ async def generate_image_endpoint(
     # _auto_select_models may pick the premium tier when no preset was sent, so
     # only an explicit budget preset is priced as budget.
     priced_preset = body.preset if "preset" in body.model_fields_set else "premium"
-    estimated_cost = await estimate_image_cost(priced_preset, body.num_images)
+    estimated_cost = await estimate_image_cost(priced_preset, body.num_images, body.resolution)
     charge = await admit_flat_charge(request, user=user, cost_usd=estimated_cost, kind="image")
 
     served = False
@@ -183,6 +183,9 @@ async def generate_image_endpoint(
         )
         if not result.get("success"):
             logger.error("Image generation failed: %s", result.get("error"))
+            # A provider call that finished was billed to us whether or not the
+            # request as a whole succeeded, so the caller keeps paying for it.
+            served = bool(result.get("completed_images"))
             return {
                 "success": False,
                 "error": result.get("error", "Unknown error"),

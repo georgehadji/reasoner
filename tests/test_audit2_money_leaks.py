@@ -295,3 +295,71 @@ async def test_funded_run_with_context_is_metered(fail_at, charged, success):
     assert response.json()["success"] is success
     reference = reserve.await_args.kwargs["reference_id"]
     assert sink.calls == [("release", 9, f"{reference}:release"), ("settle", charged, reference)]
+
+
+# ── Phase 1 (audit 8): /api/run-with-context ───────────────────────────
+
+
+async def test_context_url_count_is_capped_in_the_schema():
+    """WS4-1: the cap replaces the per-URL DNS pre-check."""
+    from pydantic import ValidationError
+
+    from reasoner.api.schemas import MAX_CONTEXT_URLS, ContextAnalysisRequest
+
+    def req(n):
+        return ContextAnalysisRequest(
+            problem="x", context=[{"source": f"https://example.com/{i}"} for i in range(n)]
+        )
+
+    assert len(req(MAX_CONTEXT_URLS).context) == MAX_CONTEXT_URLS
+    with pytest.raises(ValidationError):
+        req(MAX_CONTEXT_URLS + 1)
+
+
+async def test_context_route_does_no_dns_lookup_on_the_request_path():
+    """WS4-1: 20 URLs used to freeze the loop for seconds in socket.getaddrinfo."""
+    import socket
+
+    from reasoner.api.dependencies import require_auth_if_legacy_disabled
+
+    with patch.object(socket, "getaddrinfo", side_effect=AssertionError("DNS on the request path")):
+        response = await _post(
+            "/api/run-with-context",
+            {
+                "problem": "x", "preset": "multi-perspective-budget",
+                "method": "multi-perspective",
+                "context": [{"source": f"https://example.com/{i}"} for i in range(20)],
+            },
+            _paid_overrides(require_auth_if_legacy_disabled), [_refuse_reservation()],
+        )
+    assert response.status_code == 402, response.text  # reached admission, no DNS
+
+
+async def test_context_run_past_the_absolute_timeout_is_cancelled_and_released():
+    """WS3-12: a stuck run is cut off, not left to outlive its reservation."""
+    from reasoner.api.dependencies import require_auth_if_legacy_disabled
+
+    async def stuck(state, *args, **kwargs):
+        await asyncio.sleep(30)
+
+    sink = _Sink()
+    reserve = AsyncMock(return_value=9)
+    response = await _post(
+        "/api/run-with-context",
+        {
+            "problem": "x",
+            "preset": "multi-perspective-budget",
+            "method": "multi-perspective",
+            "context": [],
+        },
+        _paid_overrides(require_auth_if_legacy_disabled),
+        [
+            patch("reasoner.api.dependencies.reserve_or_402", reserve),
+            patch("reasoner.api.routes.context.CreditSink", lambda: sink),
+            patch("reasoner.api.routes.context.PIPELINE_ABSOLUTE_TIMEOUT_SECONDS", 0.2),
+            patch("reasoner.api.routes.context.run_perspectives_phase", stuck),
+        ],
+    )
+    assert response.status_code == 504, response.text
+    reference = reserve.await_args.kwargs["reference_id"]
+    assert [c for c in sink.calls if c[0] == "release"] == [("release", 9, f"{reference}:release")]

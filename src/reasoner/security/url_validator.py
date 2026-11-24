@@ -101,7 +101,8 @@ def _is_ip_literal(host: str) -> bool:
 def is_safe_url(url: str) -> bool:
     """Return True if *url* is safe for the server to fetch.
 
-    For input validation only. It resolves DNS synchronously and the answer
+    For input validation only, and only from synchronous code: it blocks on DNS, so
+    never call it on an event-loop path (use ``resolve_public_url`` there). The answer
     can change before a later connect, so fetch through
     ``infrastructure.safe_fetch.safe_get``, which pins the checked address.
     """

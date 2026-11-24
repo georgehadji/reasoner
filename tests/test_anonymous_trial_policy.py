@@ -2,7 +2,7 @@
 
 Anonymous runs skip the per-user credit ledger by design (no account to
 charge); these tests pin the separate daily cap that bounds anonymous spend
-instead, plus its fail-open posture when Valkey is unreachable.
+instead, plus its fail-closed posture (503) when Valkey is unreachable.
 """
 
 from __future__ import annotations
@@ -112,13 +112,15 @@ async def test_different_ips_have_independent_caps(monkeypatch):
     assert len(client.store) == 2
 
 
-async def test_valkey_unreachable_fails_open(monkeypatch):
+async def test_valkey_unreachable_fails_closed(monkeypatch):
+    """Audit 8 D13: an anonymous run is paid with our keys, so no counter means no run."""
     client = _FakeValkey(fail=True)
     _patch_valkey(monkeypatch, client)
 
-    # Must not raise -- no real money at risk for an anonymous caller, only
-    # bounded abuse exposure the daily window already limits.
-    await enforce_anonymous_trial_cap("1.2.3.4", estimated_cost_usd=10.0)
+    with pytest.raises(HTTPException) as exc_info:
+        await enforce_anonymous_trial_cap("1.2.3.4", estimated_cost_usd=10.0)
+    assert exc_info.value.status_code == 503
+    assert "Retry-After" in exc_info.value.headers
 
 
 async def test_every_counter_has_a_ttl_from_its_first_write(monkeypatch):

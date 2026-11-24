@@ -59,6 +59,9 @@ class _Credits:
     async def charge_usd(self, user_id, cost_usd, reference_id, **kw):
         self.charges.append((user_id, cost_usd, reference_id))
 
+    async def list_ledger(self, user_id, limit=50, offset=0):
+        return [SimpleNamespace(reference_id=c[2]) for c in self.charges]
+
 
 @pytest.fixture
 def credits():
@@ -102,7 +105,7 @@ async def test_non_usd_refund_is_not_clawed_back(credits):
     assert credits.charges == []
     obj["currency"] = "usd"
     await BillingService(_Port())._apply_webhook("charge.refunded", _sub("s"), _Repo(), None, obj)
-    assert [c[1:] for c in credits.charges] == [(50.0, "refund:ch_1")]
+    assert [c[1:] for c in credits.charges] == [(50.0, "refund:ch_1:5000")]
 
 
 class _StatusRepo(_Repo):
@@ -121,8 +124,8 @@ class _StatusRepo(_Repo):
     [
         # Refunded duplicate: it bought no credits and the live one is left alone.
         ("sub_dup", [], []),
-        ("sub_live", [("sub_live", "past_due")], [(20.0, "refund:ch_1")]),  # genuine refund
-        (None, [("sub_live", "past_due")], [(20.0, "refund:ch_1")]),  # unknown: as before
+        ("sub_live", [("sub_live", "past_due")], [(20.0, "refund:ch_1:2000")]),  # genuine refund
+        (None, [("sub_live", "past_due")], [(20.0, "refund:ch_1:2000")]),  # unknown: as before
     ],
 )
 async def test_full_refund_flips_only_the_subscription_it_paid_for(
@@ -170,3 +173,60 @@ async def test_paypal_refund_with_unknown_owner_is_unresolved(credits):
     sub = SimpleNamespace(paypal_subscription_id="I-x")
     with pytest.raises(UnresolvedBillingOwnerError):
         await bs._paypal_refund(sub, _Repo(paypal_user=None), None, {"id": "RF-2"})
+
+
+def _ended_sub(stripe_id):
+    sub = _sub(stripe_id)
+    sub.status = SubscriptionStatus.CANCELLED
+    return sub
+
+
+@pytest.mark.asyncio
+async def test_update_for_an_ended_subscription_does_not_refund_the_live_one():
+    """WS3-1: subscription.updated for ended A while B is live cancels and refunds nothing."""
+    port = _Port()
+    repo = _Repo(existing=_sub("sub_live"))
+    await BillingService(port)._apply_webhook(
+        "customer.subscription.updated", _ended_sub("sub_old"), repo, None
+    )
+    assert port.calls == []
+
+
+@pytest.mark.asyncio
+async def test_second_partial_refund_on_one_charge_is_clawed_back(credits):
+    """WS3-3: amount_refunded is cumulative; the second event debits only the new part."""
+    sub = _sub("s")
+    svc = BillingService(_Port())
+    for cents in (500, 2900):
+        obj = {"id": "ch_9", "amount_refunded": cents, "currency": "usd"}
+        await svc._apply_webhook("charge.refunded", sub, _Repo(), None, obj)
+    assert [c[1:] for c in credits.charges] == [
+        (5.0, "refund:ch_9:500"),
+        (24.0, "refund:ch_9:2900"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_replayed_refund_event_moves_nothing_twice(credits):
+    sub = _sub("s")
+    obj = {"id": "ch_8", "amount_refunded": 500, "currency": "usd"}
+    svc = BillingService(_Port())
+    await svc._apply_webhook("charge.refunded", sub, _Repo(), None, obj)
+    await svc._apply_webhook("charge.refunded", sub, _Repo(), None, obj)
+    assert len(credits.charges) == 1
+
+
+async def test_refunded_total_is_found_past_the_first_ledger_page():
+    """A first partial refund buried under 200+ newer rows still counts."""
+    rows = [SimpleNamespace(reference_id=f"run:{i}") for i in range(250)]
+    rows.append(SimpleNamespace(reference_id="refund:ch_p:500"))
+
+    class _Ledger:
+        async def list_ledger(self, user_id, limit=50, offset=0):
+            return rows[offset : offset + limit]
+
+    bs.set_credit_service_provider(lambda: _Ledger())
+    try:
+        assert await bs._refunded_cents_so_far("u", "ch_p", 2900) == 500
+    finally:
+        bs.set_credit_service_provider(None)

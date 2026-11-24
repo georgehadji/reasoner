@@ -289,7 +289,7 @@ class TestAPILLMErrorGracefulDegradation:
 # ─────────────────────────────────────────────────────────────────────
 
 @pytest_asyncio.fixture
-async def api_client(monkeypatch):
+async def api_client(monkeypatch, anonymous_trial_open):
     # Allow anonymous access for e2e tests that predate auth requirements.
     # `Settings` bakes each field in from the environment once, at module
     # import time (see core/settings.py) — `import reasoner.api` above has
