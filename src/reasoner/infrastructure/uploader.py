@@ -12,6 +12,7 @@ import logging
 import re
 import sys
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -111,6 +112,10 @@ def _decrypt_bytes(data: bytes) -> bytes:
 # at a mounted volume (the installed package dir is replaced on every
 # container redeploy). Empty keeps the historical in-package default so
 # local dev/tests are unaffected when it's unset.
+# A bare token: no separator or dot, so an id cannot name a file outside UPLOAD_DIR. The
+# API schema (api/schemas.py FileId) is stricter still, for ids that arrive in a request.
+_UPLOAD_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
+
 UPLOAD_DIR = (
     Path(settings.UPLOAD_STORAGE_DIR)
     if settings.UPLOAD_STORAGE_DIR
@@ -199,12 +204,21 @@ def _extract_md(content: bytes) -> str:
     return content.decode("utf-8", errors="replace")
 
 
-async def _extract_image(content: bytes, filename: str) -> str:
-    """Extract description from image via vision model captioning."""
+async def _extract_image(
+    content: bytes, filename: str, on_described: Callable[[], None] | None = None
+) -> str:
+    """Extract description from image via vision model captioning.
+
+    ``on_described`` is called once the vision call has returned, so a caller that
+    billed for it can keep the charge whatever fails afterwards (audit 8 WS3-15).
+    """
     # Defer import to avoid circular dependencies at module load time
     try:
         from reasoner.infrastructure.llm.extraction import describe_image
-        return await describe_image(content, filename)
+        description = await describe_image(content, filename)
+        if on_described is not None:
+            on_described()
+        return description
     except Exception as e:
         logger.error(f"Image description failed: {e}")
         return f"[Image description failed: {e}]"
@@ -296,7 +310,13 @@ async def _pdf_text_or_ocr(content: bytes, force_ocr: bool) -> str:
     return text if text.strip() else ocr_text
 
 
-async def _extract_text_unbounded(content: bytes, filename: str, *, force_ocr: bool = False) -> str:
+async def _extract_text_unbounded(
+    content: bytes,
+    filename: str,
+    *,
+    force_ocr: bool = False,
+    on_described: Callable[[], None] | None = None,
+) -> str:
     """
     Extract text content from a file based on its extension.
 
@@ -322,17 +342,25 @@ async def _extract_text_unbounded(content: bytes, filename: str, *, force_ocr: b
         case ".png" | ".jpg" | ".jpeg" | ".webp":
             if force_ocr:
                 return await _ocr_image(content, filename)
-            return await _extract_image(content, filename)
+            return await _extract_image(content, filename, on_described)
         case _:
             return f"[Unsupported file type: {ext}]"
 
 
-async def extract_text(content: bytes, filename: str, *, force_ocr: bool = False) -> str:
+async def extract_text(
+    content: bytes,
+    filename: str,
+    *,
+    force_ocr: bool = False,
+    on_described: Callable[[], None] | None = None,
+) -> str:
     """Extract content with a hard per-file parser/OCR timeout."""
     timeout = max(1, settings.DOCUMENT_EXTRACTION_TIMEOUT_SECONDS)
     try:
         return await asyncio.wait_for(
-            _extract_text_unbounded(content, filename, force_ocr=force_ocr),
+            _extract_text_unbounded(
+                content, filename, force_ocr=force_ocr, on_described=on_described
+            ),
             timeout=timeout,
         )
     except TimeoutError:
@@ -362,7 +390,12 @@ async def save_uploaded_files(
 
 
 async def save_uploaded_file(
-    content: bytes, filename: str, user_id: str | None = None, *, force_ocr: bool = False
+    content: bytes,
+    filename: str,
+    user_id: str | None = None,
+    *,
+    force_ocr: bool = False,
+    on_described: Callable[[], None] | None = None,
 ) -> dict[str, Any]:
     """
     Save an uploaded file and extract its text content.
@@ -371,6 +404,8 @@ async def save_uploaded_file(
         content: Raw file content bytes
         filename: Original filename
         force_ocr: If True, use OCR for images and scanned PDFs
+        on_described: Called once a billed vision call has returned, even if saving
+            then fails (the provider has been paid by then)
 
     Returns:
         Dictionary with file info and extracted text
@@ -401,7 +436,9 @@ async def save_uploaded_file(
         if meta is not None and _is_ready(meta):
             logger.info("Deduplicating upload: hash %s matches existing file %s", content_hash[:16], existing_id)
             # Re-extract text for the new upload context (OCR settings may differ)
-            text_content = await extract_text(content, filename, force_ocr=force_ocr)
+            text_content = await extract_text(
+                content, filename, force_ocr=force_ocr, on_described=on_described
+            )
             return {
                 "success": True,
                 "file_id": existing_id,
@@ -545,7 +582,9 @@ async def save_uploaded_file(
         await asyncio.to_thread(lambda: file_path.write_bytes(_encrypt_bytes(content)))
 
         # Extract text
-        text_content = await extract_text(content, filename, force_ocr=force_ocr)
+        text_content = await extract_text(
+            content, filename, force_ocr=force_ocr, on_described=on_described
+        )
         if not is_extraction_notice(text_content):
             await asyncio.to_thread(
                 lambda: _text_cache_path(file_id).write_bytes(
@@ -650,6 +689,8 @@ def _reserve_upload_id() -> tuple[str, Path]:
 
 def _get_upload_meta(file_id: str) -> dict | None:
     """Read upload metadata if it exists."""
+    if not _UPLOAD_ID_RE.fullmatch(file_id):
+        return None  # an id with a separator would read a file outside UPLOAD_DIR
     meta_path = UPLOAD_DIR / f"{file_id}.meta.json"
     if meta_path.exists():
         import json

@@ -120,10 +120,36 @@ def limits_for_tier(tier: SubscriptionTier | str | None) -> TierSpendLimits:
     return TIER_SPEND_LIMITS.get(tier, ANONYMOUS_SPEND_LIMITS)
 
 
+# How many runs one caller may have in flight at once (audit 8 WS5-2, D7). Without
+# a cap one tenant could hold hundreds of 600-second streams open. Anonymous callers
+# are counted per client address.
+TIER_MAX_INFLIGHT_RUNS: dict[SubscriptionTier, int] = {
+    SubscriptionTier.FREE: 1,
+    SubscriptionTier.PRO: 3,
+    SubscriptionTier.ENTERPRISE: 10,
+}
+ANONYMOUS_MAX_INFLIGHT_RUNS = 1
+
+
+def max_inflight_runs(tier: SubscriptionTier | str | None) -> int:
+    """In-flight run cap for a tier. An unknown or missing tier gets the anonymous cap."""
+    if isinstance(tier, str):
+        try:
+            tier = SubscriptionTier(tier)
+        except ValueError:
+            return ANONYMOUS_MAX_INFLIGHT_RUNS
+    if tier is None:
+        return ANONYMOUS_MAX_INFLIGHT_RUNS
+    return TIER_MAX_INFLIGHT_RUNS.get(tier, ANONYMOUS_MAX_INFLIGHT_RUNS)
+
+
 __all__ = [
     "UNLIMITED",
     "TierSpendLimits",
     "TIER_SPEND_LIMITS",
     "ANONYMOUS_SPEND_LIMITS",
+    "TIER_MAX_INFLIGHT_RUNS",
+    "ANONYMOUS_MAX_INFLIGHT_RUNS",
     "limits_for_tier",
+    "max_inflight_runs",
 ]

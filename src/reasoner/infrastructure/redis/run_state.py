@@ -60,6 +60,29 @@ return 0
 """
 
 
+# In-flight run slots (audit 8 WS5-2): a sorted set per owner, member = the run's
+# reference, score = expiry. Pruning expired members and counting happen in one
+# script, so two workers cannot both take the last slot. TIME is the server's, so
+# worker clocks need not agree.
+INFLIGHT_PREFIX = "inflight:"
+_ACQUIRE_SLOT_LUA = """
+local now = tonumber(redis.call('TIME')[1])
+redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', now)
+if redis.call('ZSCORE', KEYS[1], ARGV[3]) then
+    return 1
+end
+if redis.call('ZCARD', KEYS[1]) >= tonumber(ARGV[1]) then
+    return 0
+end
+redis.call('ZADD', KEYS[1], now + tonumber(ARGV[2]), ARGV[3])
+redis.call('EXPIRE', KEYS[1], tonumber(ARGV[2]))
+return 1
+"""
+SLOT_OK = "ok"
+SLOT_OWNER_FULL = "owner_full"
+SLOT_WORKER_FULL = "worker_full"
+
+
 class _RedisUnavailable(Exception):
     """Internal signal that Redis is not reachable."""
 
@@ -242,6 +265,54 @@ class RunStateManager:
                 raise
         if settings.ENVIRONMENT != "production":
             self._store().complete(client_run_id, token)
+
+    async def acquire_run_slot(
+        self,
+        owner: str,
+        member: str,
+        *,
+        limit: int,
+        worker_limit: int,
+        ttl: int = ACTIVE_TTL_SECONDS,
+    ) -> str:
+        """Take one in-flight slot for ``owner``, or say which ceiling refused it.
+
+        Returns ``SLOT_OK``, ``SLOT_OWNER_FULL`` or ``SLOT_WORKER_FULL``. The
+        per-owner count lives in Redis, so it holds across workers; each member
+        expires on its own, so a worker that dies mid-run frees its slots at the
+        TTL. When Redis is down the owner count falls back to this process (a
+        degraded cap per worker, not no cap). ``member`` is the run's reference.
+        """
+        store = self._store()
+        if not store.reserve_worker_slot(member, worker_limit, ttl):
+            return SLOT_WORKER_FULL
+        try:
+            granted = await self._redis_op(
+                lambda: self._acquire_slot_redis(owner, member, limit, ttl)
+            )
+        except _RedisUnavailable:
+            granted = store.acquire_owner_slot(owner, member, limit, ttl)
+        except BaseException:
+            store.release_slot(owner, member)
+            raise
+        if not granted:
+            store.release_slot(owner, member)
+            return SLOT_OWNER_FULL
+        return SLOT_OK
+
+    async def _acquire_slot_redis(self, owner: str, member: str, limit: int, ttl: int) -> bool:
+        granted = await self._get_redis().eval(
+            _ACQUIRE_SLOT_LUA, 1, f"{INFLIGHT_PREFIX}{owner}", limit, ttl, member
+        )
+        return int(granted) == 1
+
+    async def release_run_slot(self, owner: str, member: str) -> None:
+        """Give back the slot ``acquire_run_slot`` took. Safe to call twice (ZREM)."""
+        self._store().release_slot(owner, member)
+        with contextlib.suppress(_RedisUnavailable):
+            await self._redis_op(
+                lambda: self._get_redis().zrem(f"{INFLIGHT_PREFIX}{owner}", member)
+            )
 
     async def claim_finished(self, client_run_id: str) -> bool:
         """True when the claim's run ended and ``complete`` marked it."""

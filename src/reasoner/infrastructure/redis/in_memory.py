@@ -40,6 +40,9 @@ class RunStateStore:
         self._run_owners: dict[str, str | None] = {}
         self._claim_tokens: dict[str, str] = {}
         self._created_at: dict[str, float] = {}
+        # In-flight run slots: member -> monotonic expiry, process-wide and per owner.
+        self._worker_slots: dict[str, float] = {}
+        self._owner_slots: dict[str, dict[str, float]] = {}
         self._lock = asyncio.Lock()
 
     def try_register(
@@ -63,6 +66,40 @@ class RunStateStore:
         self._claim_tokens.pop(client_run_id, None)
         self._active_runs.discard(client_run_id)
         self._created_at.pop(client_run_id, None)
+
+    def reserve_worker_slot(self, member: str, limit: int, ttl: float) -> bool:
+        """Count one in-flight run in this process, or refuse at ``limit``.
+
+        Process-local by design: it bounds this worker's memory, whoever owns the run.
+        """
+        now = _time.monotonic()
+        self._worker_slots = {m: exp for m, exp in self._worker_slots.items() if exp > now}
+        if member in self._worker_slots:
+            return True
+        if limit > 0 and len(self._worker_slots) >= limit:
+            return False
+        self._worker_slots[member] = now + ttl
+        return True
+
+    def acquire_owner_slot(self, owner: str, member: str, limit: int, ttl: float) -> bool:
+        """The in-memory twin of the Redis per-owner slot set, for when Redis is down."""
+        now = _time.monotonic()
+        held = {m: exp for m, exp in self._owner_slots.get(owner, {}).items() if exp > now}
+        if member not in held and len(held) >= limit:
+            self._owner_slots[owner] = held
+            return False
+        held[member] = now + ttl
+        self._owner_slots[owner] = held
+        return True
+
+    def release_slot(self, owner: str, member: str) -> None:
+        """Give back both counts of one run. Safe to call twice."""
+        self._worker_slots.pop(member, None)
+        held = self._owner_slots.get(owner)
+        if held is not None:
+            held.pop(member, None)
+            if not held:
+                del self._owner_slots[owner]
 
     def complete(self, client_run_id: str, token: str) -> None:
         """Mark the holder's claim finished (the Redis twin is SET KEEPTTL)."""
@@ -160,6 +197,8 @@ class RunStateStore:
             self._active_runs.clear()
             self._run_owners.clear()
             self._claim_tokens.clear()
+            self._worker_slots.clear()
+            self._owner_slots.clear()
 
 
 # Module-level singleton — shared across the API layer.

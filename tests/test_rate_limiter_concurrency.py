@@ -61,6 +61,7 @@ class TestRateLimiterConcurrency:
             burst_size=3,
         )
         limiter = RateLimiter(config)
+        limiter._redis_script = None  # in-memory only; see test_backend_bugfixes
 
         # Client A uses all its burst
         for _ in range(3):

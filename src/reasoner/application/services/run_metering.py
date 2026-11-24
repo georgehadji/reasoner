@@ -146,6 +146,9 @@ class RunContext:
     #: Credits counted against an anonymous caller's daily cap at admission; given
     #: back when the run ends up costing nothing.
     anon_charge: AnonymousTrialCharge | None = field(default=None, compare=False)
+    #: The owner whose in-flight slot admission took (audit 8 WS5-2); the member is
+    #: ``reference_id``. Given back whenever the run ends, billed or not.
+    inflight_owner: str | None = None
     #: Built right after admission took the quota slot, so this stands in for the
     #: claim time: a release in a later quota period must not take from that one.
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC), compare=False)
@@ -278,6 +281,9 @@ async def metered(
         # settlement was interrupted and neither the release nor the true-up
         # ran (docs/plans/audit-remediation-2-2026-10-20.md BIL-12).
         with anyio.CancelScope(shield=True):
+            # First and unconditionally: a slow or failed settlement must not keep
+            # the caller's in-flight slot. Releasing twice is a no-op.
+            await _release_inflight(ctx)
             try:
                 with anyio.fail_after(SETTLE_TIMEOUT_SECONDS):
                     await _finalize(sink, ctx, cost_usd)
@@ -350,6 +356,7 @@ async def release_unstarted(sink: SettlementSink, ctx: RunContext) -> None:
                 await _true_up(sink, ctx, 0.0)
             await _release_quota_slot(sink, ctx)
             await _release_claim(ctx)
+            await _release_inflight(ctx)
         _unstarted_released.add(ctx.started)
         if scope.cancelled_caught:
             # A timed-out release left the hold debited with no record of it;
@@ -375,6 +382,12 @@ async def _release_claim(ctx: RunContext) -> None:
     from reasoner.application.services import idempotency
 
     await idempotency.release_run(ctx.run_claim)
+
+
+async def _release_inflight(ctx: RunContext) -> None:
+    from reasoner.application.services import idempotency
+
+    await idempotency.release_run_slot(ctx.inflight_owner, ctx.reference_id)
 
 
 async def _complete_claim(ctx: RunContext) -> None:

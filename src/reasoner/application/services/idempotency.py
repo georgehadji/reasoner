@@ -53,6 +53,61 @@ class RunAlreadyFinishedError(RunAlreadyInProgressError):
         self.args = (f"Run {client_run_id} already finished",)
 
 
+class RunSlotsFullError(Exception):
+    """No in-flight run slot is free: ``scope`` says whose ceiling refused it.
+
+    ``owner`` is the caller's own cap, ``worker`` this process's cap. Neither
+    holds anything, so a refusal needs no release.
+    """
+
+    def __init__(self, scope: str, limit: int):
+        self.scope = scope
+        self.limit = limit
+        super().__init__(f"In-flight run limit reached ({scope}: {limit})")
+
+
+async def acquire_run_slot(owner_key: str, member: str, *, limit: int) -> None:
+    """Count one in-flight run against ``owner_key``, or raise :class:`RunSlotsFullError`.
+
+    ``member`` is the run's own reference, so the same run never counts twice.
+    Give it back with :func:`release_run_slot` on the path that frees the claim.
+    A Redis outage degrades to a per-process count rather than refusing runs.
+    """
+    from reasoner.core.constants_limits import MAX_INFLIGHT_RUNS_PER_WORKER
+    from reasoner.infrastructure.redis.run_state import (
+        SLOT_OWNER_FULL,
+        SLOT_WORKER_FULL,
+        _run_state_manager,
+    )
+
+    outcome = await _run_state_manager.acquire_run_slot(
+        owner_key, member, limit=limit, worker_limit=MAX_INFLIGHT_RUNS_PER_WORKER
+    )
+    if outcome == SLOT_OWNER_FULL:
+        raise RunSlotsFullError("owner", limit)
+    if outcome == SLOT_WORKER_FULL:
+        raise RunSlotsFullError("worker", MAX_INFLIGHT_RUNS_PER_WORKER)
+
+
+async def release_run_slot(owner_key: str | None, member: str | None) -> None:
+    """Give back the slot ``acquire_run_slot`` took. A second call is a no-op.
+
+    Never raises; an unreleased slot expires at its TTL.
+    """
+    if not owner_key or not member:
+        return
+
+    from reasoner.infrastructure.redis.run_state import _run_state_manager
+
+    try:
+        await _run_state_manager.release_run_slot(owner_key, member)
+    except Exception as exc:
+        degraded(
+            "idempotency.release_run_slot", None, exc=exc,
+            detail=f"slot {member} held until its TTL",
+        )
+
+
 def claim_key(owner_key: str, client_run_id: str) -> str:
     """The claim for one caller's *client_run_id*.
 
@@ -148,9 +203,12 @@ async def complete_run(claim: str | None) -> None:
 __all__ = [
     "RunAlreadyFinishedError",
     "RunAlreadyInProgressError",
+    "RunSlotsFullError",
     "RunStateUnavailableError",
+    "acquire_run_slot",
     "claim_key",
     "complete_run",
     "register_run",
     "release_run",
+    "release_run_slot",
 ]

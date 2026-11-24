@@ -48,7 +48,9 @@ class BodySizeLimitMiddleware:
         data-URL routes carry base64 images of up to one upload's size (four
         reference images for generation)."""
         from reasoner.core.constants import (
+            DEFAULT_BODY_MAX_BYTES,
             MAX_DATA_URL_CHARS,
+            NEURO_LEARN_BODY_MAX_BYTES,
             REQUEST_BODY_MAX_BYTES,
             UPLOAD_MAX_FILE_BYTES,
         )
@@ -57,8 +59,14 @@ class BodySizeLimitMiddleware:
         from reasoner.core.settings import settings
 
         return {
-            "default_limit": REQUEST_BODY_MAX_BYTES,
+            "default_limit": DEFAULT_BODY_MAX_BYTES,
             "per_path": {
+                # Routes whose body carries attachments (RunRequest, FollowupRequest,
+                # ContextAnalysisRequest): /api/run, /api/run-followup,
+                # /api/run-with-context, and the agent twins.
+                "/api/run": REQUEST_BODY_MAX_BYTES,
+                "/api/agent/run": REQUEST_BODY_MAX_BYTES,
+                "/neuro/learn": NEURO_LEARN_BODY_MAX_BYTES,
                 "/api/upload": UPLOAD_MAX_FILE_BYTES * settings.UPLOAD_MAX_FILES + 2**20,
                 # Anonymous by design: one image, base64 is 4/3 of the bytes.
                 "/api/provenance/": int(UPLOAD_MAX_FILE_BYTES * 1.4) + slack,

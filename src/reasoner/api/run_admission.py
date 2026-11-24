@@ -80,6 +80,7 @@ class AdmissionResource(StrEnum):
     EXCLUSIVE_CLAIM = "exclusive_claim"
     RUN_CLAIM = "run_claim"
     QUOTA_SLOT = "quota_slot"
+    INFLIGHT_SLOT = "inflight_slot"
 
 
 class _Held:
@@ -126,6 +127,8 @@ class Admission:
     #: A claim that keeps a second concurrent run of the same thing out (resume of one
     #: pipeline). Unlike ``run_claim`` it is released whether the run completed or not.
     exclusive_claim: str | None = None
+    #: Whose in-flight slot admission took (audit 8 WS5-2); ``metered()`` gives it back.
+    inflight_owner: str | None = None
 
     def run_context(self, *, tier: str = "anonymous", interface: str = "web") -> RunContext:
         return RunContext(
@@ -139,6 +142,7 @@ class Admission:
             run_claim=self.run_claim,
             quota_slot=self.quota_slot,
             anon_charge=self.anon_charge,
+            inflight_owner=self.inflight_owner,
         )
 
 
@@ -292,11 +296,13 @@ async def admit_run(
                     status_code=409,
                     detail=f"Run id {client_run_id} is already in use. Choose another id.",
                 ) from exc
+        reference_id = run_reference(client_run_id, kind)
+        # Before the quota claim and the reservation, so a refusal holds nothing.
+        await _take_inflight_slot(request, user, owner_key, reference_id, held)
         # Atomic claim, before the reservation so a denial holds no credits.
         quota_slot = await deps.claim_quota_slot(user, preset, request)
         if quota_slot:
             held.hold(AdmissionResource.QUOTA_SLOT, lambda: deps.release_quota_slot(user))
-        reference_id = run_reference(client_run_id, kind)
         reserved_credits = await deps.reserve_or_402(
             user_id=user_id, preset=preset, problem=problem, reference_id=reference_id,
         )
@@ -317,6 +323,57 @@ async def admit_run(
         quota_slot=quota_slot,
         anon_charge=anon_charge,
         exclusive_claim=exclusive_claim,
+        inflight_owner=owner_key,
+    )
+
+
+async def _take_inflight_slot(
+    request: Request, user: User | None, owner_key: str, reference_id: str, held: _Held
+) -> None:
+    """Count this run against its caller's tier cap and this worker's cap, or 429/503.
+
+    Held on ``held`` so a later refusal gives it back; ``metered()`` gives it back
+    when the run ends (audit 8 WS5-2, D7).
+    """
+    from reasoner.api import dependencies as deps
+    from reasoner.application.services import idempotency
+    from reasoner.core.constants_limits import INFLIGHT_RETRY_AFTER_SECONDS
+    from reasoner.domain.spend_limits import max_inflight_runs
+
+    tier = await deps.resolve_request_tier(request, user) if user else None
+    try:
+        await idempotency.acquire_run_slot(
+            owner_key, reference_id, limit=max_inflight_runs(tier)
+        )
+    except idempotency.RunSlotsFullError as exc:
+        retry = str(INFLIGHT_RETRY_AFTER_SECONDS)
+        if exc.scope == "worker":
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "error": "Server busy",
+                    "message": "This server is running as many runs as it can. Retry shortly.",
+                    "retry_after": INFLIGHT_RETRY_AFTER_SECONDS,
+                },
+                headers={"Retry-After": retry},
+            ) from exc
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "Too many runs in progress",
+                "message": (
+                    f"Your plan allows {exc.limit} run(s) at a time. "
+                    "Wait for one to finish, or upgrade."
+                ),
+                "limit": exc.limit,
+                "retry_after": INFLIGHT_RETRY_AFTER_SECONDS,
+                "upgrade_url": "/pricing",
+            },
+            headers={"Retry-After": retry},
+        ) from exc
+    held.hold(
+        AdmissionResource.INFLIGHT_SLOT,
+        lambda: idempotency.release_run_slot(owner_key, reference_id),
     )
 
 

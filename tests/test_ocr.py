@@ -4,7 +4,7 @@ import io
 
 # Create an authenticated client for tests
 import os
-from unittest.mock import AsyncMock, patch
+from unittest.mock import ANY, AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -152,8 +152,29 @@ class TestExtractTextOCR:
         with patch("reasoner.infrastructure.uploader._extract_image", new_callable=AsyncMock) as mock_describe:
             mock_describe.return_value = "A photo of a cat"
             result = await extract_text(b"fake-img", "test.png")
-            mock_describe.assert_awaited_once_with(b"fake-img", "test.png")
+            mock_describe.assert_awaited_once_with(b"fake-img", "test.png", None)
             assert result == "A photo of a cat"
+
+    @pytest.mark.asyncio
+    async def test_on_described_fires_once_the_vision_call_returns(self):
+        """A billed vision call is reported to the caller (audit 8 WS3-15)."""
+        fired: list[int] = []
+        with patch(
+            "reasoner.infrastructure.llm.extraction.describe_image",
+            new=AsyncMock(return_value="A cat"),
+        ):
+            text = await extract_text(b"img", "t.png", on_described=lambda: fired.append(1))
+        assert text == "A cat" and fired == [1]
+
+    @pytest.mark.asyncio
+    async def test_on_described_stays_quiet_when_the_vision_call_fails(self):
+        fired: list[int] = []
+        with patch(
+            "reasoner.infrastructure.llm.extraction.describe_image",
+            new=AsyncMock(side_effect=RuntimeError("provider down")),
+        ):
+            text = await extract_text(b"img", "t.png", on_described=lambda: fired.append(1))
+        assert text.startswith("[Image description failed") and fired == []
 
     @pytest.mark.asyncio
     async def test_image_uses_ocr_when_forced(self):
@@ -364,7 +385,7 @@ class TestUploadEndpointOCR:
                 files={"file": ("test.png", io.BytesIO(b"fake"), "image/png")},
             )
             assert response.status_code == 200
-            mock_save.assert_awaited_once_with(b"fake", "test.png", user_id="11111111-1111-1111-1111-111111111111", force_ocr=False)
+            mock_save.assert_awaited_once_with(b"fake", "test.png", user_id="11111111-1111-1111-1111-111111111111", force_ocr=False, on_described=ANY)
 
     def test_upload_with_force_ocr(self):
         """Upload with ?force_ocr=true should pass force_ocr=True."""
@@ -383,7 +404,7 @@ class TestUploadEndpointOCR:
                 files={"file": ("test.png", io.BytesIO(b"fake"), "image/png")},
             )
             assert response.status_code == 200
-            mock_save.assert_awaited_once_with(b"fake", "test.png", user_id="11111111-1111-1111-1111-111111111111", force_ocr=True)
+            mock_save.assert_awaited_once_with(b"fake", "test.png", user_id="11111111-1111-1111-1111-111111111111", force_ocr=True, on_described=ANY)
 
     def test_upload_batch_with_force_ocr(self):
         """Batch upload with ?force_ocr=true should pass force_ocr=True."""

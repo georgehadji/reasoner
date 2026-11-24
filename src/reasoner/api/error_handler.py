@@ -27,6 +27,17 @@ _error_store = None
 # Track background tasks to prevent GC
 _BACKGROUND_TASKS: set = set()
 
+# Error-store inserts allowed in flight at once. Each is a task holding an entry (with
+# its traceback) until the store thread takes it; an error storm must not grow that
+# without bound. Past the cap an error is logged and counted, not stored.
+_MAX_INFLIGHT_STORE_TASKS = 100
+# A path is attacker-chosen text; keep a row and a log line small.
+_MAX_LOGGED_PATH_CHARS = 200
+
+
+class _StoreSaturatedError(Exception):
+    """Too many error-store inserts are in flight; this error is logged, not stored."""
+
 
 def _track_background_task(task, what: str) -> None:
     """Track a background task and clean up on completion."""
@@ -81,11 +92,14 @@ def _log_error(
         traceback = redact_sensitive(traceback)
     correlation_id = get_correlation_id()
     user_id = _extract_user_id(request) if request else None
-    path = request.url.path if request else None
+    path = request.url.path[:_MAX_LOGGED_PATH_CHARS] if request else None
     method = request.method if request else None
+    # Only a server fault or an unclassified error is worth a stored row and a Sentry
+    # event. A 4xx is the caller's mistake, and anyone can make thousands of them.
+    unexpected = status_code is None or status_code >= 500
 
     # Structured logging
-    logger.error(
+    (logger.error if unexpected else logger.warning)(
         "[%s] %s %s | %s | user=%s | corr=%s | %s",
         level.upper(),
         method or "-",
@@ -106,12 +120,18 @@ def _log_error(
         },
     )
 
+    if not unexpected:
+        _count_client_error(status_code)
+        return
+
     # Persist to ErrorStore (fire and forget, don't block response)
     try:
         import asyncio
 
         from reasoner.infrastructure.persistence.error_store import ErrorEntry
 
+        if len(_BACKGROUND_TASKS) >= _MAX_INFLIGHT_STORE_TASKS:
+            raise _StoreSaturatedError
         store = _get_error_store()
         entry = ErrorEntry(
             level=level,
@@ -128,6 +148,8 @@ def _log_error(
         # Schedule async insert without awaiting (tracked to prevent GC)
         task = asyncio.create_task(store.insert(entry))
         _track_background_task(task, "error_store.insert")
+    except _StoreSaturatedError:
+        _count_store_drop()
     except Exception as store_exc:
         logger.warning("Failed to persist error to ErrorStore: %s", store_exc)
 
@@ -148,6 +170,24 @@ def _log_error(
                 sentry_sdk.capture_message(message, level=level)
     except Exception:
         pass
+
+
+def _count_client_error(status_code: int | None) -> None:
+    try:
+        from reasoner.metrics import REASONER_API_CLIENT_ERRORS_TOTAL
+
+        REASONER_API_CLIENT_ERRORS_TOTAL.labels(status=str(status_code)).inc()
+    except Exception as exc:
+        logger.warning("Failed to count a client error: %s", exc)
+
+
+def _count_store_drop() -> None:
+    try:
+        from reasoner.metrics import REASONER_ERROR_STORE_DROPPED_TOTAL
+
+        REASONER_ERROR_STORE_DROPPED_TOTAL.inc()
+    except Exception as exc:
+        logger.warning("Failed to count a dropped error: %s", exc)
 
 
 def _safe_json_response(

@@ -756,7 +756,8 @@ async def search_web(
         }
     except Exception as exc:
         logger.warning(f"Web search failed: {exc}")
-        raise HTTPException(status_code=503, detail=f"Search unavailable: {str(exc)}") from exc
+        # The provider's error text can name hosts, keys' owners or quotas: keep it in the log.
+        raise HTTPException(status_code=503, detail="Search is temporarily unavailable") from exc
     finally:
         await close_flat_charge(charge, served=served)
 
@@ -796,6 +797,7 @@ async def clear_cache(
 async def stop_pipeline(
     run_id: str | None = None,
     user: User | None = Depends(get_optional_user),
+    rate_limit_checked = Depends(check_rate_limit),
     csrf_checked = Depends(require_csrf),
 ):
     """Cancel a running pipeline.
