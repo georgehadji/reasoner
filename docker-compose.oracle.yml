@@ -1,0 +1,54 @@
+# Oracle Cloud Always Free override: the whole stack on one
+# VM.Standard.A1.Flex instance (2 OCPU, 12 GB, arm64). Runbook: docs/DEPLOY_ORACLE.md.
+#
+# Put this in .env so every plain `docker compose ...` command (including the
+# ones in DEPLOY.md) picks up both files:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.oracle.yml
+
+networks:
+  default:
+    ipam:
+      config:
+        # Pinned so Caddy and the Next.js proxy have fixed addresses that
+        # TRUSTED_PROXIES can name. Without it every user shares one
+        # rate-limit bucket (DEPLOY.md, TRUSTED_PROXIES).
+        - subnet: 172.28.0.0/24
+
+services:
+  caddy:
+    environment:
+      - DOMAIN=${DOMAIN:?set DOMAIN in .env}
+      - ACME_EMAIL=${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      # Same target as docker-compose.yml's dev Caddyfile mount, so it replaces it.
+      - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
+    networks:
+      default:
+        ipv4_address: 172.28.0.10
+
+  frontend:
+    environment:
+      - TRUSTED_PROXIES=172.28.0.10
+    networks:
+      default:
+        ipv4_address: 172.28.0.11
+
+  backend:
+    environment:
+      # docker-compose.yml's 8 workers oversubscribe 2 OCPUs.
+      - UVICORN_WORKERS=${UVICORN_WORKERS:-3}
+      # Caddy for /api/* and /ws/*, the Next.js server for its proxied calls.
+      - TRUSTED_PROXIES=172.28.0.10,172.28.0.11
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 3G
+
+  # The code sandbox stays off (EXEC_SANDBOX_ENABLED=false by default). The
+  # profile keeps these two from starting; enable with `--profile sandbox`.
+  # arm64 images for them are unchecked.
+  docker-socket-proxy:
+    profiles: ["sandbox"]
+  sandbox-worker:
+    profiles: ["sandbox"]
