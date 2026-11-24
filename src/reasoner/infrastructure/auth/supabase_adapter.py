@@ -12,6 +12,7 @@ import hashlib
 import logging
 import time
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import UUID
@@ -19,10 +20,23 @@ from uuid import UUID
 import jwt
 
 from reasoner.application.ports.auth_port import AuthPort
+from reasoner.core.constants_limits import AUTH_VERIFY_THREADS, AUTH_VERIFY_TIMEOUT_SECONDS
 from reasoner.domain.auth import AuthenticationError
 from reasoner.domain.saas import User
 
 logger = logging.getLogger(__name__)
+
+_verify_executor: ThreadPoolExecutor | None = None
+
+
+def _get_verify_executor() -> ThreadPoolExecutor:
+    """The small pool the blocking verify call runs on, shared by every adapter."""
+    global _verify_executor
+    if _verify_executor is None:
+        _verify_executor = ThreadPoolExecutor(
+            max_workers=AUTH_VERIFY_THREADS, thread_name_prefix="supabase-verify"
+        )
+    return _verify_executor
 
 
 def _as_datetime(value: object) -> datetime | None:
@@ -97,7 +111,7 @@ class SupabaseAuthAdapter(AuthPort):
             raise AuthenticationError("Invalid or expired token", status_code=401)
         self._precheck(token)
         try:
-            user = await self._verify(token)
+            user = await self._verify_once(key, token)
         except AuthenticationError as exc:
             if getattr(exc, "rejected", False):  # not a Supabase outage
                 self._rejected[key] = time.time() + self._REJECT_TTL_SECONDS
@@ -117,11 +131,38 @@ class SupabaseAuthAdapter(AuthPort):
             self._cache.popitem(last=False)
         return user
 
+    async def _verify_once(self, key: str, token: str) -> User:
+        """Verify ``token``, sharing one Supabase call among every request that holds it.
+
+        A client retrying one token, or a page firing twenty requests with it, used
+        to make twenty blocking calls before the first one filled the cache (audit 8
+        WS5-11). The call runs in its own task, so one waiter's cancellation (a
+        dropped connection) does not cancel it for the others.
+        """
+        flights = self.__dict__.setdefault("_flights", {})
+        flight = flights.get(key)
+        if flight is None:
+            flight = asyncio.ensure_future(self._verify(token))
+            flights[key] = flight
+
+            def _done(task: asyncio.Future, key: str = key) -> None:
+                flights.pop(key, None)
+                if not task.cancelled():
+                    task.exception()  # read, so a failure nobody awaits is not logged as lost
+
+            flight.add_done_callback(_done)
+        return await asyncio.shield(flight)
+
     async def _verify(self, token: str) -> User:
         try:
             # Supabase server-side JWT verification: a blocking HTTPS call in
-            # supabase-py, so off the event loop.
-            response = await asyncio.to_thread(self._client.auth.get_user, token)
+            # supabase-py, so off the event loop, on its own pool, and bounded.
+            response = await asyncio.wait_for(
+                asyncio.get_running_loop().run_in_executor(
+                    _get_verify_executor(), self._client.auth.get_user, token
+                ),
+                timeout=AUTH_VERIFY_TIMEOUT_SECONDS,
+            )
             supabase_user = response.user
 
             if supabase_user is None:
@@ -164,6 +205,13 @@ class SupabaseAuthAdapter(AuthPort):
             return user if created_at is None else replace(user, created_at=created_at)
         except AuthenticationError:
             raise
+        except TimeoutError as exc:
+            logger.warning(
+                "Supabase auth validation timed out after %ss", AUTH_VERIFY_TIMEOUT_SECONDS
+            )
+            err = AuthenticationError("Auth provider timed out", status_code=401)
+            err.rejected = False  # an outage, not a refusal: the token is not blacklisted
+            raise err from exc
         except Exception as exc:
             logger.warning("Supabase auth validation failed: %s", exc)
             err = AuthenticationError(f"Auth validation failed: {exc}", status_code=401)

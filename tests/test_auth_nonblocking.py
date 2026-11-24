@@ -150,3 +150,39 @@ async def test_a_request_authenticates_once(monkeypatch):
     second = await dependencies.get_current_user(request, creds)
     assert second is first
     assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_concurrent_requests_with_one_token_verify_once():
+    adapter = _adapter(delay=0.2)
+    token = _token(3600)
+    users = await asyncio.gather(*(adapter.authenticate(token) for _ in range(20)))
+    assert adapter._client.auth.calls == 1
+    assert {u.email for u in users} == {"a@b.c"}
+    assert adapter.__dict__["_flights"] == {}, "a finished flight must not linger"
+
+
+@pytest.mark.asyncio
+async def test_a_cancelled_waiter_does_not_cancel_the_shared_verify():
+    adapter = _adapter(delay=0.3)
+    token = _token(3600)
+    first = asyncio.ensure_future(adapter.authenticate(token))
+    second = asyncio.ensure_future(adapter.authenticate(token))
+    await asyncio.sleep(0.05)
+    first.cancel()
+    user = await second
+    assert user.email == "a@b.c"
+    assert adapter._client.auth.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_a_hung_provider_times_out_as_an_outage_not_a_rejection(monkeypatch):
+    from reasoner.domain.auth import AuthenticationError
+    from reasoner.infrastructure.auth import supabase_adapter
+
+    monkeypatch.setattr(supabase_adapter, "AUTH_VERIFY_TIMEOUT_SECONDS", 0.1)
+    adapter = _adapter(delay=0.5)
+    with pytest.raises(AuthenticationError) as exc:
+        await adapter.authenticate(_token(3600))
+    assert exc.value.rejected is False
+    assert not adapter._rejected, "an outage must not blacklist the token"

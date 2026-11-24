@@ -454,6 +454,14 @@ MAINTENANCE_INTERVAL_SECONDS: int = 900
 
 PIPELINE_ABSOLUTE_TIMEOUT_SECONDS: float = 600.0
 
+# Runs one worker process will hold at once, whoever owns them (audit 8 WS5-2, the
+# second gate behind the per-caller cap). shortcut: provisional figure. D8 derives
+# it from the measured RSS of a run at the 1 GiB container limit (Phase 7a).
+MAX_INFLIGHT_RUNS_PER_WORKER: int = 12
+# Retry-After for a refused admission. A slot frees when a run ends; runs vary too
+# much to name the moment, so this is a polite poll interval, not a promise.
+INFLIGHT_RETRY_AFTER_SECONDS: int = 10
+
 
 # Maps routing role names to their specific call timeout.
 # Roles absent from this map use TIMEOUTS.LLM_CALL as the default.
@@ -747,23 +755,51 @@ COMPACTION_BATCH_SIZE: int = 500
 # ═════════════════════════════════════════════════════════════════════
 
 # Default cap on any request body, enforced before the app reads it
-# (api/middleware.BodySizeLimitMiddleware). Sized for the largest JSON body
-# the schemas accept: a run carrying UPLOAD_MAX_FILES attachments of mostly
-# ASCII text. Upload and data-URL routes get larger, derived caps.
+# (api/middleware.BodySizeLimitMiddleware). Every JSON route that is not listed in
+# ``BodySizeLimitMiddleware.app_limits`` gets this: its largest field is a problem
+# (10 000 characters) or a short form, so 256 KiB is generous. A 16 MiB default let
+# an unauthenticated caller make every route parse 16 MiB (audit 8 WS4-2).
+DEFAULT_BODY_MAX_BYTES: int = 256 * 1024
+# Cap on the routes that carry attachments, sized for the largest JSON body the
+# schemas accept there: a run carrying UPLOAD_MAX_FILES attachments of mostly ASCII
+# text. Upload and data-URL routes get larger, derived caps.
 REQUEST_BODY_MAX_BYTES: int = 16 * 1024 * 1024
+# What /neuro/learn takes: a prompt and one synthesis.
+NEURO_LEARN_BODY_MAX_BYTES: int = 1024 * 1024
 # Largest single uploaded file, and a base64 data: URL of one plus its header.
 UPLOAD_MAX_FILE_BYTES: int = 50 * 1024 * 1024
 MAX_DATA_URL_CHARS: int = UPLOAD_MAX_FILE_BYTES * 4 // 3 + 256
 # Total stored upload bytes per user, checked before an upload is saved.
 UPLOAD_USER_QUOTA_BYTES: int = 1024 * 1024 * 1024
-# Address-space cap for the PDF/DOCX parse child process (Linux only).
-DOCUMENT_PARSE_MEMORY_LIMIT_BYTES: int = 1024 * 1024 * 1024
+# Address-space cap for the PDF/DOCX parse child process (Linux only). Per parse, not
+# per container: at 1 GiB one parse could take the whole container (audit 8 WS5-5).
+# shortcut: provisional figure. D8 sets it from the measured RSS of a parse (Phase 7a).
+DOCUMENT_PARSE_MEMORY_LIMIT_BYTES: int = 512 * 1024 * 1024
+# Files one worker reads and parses at once. Each holds up to UPLOAD_MAX_FILE_BYTES in
+# memory plus its parse child, so this bounds a worker's upload memory.
+UPLOAD_PARSE_CONCURRENCY_PER_WORKER: int = 2
 
 # After a Valkey error every guarded caller (the rate limiter, the cached
 # repositories, the Redis circuit breaker) falls back for this long without
 # touching the network, then the next request re-probes.
 VALKEY_RETRY_SECONDS: float = 30.0
 RATE_LIMITER_REDIS_RETRY_SECONDS: float = VALKEY_RETRY_SECONDS
+# Supabase token verification (audit 8 WS5-11): a blocking HTTPS call run on its own
+# small pool, so a slow Supabase cannot take the default executor that the whole app
+# uses (file reads, DNS, hashing), and cut off after this long.
+AUTH_VERIFY_THREADS: int = 4
+AUTH_VERIFY_TIMEOUT_SECONDS: float = 5.0
+# Calls (each already retried once) that must fail in a row before the rate limiter
+# stops asking Valkey for the cooldown. One transient error used to start a 30 s
+# window in which every request was denied (audit 8 WS5-6).
+RATE_LIMITER_FAILURES_BEFORE_COOLDOWN: int = 5
+# Routes that must still answer when the rate limiter is unavailable and set to fail
+# closed: a user whose limiter is down must be able to cancel a run that is spending
+# their money, and a health probe that is denied reports the whole service down.
+RATE_LIMIT_FAIL_OPEN_PATHS: tuple[str, ...] = ("/api/stop", "/api/health")
+# How long a caller waits for a free Valkey connection before the call fails. A pool
+# at its limit used to raise at once, which the rate limiter read as an outage.
+VALKEY_POOL_WAIT_SECONDS: float = 1.0
 
 # Whole-chain bound for the direct-vendor fallback (up to eight sequential
 # attempts, each with its own LLM_CALL timeout).

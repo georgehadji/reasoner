@@ -228,3 +228,119 @@ async def test_mcp_resolve_caller_refuses_deleted_jwt_user():
         deps.forget_provisioned_user(user.id)
         with pytest.raises(mctx.McpAuthError):
             await mctx.resolve_caller(SimpleNamespace())
+
+
+# 3. default body cap and rate-limited cheap routes (audit 8 WS4-2) ------------
+
+
+def _routes_app():
+    app = FastAPI()
+
+    @app.post("/api/estimate")
+    @app.post("/api/suggestions")
+    @app.post("/api/stop")
+    @app.post("/api/run")
+    @app.post("/api/run-followup")
+    @app.post("/api/run-with-context")
+    @app.post("/api/agent/run")
+    async def echo(request: Request):
+        return {"n": len(await request.body())}
+
+    app.add_middleware(BodySizeLimitMiddleware, **BodySizeLimitMiddleware.app_limits())
+    return app
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["/api/estimate", "/api/suggestions", "/api/stop"])
+async def test_a_one_megabyte_body_is_refused_on_routes_that_take_small_json(path):
+    resp = await _post(_routes_app(), path, b"x" * 2**20)
+    assert resp.status_code == 413
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "path", ["/api/run", "/api/run-followup", "/api/run-with-context", "/api/agent/run"]
+)
+async def test_a_run_with_a_full_attachment_still_passes(path):
+    from reasoner.api.schemas import MAX_ATTACHMENT_TEXT_CHARS
+
+    body = b"x" * (MAX_ATTACHMENT_TEXT_CHARS + 2**16)  # one attachment of the largest text
+    resp = await _post(_routes_app(), path, body)
+    assert resp.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "module,path",
+    [
+        ("reasoner.api.routes.estimate", "/api/estimate"),
+        ("reasoner.api.routes.widgets", "/api/suggestions"),
+        ("reasoner.api", "/api/stop"),
+    ],
+)
+def test_cheap_routes_carry_the_rate_limit(module, path):
+    from reasoner.api.dependencies import check_rate_limit
+
+    mod = importlib.import_module(module)
+    holder = getattr(mod, "router", None) or mod.app
+    route = next(r for r in holder.routes if getattr(r, "path", None) == path)
+    assert check_rate_limit in [d.call for d in route.dependant.dependencies]
+
+
+# audit 8 WS4-4/6/7 ---------------------------------------------------------------
+
+
+@pytest.mark.parametrize("bad", ["../x", "a/b", "a\b", "A1", "", "g" * 3, "a" * 37])
+def test_attachment_ref_refuses_a_malformed_file_id(bad):
+    from pydantic import ValidationError
+
+    from reasoner.api.schemas import AttachmentRef
+
+    with pytest.raises(ValidationError):
+        AttachmentRef(file_id=bad, filename="a", mime_type="text/plain", extracted_text="")
+
+
+@pytest.mark.parametrize("bad", ["../x", "a/b", "a\b", "", "..", "a.meta"])
+def test_upload_meta_refuses_a_path_shaped_id(bad, tmp_path, monkeypatch):
+    from reasoner.infrastructure import uploader
+
+    up = tmp_path / "up"
+    up.mkdir()
+    (tmp_path / "x.meta.json").write_text('{"user_id": "u"}')
+    monkeypatch.setattr(uploader, "UPLOAD_DIR", up)
+    assert uploader._get_upload_meta(bad) is None
+    (up / "ok-1.meta.json").write_text('{"user_id": "u"}')
+    assert uploader._get_upload_meta("ok-1") == {"user_id": "u"}
+
+
+@pytest.mark.asyncio
+async def test_search_failure_does_not_leak_the_provider_error(monkeypatch):
+    import reasoner.api as api
+
+    class Boom:
+        async def search(self, *a, **k):
+            raise RuntimeError("https://secret.internal:9200 key=sk-abc quota")
+
+    async def no_charge(*a, **k):
+        return None
+
+    async def close(*a, **k):
+        return None
+
+    monkeypatch.setattr(api, "admit_flat_charge", no_charge)
+    monkeypatch.setattr(api, "close_flat_charge", close)
+    req = api.SearchRequest(query="hello world", smart=False)
+    with pytest.raises(HTTPException) as e:
+        await api.search_web(req, SimpleNamespace(), None, None, Boom())
+    assert e.value.status_code == 503
+    assert "secret" not in e.value.detail and "sk-abc" not in e.value.detail
+
+
+@pytest.mark.parametrize("func", ["create_checkout", "create_portal"])
+def test_billing_money_routes_are_rate_limited(func):
+    from reasoner.api import billing_router
+    from reasoner.api.dependencies import check_rate_limit
+
+    params = inspect.signature(getattr(billing_router, func)).parameters
+    assert any(
+        getattr(p.default, "dependency", None) is check_rate_limit for p in params.values()
+    )

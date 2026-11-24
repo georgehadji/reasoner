@@ -11,6 +11,8 @@ import warnings
 
 import valkey.asyncio as aioredis
 
+from reasoner.core.constants_limits import VALKEY_POOL_WAIT_SECONDS
+
 _pool: aioredis.Redis | None = None
 
 
@@ -28,12 +30,18 @@ def get_valkey_pool() -> aioredis.Redis:
             "VALKEY_MAX_CONNECTIONS",
             os.environ.get("REDIS_MAX_CONNECTIONS", "100"),
         ))
-        _pool = aioredis.from_url(
-            url,
-            decode_responses=True,
-            socket_connect_timeout=2.0,
-            socket_timeout=2.0,
-            max_connections=max_conn,
+        # A blocking pool: at its limit a caller waits for a free connection (up to
+        # VALKEY_POOL_WAIT_SECONDS) instead of failing at once, which the rate limiter
+        # and the run-state store each read as a Valkey outage (audit 8 WS5-6).
+        _pool = aioredis.Redis(
+            connection_pool=aioredis.BlockingConnectionPool.from_url(
+                url,
+                decode_responses=True,
+                socket_connect_timeout=2.0,
+                socket_timeout=2.0,
+                max_connections=max_conn,
+                timeout=VALKEY_POOL_WAIT_SECONDS,
+            )
         )
     return _pool
 
@@ -49,6 +57,11 @@ async def close_valkey_pool() -> None:
     global _pool
     if _pool is not None:
         await _pool.close()
+        # A client built on an explicit pool does not own it, so close() leaves the
+        # sockets open.
+        owned = getattr(_pool, "connection_pool", None)
+        if owned is not None:
+            await owned.disconnect()
         _pool = None
 
 

@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 import re
+import weakref
 
 import anyio
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -14,7 +15,11 @@ from reasoner.api.auth_deps import require_csrf
 from reasoner.api.dependencies import check_rate_limit, require_key_scope
 from reasoner.api.run_admission import admit_flat_charge, close_flat_charge
 from reasoner.application.services.estimate_service import estimate_upload_cost
-from reasoner.core.constants_limits import SETTLE_TIMEOUT_SECONDS, UPLOAD_USER_QUOTA_BYTES
+from reasoner.core.constants_limits import (
+    SETTLE_TIMEOUT_SECONDS,
+    UPLOAD_PARSE_CONCURRENCY_PER_WORKER,
+    UPLOAD_USER_QUOTA_BYTES,
+)
 from reasoner.core.settings import settings
 from reasoner.domain.saas import User
 from reasoner.infrastructure.persistence.upload_usage_repo import get_upload_usage_repo
@@ -30,6 +35,40 @@ from reasoner.uploader import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Per event loop, so a test that starts a fresh loop does not meet a semaphore bound to
+# an old one. In a worker there is one loop, so this is one semaphore per process.
+_PARSE_GATES: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Semaphore] = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _parse_gate() -> asyncio.Semaphore:
+    """The per-process limit on files being read and parsed at once (audit 8 WS5-5)."""
+    loop = asyncio.get_running_loop()
+    gate = _PARSE_GATES.get(loop)
+    if gate is None:
+        gate = _PARSE_GATES[loop] = asyncio.Semaphore(UPLOAD_PARSE_CONCURRENCY_PER_WORKER)
+    return gate
+
+
+async def _read_bounded(item) -> bytes:
+    """Read one uploaded file in a single allocation, refusing one over the size limit.
+
+    The body is already spooled to disk by the form parser, so the size is known before
+    anything is read. Joining 1 MB chunks held the file twice at its peak.
+    """
+    too_large = HTTPException(
+        status_code=413,
+        detail=f"File too large. Maximum size: {MAX_FILE_SIZE // (1024 * 1024)}MB",
+    )
+    size = getattr(item, "size", None)
+    if size is not None and size > MAX_FILE_SIZE:
+        raise too_large
+    content = await item.read(MAX_FILE_SIZE + 1)
+    if len(content) > MAX_FILE_SIZE:
+        raise too_large
+    return content
 
 
 @router.post("/api/upload")
@@ -48,6 +87,12 @@ async def upload_file(
     stored = 0
     charge = None
     served = False
+
+    def mark_described() -> None:
+        # The billed vision call has returned: the charge stands whatever fails next.
+        nonlocal served
+        served = True
+
     try:
         # Reject oversized multipart bodies before Starlette parses them into
         # memory/tempfiles.  Per-file streaming checks below remain required
@@ -98,43 +143,32 @@ async def upload_file(
                 request, user=user, cost_usd=estimate_upload_cost(n_described), kind="upload"
             )
 
-        # One file in memory at a time: read (size-guarded), save, drop.
+        # One file in memory per request at a time, and a few per process: read
+        # (size-guarded), save, drop.
         results: list[dict] = []
         for item in raw_files:
             if not hasattr(item, "read"):
                 continue
-            chunks = []
-            total = 0
-            while True:
-                chunk = await item.read(1024 * 1024)  # 1 MB chunks
-                if not chunk:
-                    break
-                total += len(chunk)
-                if total > MAX_FILE_SIZE:
-                    raise HTTPException(
-                        status_code=413,
-                        detail=f"File too large. Maximum size: {MAX_FILE_SIZE // (1024 * 1024)}MB",
-                    )
-                chunks.append(chunk)
-            content = b"".join(chunks)
-            del chunks
+            async with _parse_gate():
+                content = await _read_bounded(item)
 
-            # No/understated Content-Length: reserve the shortfall now.
-            consumed += total
-            if consumed > reserved:
-                await _reserve_quota(usage, user_id, consumed - reserved)
-                reserved = consumed
-            filename = getattr(item, "filename", "unknown")
-            results.append(
-                await save_uploaded_file(content, filename, user_id=user_id, force_ocr=force_ocr)
-            )
-            # A billed vision call has now run: keep the charge even if a later
-            # file fails, or every failed upload refunds descriptions we paid for.
-            if charge is not None and _is_described(filename, force_ocr):
-                served = True
-            stored += results[-1].get("stored_bytes", 0) if results[-1].get("success") else 0
-            del content
-        served = True
+                # No/understated Content-Length: reserve the shortfall now.
+                consumed += len(content)
+                if consumed > reserved:
+                    await _reserve_quota(usage, user_id, consumed - reserved)
+                    reserved = consumed
+                filename = getattr(item, "filename", "unknown")
+                # A billed vision call keeps its charge even if a later file or a later
+                # step fails, or every failed upload would refund descriptions we paid
+                # for. A file refused before the call (type, size, MIME) never fires it.
+                results.append(
+                    await save_uploaded_file(
+                        content, filename, user_id=user_id, force_ocr=force_ocr,
+                        on_described=mark_described,
+                    )
+                )
+                stored += results[-1].get("stored_bytes", 0) if results[-1].get("success") else 0
+                del content
         return {"success": True, "files": results}
 
     except HTTPException:

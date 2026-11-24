@@ -105,7 +105,7 @@ CLIENT_RUN_ID_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
 
 
 class AttachmentRef(BaseModel):
-    file_id: str
+    file_id: FileId
     filename: str
     mime_type: str
     extracted_text: str = Field(..., max_length=MAX_ATTACHMENT_TEXT_CHARS)

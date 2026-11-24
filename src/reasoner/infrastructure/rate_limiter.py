@@ -30,6 +30,7 @@ import valkey.asyncio as aioredis
 
 from reasoner.core.constants import (  # Imported MAX_RATE_LIMIT_BUCKETS
     MAX_RATE_LIMIT_BUCKETS,
+    RATE_LIMITER_FAILURES_BEFORE_COOLDOWN,
     RATE_LIMITER_REDIS_RETRY_SECONDS,
 )
 from reasoner.core.degrade import degraded
@@ -88,6 +89,8 @@ class RateLimiter:
         # one Redis error used to latch _redis_available off for the life of
         # the process, and fail_closed then denied every request.
         self._redis_last_fail: float = 0.0
+        # Calls in a row that failed even after a retry; success resets it.
+        self._redis_failures: int = 0
 
         is_production = settings.ENVIRONMENT == "production"
 
@@ -148,17 +151,22 @@ class RateLimiter:
         try:
             # KEYS: token_bucket_key, minute_window_key, hour_window_key
             # ARGV: current_time_ms, refill_rate, burst_capacity, requests_per_minute, requests_per_hour, requested_tokens
-            result = await self._redis_script(
-                keys=[token_bucket_key, minute_window_key, hour_window_key],
-                args=[
-                    current_time_ms,
-                    refill_rate,
-                    burst_capacity,
-                    requests_per_minute,
-                    requests_per_hour,
+            # One retry first: a dropped connection or a pool that was briefly full is
+            # not an outage. Worst case, a reply lost after the script ran counts
+            # that one request twice.
+            try:
+                result = await self._run_script(
+                    token_bucket_key, minute_window_key, hour_window_key, current_time_ms,
+                    refill_rate, burst_capacity, requests_per_minute, requests_per_hour,
                     requested_tokens,
-                ],
-            )
+                )
+            except Exception:
+                result = await self._run_script(
+                    token_bucket_key, minute_window_key, hour_window_key, current_time_ms,
+                    refill_rate, burst_capacity, requests_per_minute, requests_per_hour,
+                    requested_tokens,
+                )
+            self._redis_failures = 0
             if not self._redis_available:
                 logger.info("Redis rate limiter recovered")
                 self._redis_available = True
@@ -179,11 +187,40 @@ class RateLimiter:
             }
             return allowed, info
         except Exception as e:
-            # Unavailable until the cooldown ends, then the next call re-probes.
-            self._redis_available = False
-            self._redis_last_fail = self._clock.monotonic()
+            # This call fails, and the next one tries Valkey again, until
+            # RATE_LIMITER_FAILURES_BEFORE_COOLDOWN calls in a row have failed:
+            # then Valkey is unavailable until the cooldown ends. A re-probe that
+            # fails keeps the count above the threshold, so it re-trips at once.
+            self._redis_failures += 1
+            if self._redis_failures >= RATE_LIMITER_FAILURES_BEFORE_COOLDOWN:
+                self._redis_available = False
+                self._redis_last_fail = self._clock.monotonic()
             degraded("rate_limiter.redis", None, exc=e)
             raise ConnectionError("Redis script execution failed.") from e
+
+    async def _run_script(
+        self,
+        token_bucket_key: str,
+        minute_window_key: str,
+        hour_window_key: str,
+        current_time_ms: int,
+        refill_rate: float,
+        burst_capacity: float,
+        requests_per_minute: int,
+        requests_per_hour: int,
+        requested_tokens: int,
+    ) -> Any:
+        return await self._redis_script(
+            keys=[token_bucket_key, minute_window_key, hour_window_key],
+            args=[
+                current_time_ms,
+                refill_rate,
+                burst_capacity,
+                requests_per_minute,
+                requests_per_hour,
+                requested_tokens,
+            ],
+        )
 
     async def _in_memory_is_allowed_for_user(
         self,

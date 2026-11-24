@@ -42,6 +42,9 @@ class TestRateLimiterAnonymous:
             requests_per_hour=100,
             burst_size=2,
         ))
+        # Test the in-memory bucket alone: with no Valkey, each call would otherwise spend
+        # seconds on connect attempts and the bucket would refill between them.
+        limiter._redis_script = None
         # Exhaust burst
         for _ in range(2):
             await limiter.is_allowed("anon:1234")

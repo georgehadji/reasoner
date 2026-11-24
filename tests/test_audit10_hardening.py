@@ -77,9 +77,15 @@ def upload_env(monkeypatch):
     async def close(charge, *, served):
         calls["close"].append(served)
 
-    async def save(content, filename, user_id=None, force_ocr=False):
+    async def save(content, filename, user_id=None, force_ocr=False, on_described=None):
         if filename == "boom.png":
             raise RuntimeError("vision down")
+        if filename == "rejected.png":  # refused before the vision call (type, size, MIME)
+            return {"success": False, "error": "File content does not match extension"}
+        if filename.endswith(".png") and not force_ocr and on_described is not None:
+            on_described()  # the billed vision call returned
+        if filename == "late.png":  # a step after the vision call fails
+            return {"success": False, "error": "Upload failed"}
         return {"success": True, "stored_bytes": 0}
 
     usage = SimpleNamespace(
@@ -110,10 +116,54 @@ async def test_failed_image_upload_gives_the_hold_back(upload_env):
     assert upload_env["close"] == [False]
 
 
+async def test_a_failure_after_the_vision_call_keeps_the_charge(upload_env):
+    """The provider was paid when the description came back (audit 8 WS3-15)."""
+    await _upload([_File("late.png")])
+    assert upload_env["close"] == [True]
+
+
+async def test_a_file_refused_before_the_vision_call_is_not_charged(upload_env):
+    await _upload([_File("rejected.png")])
+    assert upload_env["close"] == [False]
+
+
 async def test_text_upload_and_force_ocr_are_not_charged(upload_env):
     await _upload([_File("a.txt")])
     await _upload([_File("a.png")], force_ocr=True)
     assert upload_env["admit"] == []
+
+
+async def test_uploads_above_the_per_process_gate_wait_instead_of_running(upload_env, monkeypatch):
+    """Audit 8 WS5-5: each file is in memory while it is read and parsed, so cap them."""
+    import asyncio
+
+    running = 0
+    peak = 0
+
+    async def slow_save(content, filename, user_id=None, force_ocr=False, on_described=None):
+        nonlocal running, peak
+        running += 1
+        peak = max(peak, running)
+        await asyncio.sleep(0.02)
+        running -= 1
+        return {"success": True, "stored_bytes": 0}
+
+    monkeypatch.setattr(uploads, "save_uploaded_file", slow_save)
+    monkeypatch.setattr(uploads, "UPLOAD_PARSE_CONCURRENCY_PER_WORKER", 2)
+    uploads._PARSE_GATES.clear()
+
+    await asyncio.gather(*(_upload([_File(f"{i}.txt")]) for i in range(6)))
+
+    assert peak == 2
+
+
+async def test_a_file_over_the_size_limit_is_refused_before_it_is_read(upload_env):
+    big = _File("big.txt")
+    big.size = uploads.MAX_FILE_SIZE + 1
+    with pytest.raises(HTTPException) as exc:
+        await _upload([big])
+    assert exc.value.status_code == 413
+    assert big._data == [b"abc", b""]  # untouched
 
 
 # B. image hold priced premium unless budget was explicit --------------------

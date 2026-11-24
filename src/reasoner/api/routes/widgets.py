@@ -86,7 +86,10 @@ async def api_models() -> dict[str, list[str]]:
 
 
 @router.post("/api/suggestions")
-async def get_suggestions(req: SuggestionRequestModel):
+async def get_suggestions(
+    req: SuggestionRequestModel,
+    rate_limit_checked=Depends(check_rate_limit),
+):
     """Get smart search suggestions based on query."""
     try:
         request = SuggestionRequest(

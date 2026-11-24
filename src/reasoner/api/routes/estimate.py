@@ -8,6 +8,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from reasoner.api.auth_deps import require_csrf
+from reasoner.api.dependencies import check_rate_limit
 from reasoner.api.schemas import RunRequest
 from reasoner.application.services.estimate_service import estimate_cost as _estimate_cost
 
@@ -17,6 +18,7 @@ router = APIRouter()
 @router.post("/api/estimate")
 async def estimate_cost(
     req: RunRequest,
+    rate_limit_checked=Depends(check_rate_limit),
     csrf_checked=Depends(require_csrf),
 ):
     """Estimate tokens, cost, and duration for a pipeline run."""

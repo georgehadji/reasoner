@@ -87,6 +87,21 @@ REASONER_CREDIT_FAILOPEN_TOTAL = Counter(
     ["path"],
 )
 
+# Expected client errors (404, 405, 422 ...) are counted and logged, not stored or sent
+# to Sentry: a scanner's 300 requests for /wp-login.php would write 300 rows
+# (audit 8 WS4-3). `status` is an HTTP code, so its cardinality is bounded.
+REASONER_API_CLIENT_ERRORS_TOTAL = Counter(
+    "reasoner_api_client_errors_total",
+    "Expected 4xx responses, by status code",
+    ["status"],
+)
+
+# Unexpected errors the error store did not take because too many inserts were in flight.
+REASONER_ERROR_STORE_DROPPED_TOTAL = Counter(
+    "reasoner_error_store_dropped_total",
+    "Errors not persisted because the error-store insert queue was full",
+)
+
 REASONER_LLM_ERRORS_TOTAL = Counter(
     "reasoner_llm_errors_total",
     "LLM provider errors",

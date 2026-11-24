@@ -516,6 +516,16 @@ async def check_rate_limit(
 
     request.state.rate_limit_info = info
 
+    if not allowed and info.get("reason") == "rate_limiter_unavailable":
+        from reasoner.core.constants_limits import RATE_LIMIT_FAIL_OPEN_PATHS
+
+        # Fail closed, except where denying does harm: a user must be able to cancel a
+        # run that is spending their credits, and a denied health probe reports the
+        # whole service down (audit 8 WS5-6). They go through undelayed, and still
+        # cost nothing the limiter could count.
+        if request.url.path.startswith(RATE_LIMIT_FAIL_OPEN_PATHS):
+            allowed = True
+
     if not allowed:
         raise HTTPException(
             status_code=429,
