@@ -107,18 +107,38 @@ _IMAGE_COST_PER_IMAGE_USD: dict[str, float] = {
 }
 
 
-async def estimate_image_cost(preset: str, num_images: int) -> float:
-    """Flat estimate for an image-generation request, priced per image.
+def _resolution_multiplier(resolution: str) -> float:
+    """Price factor for a size: 1.0 up to 1 megapixel, then by pixel count.
 
-    Used to reserve credits before generation; the full reservation is
-    refunded on failure, kept as-is on success (no true-up -- see the
+    The flat rate is calibrated for the default 1024x1024. A larger image costs
+    the provider more, so it costs the caller more. Smaller sizes stay at 1.0
+    rather than discounting, which keeps the estimate above the real price.
+    """
+    from reasoner.core.constants_limits import IMAGE_GEN_DEFAULT_HEIGHT, IMAGE_GEN_DEFAULT_WIDTH
+
+    try:
+        w_s, h_s = resolution.split("x")
+        pixels = int(w_s) * int(h_s)
+    except ValueError:
+        # The request schema only admits listed sizes. An unparseable value is
+        # priced at the largest listed size, not the cheapest.
+        pixels = 2048 * 2048
+    return max(1.0, pixels / (IMAGE_GEN_DEFAULT_WIDTH * IMAGE_GEN_DEFAULT_HEIGHT))
+
+
+async def estimate_image_cost(preset: str, num_images: int, resolution: str | None = None) -> float:
+    """Estimate for an image-generation request, priced per image and by size.
+
+    Used to reserve credits before generation. The hold is refunded when no
+    provider call completed and kept as-is otherwise (no true-up -- see the
     module comment on _IMAGE_COST_PER_IMAGE_USD).
     """
     from reasoner.core.constants_limits import IMAGE_GEN_PREMIUM_PRESET
 
     tier = "premium" if preset in (IMAGE_GEN_PREMIUM_PRESET, "premium") else "budget"
     per_image = _IMAGE_COST_PER_IMAGE_USD[tier]
-    return round(per_image * max(num_images, 0), 4)
+    factor = _resolution_multiplier(resolution) if resolution else 1.0
+    return round(per_image * factor * max(num_images, 0), 4)
 
 
 # One vision call per image the uploader describes. Flat: the call's real cost

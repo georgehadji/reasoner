@@ -266,3 +266,15 @@ class TestGuardFailsLoud:
         assert any("spend_limit.required_tier" in r.message for r in caplog.records), (
             f"the tier gate stopped checking silently: {[r.message for r in caplog.records]}"
         )
+
+
+def test_monthly_ceiling_equals_the_credit_allowance_in_usd():
+    """WS3-11: both tables count USD of model spend, so they must not drift apart.
+
+    At PRO $8 against 25,000 credits ($25) a paid user was cut off with two thirds of
+    the allowance unspent.
+    """
+    from reasoner.domain.credits import CREDITS_PER_USD, TIER_MONTHLY_CREDITS
+
+    for tier, credits in TIER_MONTHLY_CREDITS.items():
+        assert TIER_SPEND_LIMITS[tier].monthly_usd == credits / CREDITS_PER_USD, tier

@@ -260,13 +260,13 @@ def credits_wired():
         (
             "charge.refunded",
             {"id": "ch_1", "amount_refunded": 500, "refunded": True},
-            "refund:ch_1",
+            "refund:ch_1:500",
             True,
         ),
         (
             "charge.refunded",
             {"id": "ch_2", "amount_refunded": 100, "refunded": False},
-            "refund:ch_2",
+            "refund:ch_2:100",
             False,
         ),
     ],

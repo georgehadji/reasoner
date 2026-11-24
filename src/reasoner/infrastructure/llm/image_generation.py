@@ -1087,6 +1087,9 @@ async def generate_images(
             "enhanced_prompt": enhanced_prompt,
             "rewritten_prompt": rewritten_prompt,
             "images": [],
+            # Images that came back and were then discarded for being too few:
+            # the provider calls were made and billed.
+            "completed_images": len(images),
             "error": "All models failed. " + "; ".join(errors),
         }
 

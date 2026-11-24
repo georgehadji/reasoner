@@ -67,7 +67,7 @@ def bypass_credit_gate():
 
 
 @pytest.fixture
-def client():
+def client(anonymous_trial_open):
     return TestClient(app)
 
 

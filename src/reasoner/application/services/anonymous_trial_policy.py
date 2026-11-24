@@ -55,6 +55,7 @@ ANON_TRIAL_MACHINE = Machine(
 
 _KEY_PREFIX = "anon_spend"
 _WINDOW_TTL_SECONDS = 86_400
+_UNAVAILABLE_RETRY_SECONDS = 30
 
 # Atomic refund: touches the key only while it exists (so it can never create one),
 # floors at zero, and keeps the TTL. exists-then-decrby across midnight left a
@@ -93,12 +94,12 @@ async def enforce_anonymous_trial_cap(
     exceed ``settings.ANONYMOUS_DAILY_CREDIT_CAP``.
 
     Returns the credits counted, for :func:`refund_anonymous_trial`, or None when
-    nothing was counted (a zero estimate, or Valkey down).
+    nothing was counted (a zero estimate).
 
-    Fails *open* (log + allow) when Valkey is unreachable: unlike the credit
-    ledger, there's no real money at risk here for the business to lose --
-    only bounded abuse-cost exposure, and the daily window resets on its own
-    once the backend recovers.
+    Fails *closed* (503) when Valkey is unreachable. An anonymous run is paid for
+    with our own provider keys, so an unreachable counter is an uncapped spend,
+    not a free pass. Signed-in users are unaffected. The daily window resets on
+    its own once the backend recovers (audit 8 D13).
     """
     from reasoner.core.settings import settings
     from reasoner.domain.credits import usd_to_credits
@@ -117,8 +118,18 @@ async def enforce_anonymous_trial_cap(
         await client.set(key, 0, ex=_WINDOW_TTL_SECONDS, nx=True)
         spent = await client.incrby(key, estimated_credits)
     except Exception as exc:
-        logger.warning("Anonymous trial cap check failed (Valkey unreachable); allowing: %s", exc)
-        return None
+        logger.warning("Anonymous trial cap check failed (Valkey unreachable); refusing: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "Anonymous trial unavailable",
+                "message": (
+                    "Free trial runs are paused for a moment. Try again shortly, or sign in."
+                ),
+                "retry_after": _UNAVAILABLE_RETRY_SECONDS,
+            },
+            headers={"Retry-After": str(_UNAVAILABLE_RETRY_SECONDS)},
+        ) from exc
 
     charge = AnonymousTrialCharge(key=key, credits=estimated_credits)
     if spent > settings.ANONYMOUS_DAILY_CREDIT_CAP:

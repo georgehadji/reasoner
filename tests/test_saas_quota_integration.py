@@ -25,7 +25,7 @@ from reasoner.infrastructure.auth.local_adapter import LocalAuthAdapter
 
 
 @pytest.fixture
-def client():
+def client(anonymous_trial_open):
     return TestClient(app)
 
 

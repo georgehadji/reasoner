@@ -105,6 +105,41 @@ async def test_generation_failure_gives_the_charge_back(monkeypatch, charge):
     assert charge.close_calls == [{"credits": 6, "served": False}]
 
 
+async def test_failure_after_a_completed_provider_call_keeps_the_charge(monkeypatch, charge):
+    """WS3-5: a short batch discards images that were already billed to us."""
+
+    async def short_batch(**kwargs):
+        return {"success": False, "error": "Generated only 1 of 2", "completed_images": 1}
+
+    monkeypatch.setattr(images, "generate_images", short_batch)
+
+    result = await _call(GenerateImageRequest(prompt="draw a fox", num_images=2), _user())
+
+    assert result["success"] is False
+    assert charge.close_calls == [{"credits": 6, "served": True}]
+
+
+@pytest.mark.parametrize("bad", ["8192x8192", "1024x1024; drop", "huge", "0x0", ""])
+def test_unlisted_resolution_is_rejected(bad):
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        GenerateImageRequest(prompt="x", resolution=bad)
+
+
+async def test_a_larger_size_costs_more_than_the_default(monkeypatch, charge):
+    monkeypatch.setattr(images, "generate_images", _fake_generate_images_success)
+
+    await _call(GenerateImageRequest(prompt="a", preset="image-gen-budget"), _user())
+    await _call(
+        GenerateImageRequest(prompt="a", preset="image-gen-budget", resolution="2048x2048"),
+        _user(),
+    )
+
+    default_cost, large_cost = (c["cost_usd"] for c in charge.admit_calls)
+    assert large_cost == pytest.approx(default_cost * 4)
+
+
 async def test_generation_exception_gives_the_charge_back(monkeypatch, charge):
     async def exploding(**kwargs):
         raise RuntimeError("provider exploded")

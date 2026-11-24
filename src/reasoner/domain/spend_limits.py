@@ -85,12 +85,16 @@ TIER_SPEND_LIMITS: dict[SubscriptionTier, TierSpendLimits] = {
     # evaluate the product, bounded enough that a few thousand free accounts
     # stay affordable.
     SubscriptionTier.FREE: TierSpendLimits(per_run_usd=0.07, monthly_usd=0.50),
-    # per_run covers the most expensive premium preset; monthly is ~4x the
-    # expected average, so it only binds on genuine outliers.
-    SubscriptionTier.PRO: TierSpendLimits(per_run_usd=0.50, monthly_usd=8.00),
-    # Effectively uncapped for normal use; still bounded so a credential
-    # leak or a runaway integration cannot bill without limit.
-    SubscriptionTier.ENTERPRISE: TierSpendLimits(per_run_usd=2.00, monthly_usd=100.00),
+    # monthly_usd equals the tier's credit allowance (domain/credits.py
+    # TIER_MONTHLY_CREDITS / CREDITS_PER_USD, both are USD of model spend), so a
+    # user can spend what the plan grants. At $8 against 25,000 credits ($25) the
+    # ceiling cut a PRO user off with two thirds of the allowance unspent
+    # (audit 8 WS3-11, D2). tests/unit/test_spend_limits.py ties the two tables.
+    # per_run covers the most expensive premium preset.
+    SubscriptionTier.PRO: TierSpendLimits(per_run_usd=0.50, monthly_usd=25.00),
+    # Same rule. Still bounded, so a credential leak or a runaway integration
+    # cannot bill without limit.
+    SubscriptionTier.ENTERPRISE: TierSpendLimits(per_run_usd=2.00, monthly_usd=250.00),
 }
 
 # Applied to callers with no resolvable subscription (anonymous or legacy

@@ -16,6 +16,7 @@ from reasoner.core.constants import (
     DEFAULT_TOP_K,
     IMAGE_GEN_ALLOWED_ASPECT_RATIOS,
     IMAGE_GEN_ALLOWED_PRESETS,
+    IMAGE_GEN_ALLOWED_RESOLUTIONS,
     IMAGE_GEN_DEFAULT_ASPECT_RATIO,
     IMAGE_GEN_DEFAULT_PRESET,
     IMAGE_GEN_DEFAULT_RESOLUTION,
@@ -451,6 +452,15 @@ class GenerateImageRequest(BaseModel):
             raise ValueError(f"Invalid aspect ratio: {v}. Allowed: {allowed}")
         return v
 
+    @field_validator("resolution")
+    @classmethod
+    def validate_resolution(cls, v: str) -> str:
+        if v not in IMAGE_GEN_ALLOWED_RESOLUTIONS:
+            raise ValueError(
+                f"Invalid resolution: {v}. Allowed: {', '.join(IMAGE_GEN_ALLOWED_RESOLUTIONS)}"
+            )
+        return v
+
     @field_validator("reference_images")
     @classmethod
     def validate_reference_images(cls, v: list[str]) -> list[str]:
@@ -462,6 +472,9 @@ class GenerateImageRequest(BaseModel):
         return v
 
     model_config = {"extra": "forbid"}
+
+
+MAX_CONTEXT_URLS = 20
 
 
 class ContextAnalysisRequest(BaseModel):
@@ -498,6 +511,15 @@ class ContextAnalysisRequest(BaseModel):
     def validate_context_length(cls, v: list) -> list:
         if len(v) > 100:
             raise ValueError("Context list cannot exceed 100 items")
+        urls = sum(
+            1
+            for item in v
+            if isinstance(item, dict)
+            for value in item.values()
+            if isinstance(value, str) and value.startswith(("http://", "https://"))
+        )
+        if urls > MAX_CONTEXT_URLS:
+            raise ValueError(f"Context cannot contain more than {MAX_CONTEXT_URLS} URLs")
         # state.vetted_context is rendered into the synthesis prompt.
         return sanitize_strings_deep(v)
 
