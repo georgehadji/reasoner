@@ -61,7 +61,7 @@ This mounts the MCP server at `/mcp` on the same FastAPI app that serves the RES
 | `reasoner_presets` | Free | List available presets with method, description, and primary model. |
 | `reasoner_health` | Free | Liveness and dependency status. |
 
-There is no admin, key-management, or GDPR tool on this surface, and there will not be — that boundary is enforced by a test (`tests/test_mcp_tools.py`), not just a convention.
+There is no admin, key-management, or GDPR tool on this surface, and there will not be — that boundary is enforced by a test (`tests/test_mcp_tools.py`), not just a convention. The test runs in the `mcp-extra` CI job, which installs the extra and fails if any MCP test is skipped; the main `pytest` job does not install it and skips them.
 
 ### Progress
 

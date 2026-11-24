@@ -22,11 +22,15 @@ except ImportError:
 
 
 def init_sentry() -> None:
-    if not _HAS_SENTRY:
-        logger.debug("sentry-sdk not installed, skipping Sentry initialization")
+    if not settings.SENTRY_DSN:
         return
 
-    if not settings.SENTRY_DSN:
+    if not _HAS_SENTRY:
+        # A DSN says the operator expects error tracking. Skipping silently in
+        # production would run with none and report nothing.
+        if settings.ENVIRONMENT == "production":
+            raise RuntimeError("SENTRY_DSN is set but sentry-sdk is not installed.")
+        logger.warning("SENTRY_DSN is set but sentry-sdk is not installed; Sentry disabled.")
         return
 
     sentry_sdk.init(

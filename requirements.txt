@@ -35,6 +35,16 @@ pydantic>=2.14.3,<3.0.0
 
 # Utilities
 python-dotenv>=1.2.4,<2.0.0
+pyyaml>=6.0.3,<7.0.0 # neuro/config.py
+click>=8.5.1,<9.0.0 # neuro/cli.py
+rich>=15.0.0,<16.0.0 # application/services/renderers, main.py
+numpy>=2.5.0,<3.0.0 # neuro/cache.py embedding search
+
+# Observability. Imported behind try/except, so a missing package fails silently:
+# no error tracking, and /metrics answers with an empty body (audit 8 WS10-4, WS8-2).
+# sentry-sdk stays on 2.x: api/error_handler.py uses sentry_sdk.Hub, removed in 3.0.
+sentry-sdk[fastapi]>=2.76.0,<3.0.0
+prometheus-client>=0.26.0,<0.27.0
 
 # File Processing
 pypdf>=7.1.0,<8.0.0

@@ -413,6 +413,33 @@ jobs:
           CSRF_ENFORCE_BACKEND: 'false'
           REASONER_TEST_PG_DSN: postgresql://postgres:test@localhost:5432/reasoner_test
 
+  mcp-extra:
+    # The main job does not install the `mcp` extra, so every MCP test skips there
+    # (importorskip). This job installs it and fails on a skip (REQUIRE_MCP, see
+    # tests/conftest.py), so the tool-surface boundary tests cannot rot unseen.
+    name: MCP extra (tool surface)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies and the mcp extra
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip install -e ".[mcp]"
+
+      - name: Run MCP tests
+        run: pytest tests/test_mcp_tools.py tests/test_audit6_auth_failure.py tests/test_t3_trust_boundary.py tests/unit/test_security_review_round3.py -v -p no:randomly -rs
+        env:
+          PYTHONPATH: ${{ env.PYTHONPATH }}
+          CSRF_ENFORCE_BACKEND: 'false'
+          REQUIRE_MCP: '1'
+
   tsc:
     name: TypeScript type check
     runs-on: ubuntu-latest
