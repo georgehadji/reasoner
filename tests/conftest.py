@@ -63,6 +63,30 @@ from reasoner.infrastructure.observability.langfuse_subscriber import reset_lang
 from reasoner.infrastructure.rate_limiter import reset_rate_limiter_state
 from reasoner.token_cache import reset_token_cache
 
+# CI job `mcp-extra` sets REQUIRE_MCP=1: there the optional `mcp` extra is installed,
+# so an importorskip("mcp") that fires means the extra is broken, not absent. Fail the
+# run instead of reporting green with every MCP test skipped (audit 8 WS7-1).
+_MCP_SKIPS: list[str] = []
+
+
+def _note_mcp_skip(report) -> None:
+    if os.environ.get("REQUIRE_MCP") == "1" and report.skipped and "mcp" in str(report.longrepr):
+        _MCP_SKIPS.append(report.nodeid)
+
+
+def pytest_collectreport(report):
+    _note_mcp_skip(report)
+
+
+def pytest_runtest_logreport(report):
+    _note_mcp_skip(report)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    if _MCP_SKIPS:
+        print(f"\nREQUIRE_MCP=1 but {len(_MCP_SKIPS)} MCP test(s) were skipped: {_MCP_SKIPS[:5]}")
+        session.exitstatus = 1
+
 # The port is a process-global injected by each composition root (api/__init__.py,
 # main.py, headless.py). Tests have no composition root, so anything reaching
 # get_model_registry_port() raised "ModelRegistryPort not injected" unless some

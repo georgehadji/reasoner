@@ -12,7 +12,10 @@ import time
 
 try:
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+    _PROMETHEUS_AVAILABLE = True
 except Exception:
+    _PROMETHEUS_AVAILABLE = False
+
     def generate_latest(*args, **kwargs):
         return b""
     CONTENT_TYPE_LATEST = "text/plain; charset=utf-8"
@@ -20,7 +23,24 @@ except Exception:
 from fastapi import Response
 
 # Re-export all metrics from shared module
+from reasoner.core.settings import settings
 from reasoner.metrics import *  # noqa: F401, F403
+
+
+def require_metrics_backend(environment: str, available: bool | None = None) -> None:
+    """Refuse to boot in production without prometheus_client.
+
+    Without it every metric is a no-op and /api/metrics answers with an empty body,
+    which a scraper reads as a healthy, idle service.
+    """
+    ok = _PROMETHEUS_AVAILABLE if available is None else available
+    if environment == "production" and not ok:
+        raise RuntimeError(
+            "prometheus_client is not installed: metrics would be silently empty in production."
+        )
+
+
+require_metrics_backend(settings.ENVIRONMENT)
 
 
 async def metrics_endpoint() -> Response:

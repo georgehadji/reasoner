@@ -88,6 +88,11 @@ class LangfuseSubscriber:
         self._active_traces: dict[str, Any] = {}
         self._active_spans: dict[str, Any] = {}
 
+    @property
+    def is_enabled(self) -> bool:
+        """True when the SDK imported and the client was created."""
+        return _is_langfuse_enabled
+
     async def handle_llm_generation_completed(self, event: LLMGenerationCompleted) -> None:
         if not _is_langfuse_enabled or _langfuse_client is None: return
 

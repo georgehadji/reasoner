@@ -531,16 +531,18 @@ async def init_default_subscribers(bus: EventBus | None = None) -> None:
 
     # Initialize and register Langfuse subscriber if enabled
     # Check if Langfuse keys are set in environment variables
+    # Optional: a subscriber that cannot start is logged and skipped, never fatal to the lifespan.
     if settings.LANGFUSE_PUBLIC_KEY and settings.LANGFUSE_SECRET_KEY:
-        langfuse_subscriber = await get_langfuse_subscriber()
-        # The _is_langfuse_enabled check is now inside the get_langfuse_subscriber factory
-        # We only proceed if an active subscriber is returned.
-        if langfuse_subscriber._is_langfuse_enabled:
-            bus.subscribe(PipelineEventType.LLM_GENERATION_COMPLETED, langfuse_subscriber.handle_llm_generation_completed)
-            bus.subscribe(PipelineEventType.PIPELINE_STARTED, langfuse_subscriber.handle_pipeline_started)
-            bus.subscribe(PipelineEventType.PIPELINE_COMPLETED, langfuse_subscriber.handle_pipeline_completed)
-            bus.subscribe(PipelineEventType.PIPELINE_FAILED, langfuse_subscriber.handle_pipeline_failed)
-            logger.info("Langfuse subscriber registered with EventBus.")
+        try:
+            langfuse_subscriber = await get_langfuse_subscriber()
+            if langfuse_subscriber.is_enabled:
+                bus.subscribe(PipelineEventType.LLM_GENERATION_COMPLETED, langfuse_subscriber.handle_llm_generation_completed)
+                bus.subscribe(PipelineEventType.PIPELINE_STARTED, langfuse_subscriber.handle_pipeline_started)
+                bus.subscribe(PipelineEventType.PIPELINE_COMPLETED, langfuse_subscriber.handle_pipeline_completed)
+                bus.subscribe(PipelineEventType.PIPELINE_FAILED, langfuse_subscriber.handle_pipeline_failed)
+                logger.info("Langfuse subscriber registered with EventBus.")
+        except Exception as exc:
+            logger.warning("Langfuse subscriber skipped: %s", exc)
 
     # ── Transactional Email Notifications (P2.14) ──
     _register_notification_subscriber(bus)
